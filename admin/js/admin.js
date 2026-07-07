@@ -75,7 +75,6 @@
 
   /* ---------------- boot & auth ---------------- */
   async function boot() {
-    $("#adminEmail").value = CFG.ADMIN_EMAIL || "";
     $("#brandSeason").textContent = CFG.EVENT.season;
 
     if (!LIVE || !window.supabase) {
@@ -86,9 +85,51 @@
       $("#btnLogin").disabled = true;
       return;
     }
-    sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+    $("#authProject").textContent =
+      "Connected to " + new URL(CFG.SUPABASE_URL).hostname;
+
+    // Session lives in sessionStorage only — nothing persists after the
+    // tab closes, and nothing is written to localStorage.
+    sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
+      auth: {
+        storage: window.sessionStorage,
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    });
     const { data } = await sb.auth.getSession();
     if (data.session) enterDash(data.session.user);
+  }
+
+  function friendlyAuthError(error) {
+    const m = error.message || String(error);
+    const ref = new URL(CFG.SUPABASE_URL).hostname.split(".")[0];
+    if (/invalid login credentials/i.test(m)) {
+      return (
+        "Invalid credentials. Confirm this exact user exists in project “" + ref +
+        "” under Authentication → Users and the password matches. Running " +
+        "supabase/create-admin.sql in the SQL Editor creates or resets the account."
+      );
+    }
+    if (/email not confirmed/i.test(m)) {
+      return (
+        "Email not confirmed. In Supabase → Authentication → Users open the user " +
+        "and confirm the email — or recreate it with “Auto Confirm User” ticked."
+      );
+    }
+    if (/logins? (are )?disabled|signups? not allowed/i.test(m)) {
+      return (
+        "Email sign-in appears disabled. Enable the Email provider under " +
+        "Supabase → Authentication → Sign In / Providers."
+      );
+    }
+    if (/failed to fetch|network|load failed/i.test(m)) {
+      return (
+        "Can't reach Supabase from this browser. Check your connection and that " +
+        "project “" + ref + "” isn't paused."
+      );
+    }
+    return m;
   }
 
   $("#loginForm").addEventListener("submit", async (e) => {
@@ -97,16 +138,17 @@
     const btn = $("#btnLogin");
     busy(btn, true);
     const { data, error } = await sb.auth.signInWithPassword({
-      email: $("#adminEmail").value.trim(),
+      email: $("#adminEmail").value.trim().toLowerCase(),
       password: $("#adminPass").value,
     });
     busy(btn, false);
-    if (error) return alertBox($("#authAlert"), error.message);
+    if (error) return alertBox($("#authAlert"), friendlyAuthError(error));
     enterDash(data.user);
   });
 
   $("#btnLogout").addEventListener("click", async () => {
     await sb.auth.signOut();
+    sessionStorage.clear();
     location.reload();
   });
 

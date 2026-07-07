@@ -14,9 +14,6 @@ window.MPL_ADMIN_CONFIG = {
 
   STORAGE_BUCKET: "registrations",
 
-  /* Prefilled on the login screen (password is never stored here) */
-  ADMIN_EMAIL: "ishanvashistha.1993@gmail.com",
-
   EVENT: {
     name: "Monsoon Pickle League",
     season: "Season 1",

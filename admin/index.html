@@ -16,7 +16,7 @@
 
   <!-- ==================== LOGIN ==================== -->
   <div class="auth-wrap" id="authWrap">
-    <form class="auth-card" id="loginForm">
+    <form class="auth-card" id="loginForm" autocomplete="off">
       <div class="auth-badge" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
       </div>
@@ -25,11 +25,11 @@
 
       <div class="field">
         <label for="adminEmail">Email</label>
-        <input type="email" id="adminEmail" autocomplete="username" placeholder="you@club.com" required />
+        <input type="email" id="adminEmail" autocomplete="off" placeholder="you@club.com" required />
       </div>
       <div class="field">
         <label for="adminPass">Password</label>
-        <input type="password" id="adminPass" autocomplete="current-password" placeholder="••••••••" required />
+        <input type="password" id="adminPass" autocomplete="new-password" placeholder="••••••••" required />
       </div>
 
       <div class="alert" id="authAlert" role="alert"></div>
@@ -38,6 +38,7 @@
         <span class="spin" aria-hidden="true"></span><span class="btn-label">Sign In</span>
       </button>
       <p class="auth-fine">Access is restricted to tournament staff. Accounts are managed in Supabase → Authentication.</p>
+      <p class="auth-fine" id="authProject" style="margin-top:8px"></p>
     </form>
   </div>
 
