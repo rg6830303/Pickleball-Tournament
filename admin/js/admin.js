@@ -142,8 +142,93 @@
       password: $("#adminPass").value,
     });
     busy(btn, false);
-    if (error) return alertBox($("#authAlert"), friendlyAuthError(error));
+    if (error) {
+      alertBox($("#authAlert"), friendlyAuthError(error));
+      // offer the one-time inline setup whenever sign-in is rejected
+      $("#btnRepairToggle").hidden = false;
+      return;
+    }
     enterDash(data.user);
+  });
+
+  /* ---- inline first-time account setup (uses the secret key) ---- */
+  $("#btnRepairToggle").addEventListener("click", () => {
+    $("#repairPanel").hidden = false;
+    $("#btnRepairToggle").hidden = true;
+    $("#repairKey").focus();
+  });
+
+  async function adminApi(key, path, opts = {}) {
+    return fetch(CFG.SUPABASE_URL + path, {
+      ...opts,
+      headers: {
+        apikey: key,
+        Authorization: "Bearer " + key,
+        "Content-Type": "application/json",
+        ...(opts.headers || {}),
+      },
+    });
+  }
+
+  async function findAuthUser(key, email) {
+    for (let page = 1; page <= 10; page++) {
+      const r = await adminApi(key, `/auth/v1/admin/users?page=${page}&per_page=100`);
+      if (!r.ok) {
+        const body = await r.text();
+        throw new Error(
+          r.status === 401 || r.status === 403
+            ? "That key was rejected. Use the service_role JWT or sb_secret_ key from Project Settings → API keys (not the anon key)."
+            : `Auth admin API error ${r.status}: ${body.slice(0, 120)}`
+        );
+      }
+      const data = await r.json();
+      const users = data.users || data || [];
+      const hit = users.find((u) => (u.email || "").toLowerCase() === email);
+      if (hit) return hit;
+      if (users.length < 100) return null;
+    }
+    return null;
+  }
+
+  $("#btnRepairRun").addEventListener("click", async () => {
+    const btn = $("#btnRepairRun");
+    const email = $("#adminEmail").value.trim().toLowerCase();
+    const pass = $("#adminPass").value;
+    const key = $("#repairKey").value.trim();
+
+    if (!email || !/@/.test(email))
+      return alertBox($("#repairAlert"), "Enter the admin email in the field above first.");
+    if (pass.length < 6)
+      return alertBox($("#repairAlert"), "Type the password you want (min 6 characters) in the field above first.");
+    if (!(key.startsWith("sb_secret_") || key.startsWith("eyJ")))
+      return alertBox($("#repairAlert"), "Paste your secret key (starts with sb_secret_ or eyJ).");
+
+    busy(btn, true);
+    try {
+      const existing = await findAuthUser(key, email);
+      if (existing) {
+        const r = await adminApi(key, `/auth/v1/admin/users/${existing.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ password: pass, email_confirm: true, ban_duration: "none" }),
+        });
+        if (!r.ok) throw new Error((await r.json()).msg || `reset failed (${r.status})`);
+      } else {
+        const r = await adminApi(key, "/auth/v1/admin/users", {
+          method: "POST",
+          body: JSON.stringify({ email, password: pass, email_confirm: true }),
+        });
+        if (!r.ok) throw new Error((await r.json()).msg || `create failed (${r.status})`);
+      }
+
+      // account is ready — sign in for real
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error) throw new Error("Account set up, but sign-in still failed: " + error.message);
+      enterDash(data.user);
+    } catch (err) {
+      alertBox($("#repairAlert"), err.message || String(err));
+    } finally {
+      busy(btn, false);
+    }
   });
 
   $("#btnLogout").addEventListener("click", async () => {

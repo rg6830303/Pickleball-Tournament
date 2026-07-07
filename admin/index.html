@@ -37,10 +37,35 @@
       <button type="submit" class="btn-primary" id="btnLogin">
         <span class="spin" aria-hidden="true"></span><span class="btn-label">Sign In</span>
       </button>
+
+      <button type="button" class="repair-toggle" id="btnRepairToggle" hidden>
+        ⚡ First time here, or can't sign in? Set up my login →
+      </button>
+
+      <!-- Inline one-time account setup: creates + confirms the admin account
+           using your Supabase secret key, then signs you straight in. -->
+      <div class="repair-panel" id="repairPanel" hidden>
+        <p class="repair-title">One-time login setup</p>
+        <p class="repair-help">
+          Paste your Supabase <b>secret key</b> (Project Settings → API keys →
+          <code>service_role</code> or <code>sb_secret_…</code>). It's used in this
+          tab only — never stored. This creates the account for the email &amp;
+          password above (or resets them), confirms the email, and signs you in.
+        </p>
+        <div class="field">
+          <label for="repairKey">Supabase secret key</label>
+          <input type="password" id="repairKey" autocomplete="off" placeholder="service_role JWT or sb_secret_…" />
+        </div>
+        <div class="alert" id="repairAlert" role="alert"></div>
+        <button type="button" class="btn-primary" id="btnRepairRun">
+          <span class="spin" aria-hidden="true"></span><span class="btn-label">Create login &amp; sign in</span>
+        </button>
+      </div>
+
       <p class="auth-fine">Access is restricted to tournament staff. Accounts are managed in Supabase → Authentication.</p>
       <p class="auth-fine" id="authProject" style="margin-top:8px"></p>
       <p class="auth-fine" style="margin-top:8px">
-        Trouble signing in? <a href="setup.html" style="color:var(--red); text-decoration:none">Run Setup &amp; Diagnostics →</a>
+        Need full backend checks? <a href="setup.html" style="color:var(--red); text-decoration:none">Open Setup &amp; Diagnostics →</a>
       </p>
     </form>
   </div>
