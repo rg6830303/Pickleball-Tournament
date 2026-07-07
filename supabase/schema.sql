@@ -156,11 +156,16 @@ create policy "staff can replace registration images"
   to authenticated
   using (bucket_id = 'registrations');
 
--- Bucket is public-read so image URLs work in the admin panel & player cards.
+-- Image reads: the bucket's `public` flag already serves any *known* object URL
+-- (that's how the admin panel loads thumbnails), so we do NOT grant the anon role
+-- a blanket SELECT here. Without it, an anonymous visitor cannot LIST/enumerate
+-- the bucket — so profile photos and payment screenshots can't be scraped, even
+-- though staff and known direct URLs keep working. Only signed-in staff may list.
 drop policy if exists "public can view registration images" on storage.objects;
-create policy "public can view registration images"
+drop policy if exists "staff can view registration images" on storage.objects;
+create policy "staff can view registration images"
   on storage.objects for select
-  to public
+  to authenticated
   using (bucket_id = 'registrations');
 
 -- Staff may clean up images.

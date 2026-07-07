@@ -15,6 +15,8 @@
   let editingId = null;   // null = add mode
   let freshIds = new Set();
   let confirmAction = null;
+  let gridFocused = false; // a spreadsheet cell currently has focus
+  let gridDirty = false;   // a realtime change arrived while editing → re-render on blur
 
   /* ---------------- utilities ---------------- */
   const esc = (s) =>
@@ -260,10 +262,6 @@
       mSize.insertAdjacentHTML("beforeend", `<option>${esc(s)}</option>`)
     );
 
-    $("#lnkSupabase").href = `https://supabase.com/dashboard/project/${
-      new URL(CFG.SUPABASE_URL).hostname.split(".")[0]
-    }`;
-
     load();
     loadSettings();
     startRealtime();
@@ -277,6 +275,7 @@
         x.setAttribute("aria-selected", x === t ? "true" : "false");
       });
       $$(".tabpane").forEach((p) => (p.hidden = p.id !== `tab-${t.dataset.tab}`));
+      if (t.dataset.tab === "grid") renderGrid();
     })
   );
 
@@ -294,6 +293,7 @@
     rows = data || [];
     render();
     renderDbFacts();
+    renderGrid();
   }
   $("#btnRefresh").addEventListener("click", () => {
     load();
@@ -320,6 +320,9 @@
             }
             render();
             renderDbFacts();
+            // don't rebuild the sheet under the user's cursor — defer if editing
+            if (gridFocused) gridDirty = true;
+            else renderGrid();
           }
         )
         .subscribe((status) => {
@@ -414,6 +417,148 @@
       <li>Rows <b>${rows.length}</b></li>
       <li>Latest entry <b>${latest ? esc(latest.full_name) + " · " + new Date(latest.created_at).toLocaleString() : "—"}</b></li>`;
   }
+
+  /* ---------------- FULL TABLE: live, Excel-style editable grid ---------------- */
+  const GRID_COLS = [
+    { key: "reg_code",             label: "Reg Code",   type: "code" },
+    { key: "created_at",           label: "Created",    type: "date" },
+    { key: "full_name",            label: "Name",       type: "text" },
+    { key: "phone",                label: "Phone",      type: "text" },
+    { key: "email",                label: "Email",      type: "text" },
+    { key: "gender",               label: "Gender",     type: "select", opts: ["Male", "Female", "Other"] },
+    { key: "dupr",                 label: "DUPR",       type: "number" },
+    { key: "category",             label: "Category",   type: "select", opts: CFG.EVENT.categories },
+    { key: "partner_name",         label: "Partner",    type: "text" },
+    { key: "jersey_size",          label: "Size",       type: "select", opts: CFG.JERSEY_SIZES },
+    { key: "jersey_name",          label: "Jersey",     type: "text" },
+    { key: "payment_method",       label: "Pay",        type: "select", opts: ["Online", "Cash"] },
+    { key: "status",               label: "Status",     type: "status", opts: CFG.STATUSES },
+    { key: "profile_pic_url",      label: "Photo",      type: "img" },
+    { key: "payment_screenshot_url", label: "Screenshot", type: "img" },
+  ];
+
+  function gridFiltered() {
+    const q = ($("#gq").value || "").trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      `${r.full_name} ${r.phone} ${r.reg_code} ${r.email || ""} ${r.partner_name || ""} ${r.jersey_name || ""}`
+        .toLowerCase()
+        .includes(q)
+    );
+  }
+
+  function gridCell(r, col) {
+    const v = r[col.key];
+    const idf = `data-id="${esc(r.id)}" data-field="${col.key}"`;
+    switch (col.type) {
+      case "code":
+        return `<span class="g-code">${esc(v)}</span>`;
+      case "date":
+        return `<span class="g-ro">${v ? new Date(v).toLocaleString() : "—"}</span>`;
+      case "number":
+        return `<input class="g-in g-num" type="number" step="0.001" min="0" max="8" value="${v ?? ""}" ${idf} />`;
+      case "select":
+        return `<select class="g-sel" ${idf}>${col.opts
+          .map((o) => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`)
+          .join("")}</select>`;
+      case "status":
+        return `<select class="g-sel g-status s-${esc(v)}" ${idf}>${col.opts
+          .map((o) => `<option value="${o}" ${o === v ? "selected" : ""}>${o}</option>`)
+          .join("")}</select>`;
+      case "img":
+        return v
+          ? `<img class="g-thumb" src="${esc(v)}" alt="" data-zoom="${esc(v)}" loading="lazy" />`
+          : `<span class="g-ro">—</span>`;
+      default:
+        return `<input class="g-in" value="${esc(v ?? "")}" ${idf} autocomplete="off" spellcheck="false" />`;
+    }
+  }
+
+  function renderGrid() {
+    const head = $("#gridHead");
+    if (!head) return;
+    head.innerHTML =
+      GRID_COLS.map((c) => `<th>${c.label}</th>`).join("") + `<th class="th-actions">·</th>`;
+    const list = gridFiltered();
+    $("#gridEmpty").hidden = list.length > 0;
+    $("#gridEmpty").textContent = rows.length ? "No rows match your filter." : "No registrations yet.";
+    $("#gridBody").innerHTML = list
+      .map(
+        (r) =>
+          `<tr data-id="${esc(r.id)}">${GRID_COLS.map(
+            (c) => `<td class="g-td g-${c.type}">${gridCell(r, c)}</td>`
+          ).join("")}<td class="g-td g-actions">
+            <button type="button" class="icon-btn del" data-del="${esc(r.id)}" title="Delete entry" aria-label="Delete">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            </button></td></tr>`
+      )
+      .join("");
+  }
+
+  async function commitCell(el) {
+    const id = el.dataset.id;
+    const field = el.dataset.field;
+    const row = rows.find((r) => r.id === id);
+    if (!row) return;
+
+    let value = el.value;
+    if (field === "dupr") value = value === "" ? null : Number(value);
+    else if (field === "email" || field === "partner_name") value = value.trim() || null;
+    else if (field === "jersey_name") value = value.trim().toUpperCase();
+    else if (typeof value === "string") value = value.trim();
+
+    if ((row[field] ?? null) === (value ?? null)) return; // no change → skip write
+
+    el.classList.add("g-saving");
+    const { error } = await sb.from("registrations").update({ [field]: value }).eq("id", id);
+    el.classList.remove("g-saving");
+    if (error) {
+      toast("Couldn't save: " + error.message, "err");
+      el.value = row[field] ?? "";               // revert the cell to the stored value
+      el.classList.add("g-err");
+      setTimeout(() => el.classList.remove("g-err"), 1200);
+      return;
+    }
+    row[field] = value;
+    if (field === "jersey_name") el.value = value;                 // reflect UPPERCASE
+    if (el.classList.contains("g-status")) el.className = "g-sel g-status s-" + value;
+    el.classList.add("g-ok");
+    setTimeout(() => el.classList.remove("g-ok"), 900);
+    renderStats();
+    renderDbFacts();
+  }
+
+  const gridBody = $("#gridBody");
+  if (gridBody) {
+    gridBody.addEventListener("change", (e) => {
+      const el = e.target.closest("[data-id][data-field]");
+      if (el) commitCell(el);
+    });
+    gridBody.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target.matches(".g-in")) {
+        e.preventDefault();
+        e.target.blur();               // commit on Enter, Excel-style
+      }
+    });
+    gridBody.addEventListener("focusin", () => (gridFocused = true));
+    gridBody.addEventListener("focusout", () => {
+      gridFocused = false;
+      // let focus settle: if the user simply tabbed to the next cell, stay put.
+      // Only rebuild once focus has truly left the sheet and realtime changes
+      // arrived while editing.
+      setTimeout(() => {
+        if (!gridFocused && gridDirty) {
+          gridDirty = false;
+          renderGrid();
+        }
+      }, 0);
+    });
+  }
+  $("#gq").addEventListener("input", renderGrid);
+  $("#btnGridAdd").addEventListener("click", () => openModal(null));
+  $("#btnGridCsv").addEventListener("click", () =>
+    exportCsv(gridFiltered(), `mpl-registrations-${stamp()}.csv`)
+  );
 
   /* ---------------- inline status change ---------------- */
   document.addEventListener("change", async (e) => {

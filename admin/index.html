@@ -92,6 +92,7 @@
 
     <nav class="tabs" role="tablist">
       <button class="tab on" data-tab="registrations" role="tab" aria-selected="true">Registrations</button>
+      <button class="tab" data-tab="grid" role="tab" aria-selected="false">Full Table (Live)</button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">Event Controls</button>
     </nav>
 
@@ -138,6 +139,28 @@
       </section>
     </section>
 
+    <!-- ---------- TAB: FULL TABLE (live editable spreadsheet) ---------- -->
+    <section class="tabpane" id="tab-grid" hidden>
+      <section class="toolbar">
+        <div class="filters">
+          <input type="search" id="gq" placeholder="Filter the sheet — name / phone / reg code / email…" />
+        </div>
+        <div class="toolbar-actions">
+          <span class="grid-hint">Click any cell to edit · saves instantly · updates live</span>
+          <button class="btn-mini" id="btnGridCsv" type="button">⬇ Download CSV</button>
+          <button class="btn-primary sm" id="btnGridAdd" type="button">＋ Add Entry</button>
+        </div>
+      </section>
+
+      <section class="grid-wrap">
+        <table class="grid">
+          <thead><tr id="gridHead"></tr></thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+        <p class="empty" id="gridEmpty" hidden>No registrations yet.</p>
+      </section>
+    </section>
+
     <!-- ---------- TAB: EVENT CONTROLS ---------- -->
     <section class="tabpane" id="tab-settings" hidden>
       <div class="settings-grid">
@@ -167,7 +190,6 @@
           <ul class="db-facts" id="dbFacts"></ul>
           <div class="panel-actions">
             <button class="btn-mini" id="btnCsvAll" type="button">⬇ Export full CSV backup</button>
-            <a class="btn-mini ghost" id="lnkSupabase" href="#" target="_blank" rel="noopener">Open Supabase dashboard ↗</a>
           </div>
         </div>
 

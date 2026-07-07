@@ -541,11 +541,10 @@
         const { error } = await sb.from("registrations").insert(record);
         if (error) throw error;
       } else {
-        // demo mode: persist locally so the flow is fully testable
+        // demo mode (backend not configured): simulate the round-trip only.
+        // No player data is ever written to this browser — nothing is stored
+        // in localStorage, sessionStorage, cookies or IndexedDB.
         await new Promise((r) => setTimeout(r, 1400));
-        const store = JSON.parse(localStorage.getItem("mpl_demo") || "[]");
-        store.push({ ...record, created_at: new Date().toISOString() });
-        localStorage.setItem("mpl_demo", JSON.stringify(store));
       }
       showSuccess(record);
     } catch (err) {
