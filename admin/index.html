@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MPL Console — Monsoon Pickle League</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#070707" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='84' height='84' rx='18' fill='%23e5262d'/%3E%3Cpath d='M30 52l14 14 26-30' stroke='%23070707' stroke-width='10' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+
+  <!-- ==================== LOGIN ==================== -->
+  <div class="auth-wrap" id="authWrap">
+    <form class="auth-card" id="loginForm">
+      <div class="auth-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <p class="auth-kicker">Monsoon Pickle League</p>
+      <h1 class="auth-title">Organiser Console</h1>
+
+      <div class="field">
+        <label for="adminEmail">Email</label>
+        <input type="email" id="adminEmail" autocomplete="username" placeholder="you@club.com" required />
+      </div>
+      <div class="field">
+        <label for="adminPass">Password</label>
+        <input type="password" id="adminPass" autocomplete="current-password" placeholder="••••••••" required />
+      </div>
+
+      <div class="alert" id="authAlert" role="alert"></div>
+
+      <button type="submit" class="btn-primary" id="btnLogin">
+        <span class="spin" aria-hidden="true"></span><span class="btn-label">Sign In</span>
+      </button>
+      <p class="auth-fine">Access is restricted to tournament staff. Accounts are managed in Supabase → Authentication.</p>
+    </form>
+  </div>
+
+  <!-- ==================== CONSOLE ==================== -->
+  <div class="dash" id="dash" hidden>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <p class="brand-league">Monsoon Pickle League</p>
+          <p class="brand-sub">Organiser Console · <span id="brandSeason"></span></p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="live-dot" id="liveDot" title="Realtime connection">
+          <i></i><span id="liveLabel">connecting…</span>
+        </span>
+        <span class="whoami" id="whoami"></span>
+        <button class="btn-mini ghost" id="btnLogout" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab on" data-tab="registrations" role="tab" aria-selected="true">Registrations</button>
+      <button class="tab" data-tab="settings" role="tab" aria-selected="false">Event Controls</button>
+    </nav>
+
+    <!-- ---------- TAB: REGISTRATIONS ---------- -->
+    <section class="tabpane" id="tab-registrations">
+
+      <section class="stats" id="stats" aria-label="Registration statistics"></section>
+
+      <section class="toolbar">
+        <div class="filters">
+          <input type="search" id="q" placeholder="Search name / phone / reg code…" />
+          <select id="fCat"><option value="">All categories</option></select>
+          <select id="fPay">
+            <option value="">All payments</option>
+            <option>Online</option>
+            <option>Cash</option>
+          </select>
+          <select id="fStatus"><option value="">All statuses</option></select>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn-mini" id="btnRefresh" type="button">↻ Refresh</button>
+          <button class="btn-mini" id="btnCsv" type="button">⬇ CSV</button>
+          <button class="btn-primary sm" id="btnAdd" type="button">＋ Add Entry</button>
+        </div>
+      </section>
+
+      <section class="table-wrap">
+        <table class="regs">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Contact</th>
+              <th>Category</th>
+              <th>DUPR</th>
+              <th>Jersey</th>
+              <th>Payment</th>
+              <th>Status</th>
+              <th class="th-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="regBody"></tbody>
+        </table>
+        <p class="empty" id="emptyMsg" hidden>No registrations match.</p>
+      </section>
+    </section>
+
+    <!-- ---------- TAB: EVENT CONTROLS ---------- -->
+    <section class="tabpane" id="tab-settings" hidden>
+      <div class="settings-grid">
+
+        <div class="panel">
+          <h2 class="panel-title">Registration Window</h2>
+          <p class="panel-sub">Instantly open or close the public registration form.</p>
+          <label class="switch-row">
+            <span class="switch">
+              <input type="checkbox" id="setOpen" />
+              <i></i>
+            </span>
+            <span class="switch-label" id="setOpenLabel">Registrations are open</span>
+          </label>
+          <div class="field" style="margin-top:18px">
+            <label for="setBanner">Announcement banner <span class="hint">(shown on the form; leave empty to hide)</span></label>
+            <input type="text" id="setBanner" maxlength="140" placeholder="e.g. Only 8 doubles slots left!" />
+          </div>
+          <button class="btn-primary sm" id="btnSaveSettings" type="button" style="margin-top:6px">
+            <span class="spin" aria-hidden="true"></span><span class="btn-label">Save Controls</span>
+          </button>
+        </div>
+
+        <div class="panel">
+          <h2 class="panel-title">Database</h2>
+          <p class="panel-sub">Everything below acts directly on your Supabase project.</p>
+          <ul class="db-facts" id="dbFacts"></ul>
+          <div class="panel-actions">
+            <button class="btn-mini" id="btnCsvAll" type="button">⬇ Export full CSV backup</button>
+            <a class="btn-mini ghost" id="lnkSupabase" href="#" target="_blank" rel="noopener">Open Supabase dashboard ↗</a>
+          </div>
+        </div>
+
+        <div class="panel danger">
+          <h2 class="panel-title">Danger Zone</h2>
+          <p class="panel-sub">Bulk actions are permanent. A confirmation is required.</p>
+          <div class="panel-actions">
+            <button class="btn-mini danger" id="btnPurgeRejected" type="button">Delete all rejected entries</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <!-- ==================== ENTRY EDITOR MODAL ==================== -->
+  <div class="modal-veil" id="modalVeil" hidden>
+    <form class="modal" id="entryForm" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modal-head">
+        <h2 id="modalTitle">Add Entry</h2>
+        <button type="button" class="modal-x" id="btnModalClose" aria-label="Close">✕</button>
+      </header>
+
+      <div class="modal-body">
+        <div class="mgrid">
+          <div class="field span2">
+            <label for="mName">Player's Name *</label>
+            <input type="text" id="mName" required />
+          </div>
+          <div class="field">
+            <label for="mPhone">Phone *</label>
+            <input type="tel" id="mPhone" required />
+          </div>
+          <div class="field">
+            <label for="mEmail">Email</label>
+            <input type="email" id="mEmail" />
+          </div>
+          <div class="field">
+            <label for="mGender">Gender *</label>
+            <select id="mGender" required>
+              <option>Male</option><option>Female</option><option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="mDupr">DUPR</label>
+            <input type="number" id="mDupr" step="0.001" min="0" max="8" placeholder="unrated" />
+          </div>
+          <div class="field">
+            <label for="mCategory">Category *</label>
+            <select id="mCategory" required></select>
+          </div>
+          <div class="field">
+            <label for="mPartner">Partner</label>
+            <input type="text" id="mPartner" placeholder="doubles only" />
+          </div>
+          <div class="field">
+            <label for="mSize">Jersey Size *</label>
+            <select id="mSize" required></select>
+          </div>
+          <div class="field">
+            <label for="mJName">Name on Jersey *</label>
+            <input type="text" id="mJName" maxlength="12" required />
+          </div>
+          <div class="field">
+            <label for="mPay">Payment *</label>
+            <select id="mPay"><option>Online</option><option>Cash</option></select>
+          </div>
+          <div class="field">
+            <label for="mStatus">Status *</label>
+            <select id="mStatus"></select>
+          </div>
+
+          <div class="field span2 img-fields">
+            <div>
+              <label for="mProfileFile">Profile picture</label>
+              <div class="img-edit">
+                <img id="mProfileThumb" alt="" hidden />
+                <input type="file" id="mProfileFile" accept="image/*" />
+              </div>
+            </div>
+            <div>
+              <label for="mShotFile">Payment screenshot</label>
+              <div class="img-edit">
+                <img id="mShotThumb" alt="" hidden />
+                <input type="file" id="mShotFile" accept="image/*" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert" id="modalAlert" role="alert"></div>
+      </div>
+
+      <footer class="modal-foot">
+        <button type="button" class="btn-mini ghost" id="btnModalCancel">Cancel</button>
+        <button type="submit" class="btn-primary sm" id="btnModalSave">
+          <span class="spin" aria-hidden="true"></span><span class="btn-label">Save Entry</span>
+        </button>
+      </footer>
+    </form>
+  </div>
+
+  <!-- ==================== CONFIRM DIALOG ==================== -->
+  <div class="modal-veil" id="confirmVeil" hidden>
+    <div class="modal confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirmMsg">
+      <p id="confirmMsg" class="confirm-msg"></p>
+      <div class="modal-foot">
+        <button type="button" class="btn-mini ghost" id="btnConfirmNo">Cancel</button>
+        <button type="button" class="btn-mini danger" id="btnConfirmYes">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== LIGHTBOX / TOASTS ==================== -->
+  <div class="lightbox" id="lightbox" hidden><img alt="Attachment preview" id="lightboxImg" /></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="js/config.js"></script>
+  <script src="js/admin.js" defer></script>
+</body>
+</html>

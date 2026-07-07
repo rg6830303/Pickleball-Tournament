@@ -181,6 +181,7 @@ input, select, textarea { font-family: inherit; }
 .page {
   display: none;
   min-height: 100vh;
+  min-height: 100svh;
 }
 .page.active { display: block; }
 .page.enter { animation: pageIn 0.75s var(--ease-out) both; }
@@ -293,6 +294,16 @@ input, select, textarea { font-family: inherit; }
 }
 .meta-chip svg { width: 15px; height: 15px; stroke: var(--red); flex: none; }
 .meta-chip b { color: var(--text); font-weight: 600; }
+
+/* small phones: keep chips + hero airy, never clipped */
+@media (max-width: 390px) {
+  .meta-chip { font-size: 11px; padding: 8px 13px; letter-spacing: 0.1em; }
+  .hero { padding-top: 48px; }
+  .hero-kicker { letter-spacing: 0.45em; text-indent: 0.45em; }
+  .hero-sub { letter-spacing: 0.42em; text-indent: 0.42em; }
+  .btn-lock { font-size: 16px; letter-spacing: 0.24em; text-indent: 0.24em; }
+  .seg .seg-btn { font-size: 14px; letter-spacing: 0.14em; }
+}
 
 .hero-scroll {
   margin: 44px auto 0;
@@ -415,7 +426,7 @@ input, select, textarea { font-family: inherit; }
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-size: 15.5px;
+  font-size: 16px; /* ≥16px prevents iOS Safari from zooming on focus */
   padding: 14px 16px;
   outline: none;
   transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
@@ -754,6 +765,33 @@ input, select, textarea { font-family: inherit; }
 }
 .field.error .ferr { display: block; }
 
+/* organiser banner + closed state */
+.form-banner {
+  margin: 0 0 22px;
+  border: 1px solid rgba(229,38,45,0.5);
+  background: linear-gradient(90deg, rgba(229,38,45,0.13), rgba(229,38,45,0.05));
+  border-radius: var(--radius-sm);
+  padding: 13px 17px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffd7d8;
+  letter-spacing: 0.02em;
+  animation: pageIn 0.6s var(--ease-out) both;
+}
+.closed-note {
+  margin: 0 0 22px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  font-size: 14px;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.closed-note b { color: var(--text); }
+
 /* demo-mode ribbon */
 .demo-note {
   display: none;
@@ -897,6 +935,7 @@ input, select, textarea { font-family: inherit; }
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100svh;
   padding-top: 48px;
   padding-bottom: 48px;
 }

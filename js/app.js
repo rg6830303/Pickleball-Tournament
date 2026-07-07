@@ -84,8 +84,34 @@
   function initBackend() {
     if (LIVE && window.supabase) {
       sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+      loadEventSettings();
     } else if (!LIVE) {
       $("#demoNote").classList.add("show");
+    }
+  }
+
+  /* organiser controls from the admin console (event_settings table) */
+  async function loadEventSettings() {
+    try {
+      const { data } = await sb
+        .from("event_settings")
+        .select("registration_open, banner_message")
+        .eq("id", 1)
+        .maybeSingle();
+      if (!data) return;
+      if (data.banner_message) {
+        const b = $("#formBanner");
+        b.textContent = data.banner_message;
+        b.hidden = false;
+      }
+      if (!data.registration_open) {
+        $("#closedNote").hidden = false;
+        const btn = $("#btnSubmit");
+        btn.disabled = true;
+        $(".btn-label", btn).textContent = "Registrations Closed";
+      }
+    } catch {
+      /* settings are optional — the form still works without them */
     }
   }
 
