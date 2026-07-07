@@ -469,64 +469,6 @@ input, select, textarea { font-family: inherit; }
   transform: translateY(-1px);
 }
 
-/* category cards */
-.cat-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-@media (max-width: 460px) { .cat-grid { grid-template-columns: 1fr; } }
-.cat {
-  appearance: none;
-  text-align: left;
-  border: 1px solid var(--line);
-  background: var(--panel-2);
-  border-radius: var(--radius-sm);
-  padding: 15px 16px;
-  color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: all 0.22s var(--ease-out);
-}
-.cat .dot {
-  flex: none;
-  width: 16px; height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid var(--line-strong);
-  display: grid;
-  place-items: center;
-  transition: border-color 0.2s;
-}
-.cat .dot::after {
-  content: "";
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: var(--red);
-  transform: scale(0);
-  transition: transform 0.25s var(--ease-spring);
-}
-.cat span { font-size: 14.5px; font-weight: 600; letter-spacing: 0.03em; }
-.cat:hover { border-color: var(--line-strong); color: var(--text); }
-.cat.on {
-  border-color: var(--red);
-  background: rgba(229,38,45,0.10);
-  color: #fff;
-  box-shadow: 0 6px 22px rgba(229,38,45,0.13);
-}
-.cat.on .dot { border-color: var(--red); }
-.cat.on .dot::after { transform: scale(1); }
-
-/* partner field slide-down */
-.slide {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.45s var(--ease-out);
-}
-.slide.open { grid-template-rows: 1fr; }
-.slide > div { overflow: hidden; }
-.slide .field { margin-top: 16px; margin-bottom: 0; }
-
 /* jersey preview */
 .jersey-row {
   display: grid;
@@ -1127,6 +1069,104 @@ input, select, textarea { font-family: inherit; }
   pointer-events: none;
   z-index: 60;
 }
+
+/* ------------------------------------------------------------
+   PICKLEBALL MOTIFS & AMBIENT MOTION
+   ------------------------------------------------------------ */
+.svg-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ambient floating pickleballs — behind all app content (#app is z-index:1) */
+#pickles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pball {
+  position: absolute;
+  color: var(--red);
+  animation: pbob ease-in-out infinite alternate;
+  will-change: transform;
+}
+.pball .pb {
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0.07;
+  animation: pspin linear infinite;
+  filter: drop-shadow(0 6px 20px rgba(229, 38, 45, 0.15));
+}
+@keyframes pbob   { from { transform: translateY(6px); }  to { transform: translateY(-24px); } }
+@keyframes pspin  { to { transform: rotate(360deg); } }
+@keyframes pspinR { to { transform: rotate(-360deg); } }
+
+.p1 { top: 14%; left: 5%;   width: 84px; height: 84px; animation-duration: 6.5s; }
+.p1 .pb { animation-duration: 26s; }
+.p2 { top: 30%; right: 7%;  width: 54px; height: 54px; animation-duration: 5s;   animation-delay: -1.4s; }
+.p2 .pb { animation-name: pspinR; animation-duration: 18s; }
+.p3 { top: 63%; left: 9%;   width: 40px; height: 40px; animation-duration: 7.5s; animation-delay: -3s; }
+.p3 .pb { animation-duration: 22s; }
+.p4 { top: 79%; right: 11%; width: 96px; height: 96px; animation-duration: 8.5s; animation-delay: -2s; }
+.p4 .pb { animation-name: pspinR; animation-duration: 30s; opacity: 0.05; }
+.p5 { top: 46%; right: 27%; width: 30px; height: 30px; animation-duration: 6s;   animation-delay: -0.8s; }
+.p5 .pb { animation-duration: 16s; }
+
+/* hero focal pickleball — kept behind the headline via an isolated context */
+.hero { isolation: isolate; }
+.hero-ball {
+  position: absolute;
+  top: 4px;
+  right: clamp(0px, 5vw, 40px);
+  width: clamp(52px, 15vw, 104px);
+  height: clamp(52px, 15vw, 104px);
+  z-index: -1;
+  color: var(--red);
+  pointer-events: none;
+}
+.hero-ball .pb {
+  width: 100%; height: 100%; display: block;
+  opacity: 0.45;
+  animation: pspin 15s linear infinite;
+  filter: drop-shadow(0 8px 26px rgba(229, 38, 45, 0.3));
+}
+
+/* success celebratory pickleball */
+.win-ball { display: block; width: 56px; height: 56px; margin: 0 auto 8px; color: var(--red); }
+.win-ball .pb {
+  width: 100%; height: 100%; display: block;
+  animation: winBounce 1.15s var(--ease-spring) infinite;
+  filter: drop-shadow(0 10px 22px rgba(229, 38, 45, 0.4));
+}
+@keyframes winBounce {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  30%      { transform: translateY(-22px) rotate(-18deg); }
+  55%      { transform: translateY(0) rotate(6deg); }
+  72%      { transform: translateY(-9px) rotate(-4deg); }
+}
+
+/* section number — pulsing ring */
+.sec-num { position: relative; }
+.sec-num::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid rgba(229, 38, 45, 0.5);
+  animation: secPulse 2.6s ease-out infinite;
+}
+@keyframes secPulse {
+  0%   { transform: scale(0.9);  opacity: 0.7; }
+  70%  { transform: scale(1.35); opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* section divider styled as a court net */
+.sec-line { background: repeating-linear-gradient(90deg, var(--line) 0 7px, transparent 7px 13px); }
+
+/* meta-chip micro-interaction */
+.meta-chip { transition: transform 0.25s var(--ease-out), border-color 0.25s, background 0.25s; }
+.meta-chip:hover { transform: translateY(-2px); border-color: rgba(229, 38, 45, 0.5); background: rgba(16, 16, 18, 0.9); }
 
 /* ------------------------------------------------------------
    REDUCED MOTION

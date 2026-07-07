@@ -27,15 +27,6 @@ window.MPL_CONFIG = {
     tagline: "Champion takes the glory",
     phones: ["+91 80176 72062", "+91 70032 68862"],
 
-    /* Categories offered. `partner: true` reveals a partner-name field. */
-    categories: [
-      { id: "mens-singles",   label: "Men's Singles",   partner: false },
-      { id: "womens-singles", label: "Women's Singles", partner: false },
-      { id: "mens-doubles",   label: "Men's Doubles",   partner: true  },
-      { id: "womens-doubles", label: "Women's Doubles", partner: true  },
-      { id: "mixed-doubles",  label: "Mixed Doubles",   partner: true  },
-    ],
-
     /* Entry fee text shown in the payment card. Edit freely,
        e.g. "₹999 per player · ₹1,798 per doubles team" */
     feeNote: "Pay the entry fee, then attach the screenshot below.",

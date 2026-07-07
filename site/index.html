@@ -23,6 +23,29 @@
   <!-- ambient rain -->
   <canvas id="rain" aria-hidden="true"></canvas>
 
+  <!-- reusable pickleball glyph (ball with holes) -->
+  <svg width="0" height="0" class="svg-sprite" aria-hidden="true" focusable="false">
+    <symbol id="pball" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="4" />
+      <circle cx="38" cy="28" r="5.4" fill="currentColor" />
+      <circle cx="63" cy="26" r="5.4" fill="currentColor" />
+      <circle cx="74" cy="47" r="5.4" fill="currentColor" />
+      <circle cx="51" cy="50" r="5.4" fill="currentColor" />
+      <circle cx="28" cy="50" r="5.4" fill="currentColor" />
+      <circle cx="60" cy="70" r="5.4" fill="currentColor" />
+      <circle cx="37" cy="72" r="5.4" fill="currentColor" />
+    </symbol>
+  </svg>
+
+  <!-- ambient floating pickleballs (spin + drift, purely decorative) -->
+  <div id="pickles" aria-hidden="true">
+    <span class="pball p1"><svg class="pb"><use href="#pball"></use></svg></span>
+    <span class="pball p2"><svg class="pb"><use href="#pball"></use></svg></span>
+    <span class="pball p3"><svg class="pb"><use href="#pball"></use></svg></span>
+    <span class="pball p4"><svg class="pb"><use href="#pball"></use></svg></span>
+    <span class="pball p5"><svg class="pb"><use href="#pball"></use></svg></span>
+  </div>
+
   <!-- ============ SPLASH / LOADING PREVIEW (the poster) ============ -->
   <div id="splash" role="status" aria-label="Loading Monsoon Pickle League">
     <div class="splash-poster-wrap">
@@ -44,6 +67,7 @@
       <div class="shell">
 
         <header class="hero">
+          <span class="hero-ball" aria-hidden="true"><svg class="pb"><use href="#pball"></use></svg></span>
           <p class="hero-presents" id="heroPresents"></p>
           <p class="hero-kicker">Monsoon</p>
           <h1 class="hero-title">Pickle</h1>
@@ -126,34 +150,10 @@
             </div>
           </section>
 
-          <!-- 2 · EVENT -->
+          <!-- 2 · JERSEY -->
           <section class="section reveal">
             <div class="sec-head">
               <span class="sec-num">2</span>
-              <h2 class="sec-title">Event Category</h2>
-              <span class="sec-line"></span>
-            </div>
-
-            <div class="field" data-field="category" style="margin-bottom:0">
-              <div class="cat-grid" id="catGrid" role="radiogroup" aria-label="Event category"></div>
-              <p class="ferr">Please pick your event category.</p>
-            </div>
-
-            <div class="slide" id="partnerSlide">
-              <div>
-                <div class="field" data-field="partner_name">
-                  <label for="partnerName">Partner's Name <span class="req">*</span></label>
-                  <input type="text" id="partnerName" name="partner_name" placeholder="Who's on your side of the net?" />
-                  <p class="ferr">Doubles needs a partner — enter their name.</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- 3 · JERSEY -->
-          <section class="section reveal">
-            <div class="sec-head">
-              <span class="sec-num">3</span>
               <h2 class="sec-title">Jersey</h2>
               <span class="sec-line"></span>
             </div>
@@ -185,10 +185,10 @@
             </div>
           </section>
 
-          <!-- 4 · PROFILE PICTURE -->
+          <!-- 3 · PROFILE PICTURE -->
           <section class="section reveal">
             <div class="sec-head">
-              <span class="sec-num">4</span>
+              <span class="sec-num">3</span>
               <h2 class="sec-title">Profile Picture</h2>
               <span class="sec-line"></span>
             </div>
@@ -220,10 +220,10 @@
             </div>
           </section>
 
-          <!-- 5 · PAYMENT -->
+          <!-- 4 · PAYMENT -->
           <section class="section reveal">
             <div class="sec-head">
-              <span class="sec-num">5</span>
+              <span class="sec-num">4</span>
               <h2 class="sec-title">Payment Option</h2>
               <span class="sec-line"></span>
             </div>
@@ -295,6 +295,7 @@
     <!-- ========================= SUCCESS PAGE ========================= -->
     <main class="page" id="page-success">
       <div class="shell">
+        <span class="win-ball" aria-hidden="true"><svg class="pb"><use href="#pball"></use></svg></span>
         <div class="check-wrap" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5" /></svg>
         </div>

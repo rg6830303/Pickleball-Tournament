@@ -15,9 +15,6 @@
 
   const state = {
     gender: "",
-    category: "",
-    categoryLabel: "",
-    needsPartner: false,
     jerseySize: "",
     payment: "Online",
     profileFile: null,
@@ -49,21 +46,6 @@
         ${p}</a>`
     )
     .join("");
-
-  /* categories */
-  const catGrid = $("#catGrid");
-  EV.categories.forEach((c) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "cat";
-    btn.dataset.value = c.id;
-    btn.dataset.label = c.label;
-    btn.dataset.partner = c.partner ? "1" : "";
-    btn.setAttribute("role", "radio");
-    btn.setAttribute("aria-checked", "false");
-    btn.innerHTML = `<span class="dot"></span><span>${c.label}</span>`;
-    catGrid.appendChild(btn);
-  });
 
   /* jersey sizes */
   const sizePills = $("#sizePills");
@@ -237,17 +219,6 @@
   }
 
   bindRadioGroup($("#genderPills"), (b) => (state.gender = b.dataset.value));
-
-  bindRadioGroup(catGrid, (b) => {
-    state.category = b.dataset.value;
-    state.categoryLabel = b.dataset.label;
-    state.needsPartner = Boolean(b.dataset.partner);
-    $("#partnerSlide").classList.toggle("open", state.needsPartner);
-    if (!state.needsPartner) {
-      $("#partnerName").value = "";
-      clearError($("[data-field='partner_name']"));
-    }
-  });
 
   bindRadioGroup(sizePills, (b) => {
     state.jerseySize = b.dataset.value;
@@ -428,15 +399,6 @@
       problems.push("DUPR ratings range from 2.000 to 8.000.");
     }
 
-    if (!state.category) {
-      setError("category");
-      problems.push("Please pick your event category.");
-    }
-    if (state.needsPartner && !$("#partnerName").value.trim()) {
-      setError("partner_name");
-      problems.push("Doubles needs a partner — enter their name.");
-    }
-
     if (!state.jerseySize) {
       setError("jersey_size");
       problems.push("Please pick a jersey size.");
@@ -508,8 +470,6 @@
       email: $("#email").value.trim() || null,
       gender: state.gender,
       dupr: $("#dupr").value ? Number($("#dupr").value) : null,
-      category: state.categoryLabel,
-      partner_name: state.needsPartner ? $("#partnerName").value.trim() : null,
       jersey_size: state.jerseySize,
       jersey_name: $("#jerseyName").value.trim().toUpperCase(),
       payment_method: state.payment,
@@ -585,8 +545,6 @@
     const rows = [
       ["Reg. Code", r.reg_code, "mono"],
       ["Player", r.full_name],
-      ["Category", r.category],
-      r.partner_name ? ["Partner", r.partner_name] : null,
       r.dupr != null ? ["DUPR", r.dupr.toFixed(3)] : ["DUPR", "Unrated"],
       ["Jersey", `${r.jersey_size} · “${r.jersey_name}”`],
       ["Payment", r.payment_method === "Online" ? "Online · screenshot received" : "Cash at venue"],
@@ -619,14 +577,10 @@
     $$(".field.error").forEach(clearError);
     Object.assign(state, {
       gender: "",
-      category: "",
-      categoryLabel: "",
-      needsPartner: false,
       jerseySize: "",
       profileFile: null,
       paymentFile: null,
     });
-    $("#partnerSlide").classList.remove("open");
     $("#jPrevName").textContent = "NAME";
     $("#jPrevSize").textContent = "—";
     hideAlert();

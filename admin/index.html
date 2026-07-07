@@ -104,7 +104,6 @@
       <section class="toolbar">
         <div class="filters">
           <input type="search" id="q" placeholder="Search name / phone / reg code…" />
-          <select id="fCat"><option value="">All categories</option></select>
           <select id="fPay">
             <option value="">All payments</option>
             <option>Online</option>
@@ -125,7 +124,6 @@
             <tr>
               <th>Player</th>
               <th>Contact</th>
-              <th>Category</th>
               <th>DUPR</th>
               <th>Jersey</th>
               <th>Payment</th>
@@ -236,14 +234,6 @@
           <div class="field">
             <label for="mDupr">DUPR</label>
             <input type="number" id="mDupr" step="0.001" min="0" max="8" placeholder="unrated" />
-          </div>
-          <div class="field">
-            <label for="mCategory">Category *</label>
-            <select id="mCategory" required></select>
-          </div>
-          <div class="field">
-            <label for="mPartner">Partner</label>
-            <input type="text" id="mPartner" placeholder="doubles only" />
           </div>
           <div class="field">
             <label for="mSize">Jersey Size *</label>

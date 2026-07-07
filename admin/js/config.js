@@ -17,13 +17,6 @@ window.MPL_ADMIN_CONFIG = {
   EVENT: {
     name: "Monsoon Pickle League",
     season: "Season 1",
-    categories: [
-      "Men's Singles",
-      "Women's Singles",
-      "Men's Doubles",
-      "Women's Doubles",
-      "Mixed Doubles",
-    ],
   },
 
   JERSEY_SIZES: ["XS", "S", "M", "L", "XL", "XXL"],

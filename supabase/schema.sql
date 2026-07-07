@@ -15,8 +15,6 @@ create table if not exists public.registrations (
   email                   text,
   gender                  text not null,
   dupr                    numeric(5,3),
-  category                text not null,
-  partner_name            text,
   jersey_size             text not null,
   jersey_name             text not null,
   payment_method          text not null check (payment_method in ('Cash','Online')),
@@ -38,8 +36,6 @@ begin
     add constraint reg_email_len         check (email is null or char_length(email) <= 160),
     add constraint reg_gender_valid      check (gender in ('Male','Female','Other')),
     add constraint reg_dupr_range        check (dupr is null or (dupr >= 0 and dupr <= 8)),
-    add constraint reg_category_len      check (char_length(category)     between 1 and 60),
-    add constraint reg_partner_len       check (partner_name is null or char_length(partner_name) <= 120),
     add constraint reg_jersey_size_valid check (jersey_size in ('XS','S','M','L','XL','XXL')),
     add constraint reg_jersey_name_len   check (char_length(jersey_name)  between 1 and 12),
     add constraint reg_code_len          check (char_length(reg_code)     between 6 and 24),
@@ -47,6 +43,12 @@ begin
     add constraint reg_shot_url_len      check (payment_screenshot_url is null or char_length(payment_screenshot_url) <= 500);
 exception when duplicate_object then null;
 end $$;
+
+-- Migration: earlier versions also collected an event category + partner name.
+-- Those fields were removed from the registration form; drop the columns (and
+-- their constraints) if an older database still has them. Safe to re-run.
+alter table public.registrations drop column if exists category;
+alter table public.registrations drop column if exists partner_name;
 
 -- Anyone (the public form) may INSERT a registration…
 drop policy if exists "public can register" on public.registrations;

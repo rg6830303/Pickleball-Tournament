@@ -245,12 +245,6 @@
     $("#whoami").textContent = user.email;
 
     // filter + modal option lists from config
-    const fCat = $("#fCat");
-    const mCat = $("#mCategory");
-    CFG.EVENT.categories.forEach((c) => {
-      fCat.insertAdjacentHTML("beforeend", `<option>${esc(c)}</option>`);
-      mCat.insertAdjacentHTML("beforeend", `<option>${esc(c)}</option>`);
-    });
     const fStatus = $("#fStatus");
     const mStatus = $("#mStatus");
     CFG.STATUSES.forEach((s) => {
@@ -338,21 +332,19 @@
   /* ---------------- filters & render ---------------- */
   function filtered() {
     const q = $("#q").value.trim().toLowerCase();
-    const cat = $("#fCat").value;
     const pay = $("#fPay").value;
     const st = $("#fStatus").value;
     return rows.filter((r) => {
-      if (cat && r.category !== cat) return false;
       if (pay && r.payment_method !== pay) return false;
       if (st && r.status !== st) return false;
       if (q) {
-        const hay = `${r.full_name} ${r.phone} ${r.reg_code} ${r.partner_name || ""} ${r.email || ""} ${r.jersey_name || ""}`.toLowerCase();
+        const hay = `${r.full_name} ${r.phone} ${r.reg_code} ${r.email || ""} ${r.jersey_name || ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
   }
-  ["q", "fCat", "fPay", "fStatus"].forEach((id) =>
+  ["q", "fPay", "fStatus"].forEach((id) =>
     $("#" + id).addEventListener("input", render)
   );
 
@@ -361,13 +353,13 @@
     const online = rows.filter((r) => r.payment_method === "Online").length;
     const verified = rows.filter((r) => r.status === "verified" || r.status === "checked-in").length;
     const pending = rows.filter((r) => r.status === "pending").length;
-    const doubles = rows.filter((r) => (r.category || "").includes("Doubles")).length;
+    const cash = rows.filter((r) => r.payment_method === "Cash").length;
     $("#stats").innerHTML = `
       <div class="stat red"><div class="n">${total}</div><div class="l">Total entries</div></div>
       <div class="stat"><div class="n">${online}</div><div class="l">Paid online</div></div>
       <div class="stat ok"><div class="n">${verified}</div><div class="l">Verified</div></div>
       <div class="stat warn"><div class="n">${pending}</div><div class="l">Pending review</div></div>
-      <div class="stat"><div class="n">${doubles}</div><div class="l">Doubles entries</div></div>`;
+      <div class="stat"><div class="n">${cash}</div><div class="l">Cash at venue</div></div>`;
   }
 
   function render() {
@@ -388,7 +380,6 @@
             <div><div class="nm">${esc(r.full_name)}</div>
             <div class="code">${esc(r.reg_code)}</div></div></div></td>
           <td>${esc(r.phone)}${r.email ? `<div class="sub">${esc(r.email)}</div>` : ""}</td>
-          <td>${esc(r.category)}${r.partner_name ? `<div class="partner">w/ ${esc(r.partner_name)}</div>` : ""}</td>
           <td>${r.dupr != null ? Number(r.dupr).toFixed(3) : "<span class='sub'>—</span>"}</td>
           <td><b>${esc(r.jersey_size)}</b><div class="sub">“${esc(r.jersey_name)}”</div></td>
           <td><span class="pay-chip ${r.payment_method === "Online" ? "online" : ""}">${esc(r.payment_method)}</span>${shot}</td>
@@ -427,8 +418,6 @@
     { key: "email",                label: "Email",      type: "text" },
     { key: "gender",               label: "Gender",     type: "select", opts: ["Male", "Female", "Other"] },
     { key: "dupr",                 label: "DUPR",       type: "number" },
-    { key: "category",             label: "Category",   type: "select", opts: CFG.EVENT.categories },
-    { key: "partner_name",         label: "Partner",    type: "text" },
     { key: "jersey_size",          label: "Size",       type: "select", opts: CFG.JERSEY_SIZES },
     { key: "jersey_name",          label: "Jersey",     type: "text" },
     { key: "payment_method",       label: "Pay",        type: "select", opts: ["Online", "Cash"] },
@@ -441,7 +430,7 @@
     const q = ($("#gq").value || "").trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
-      `${r.full_name} ${r.phone} ${r.reg_code} ${r.email || ""} ${r.partner_name || ""} ${r.jersey_name || ""}`
+      `${r.full_name} ${r.phone} ${r.reg_code} ${r.email || ""} ${r.jersey_name || ""}`
         .toLowerCase()
         .includes(q)
     );
@@ -503,7 +492,7 @@
 
     let value = el.value;
     if (field === "dupr") value = value === "" ? null : Number(value);
-    else if (field === "email" || field === "partner_name") value = value.trim() || null;
+    else if (field === "email") value = value.trim() || null;
     else if (field === "jersey_name") value = value.trim().toUpperCase();
     else if (typeof value === "string") value = value.trim();
 
@@ -584,8 +573,6 @@
     $("#mEmail").value = row?.email || "";
     $("#mGender").value = row?.gender || "Male";
     $("#mDupr").value = row?.dupr ?? "";
-    $("#mCategory").value = row?.category || CFG.EVENT.categories[0];
-    $("#mPartner").value = row?.partner_name || "";
     $("#mSize").value = row?.jersey_size || "M";
     $("#mJName").value = row?.jersey_name || "";
     $("#mPay").value = row?.payment_method || "Cash";
@@ -637,8 +624,6 @@
       email: $("#mEmail").value.trim() || null,
       gender: $("#mGender").value,
       dupr: $("#mDupr").value ? Number($("#mDupr").value) : null,
-      category: $("#mCategory").value,
-      partner_name: $("#mPartner").value.trim() || null,
       jersey_size: $("#mSize").value,
       jersey_name: $("#mJName").value.trim().toUpperCase(),
       payment_method: $("#mPay").value,
@@ -787,7 +772,7 @@
   function exportCsv(list, name) {
     const cols = [
       "reg_code", "created_at", "full_name", "phone", "email", "gender", "dupr",
-      "category", "partner_name", "jersey_size", "jersey_name",
+      "jersey_size", "jersey_name",
       "payment_method", "status", "profile_pic_url", "payment_screenshot_url",
     ];
     const cell = (v) => {
