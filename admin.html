@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MPL Admin — Registrations</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#070707" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%23e5262d'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body class="admin">
+
+  <!-- ================= LOGIN ================= -->
+  <div class="auth-wrap" id="authWrap">
+    <form class="auth-card" id="loginForm">
+      <p class="auth-kicker">Monsoon Pickle League</p>
+      <h1 class="auth-title">Organiser Panel</h1>
+
+      <div class="field">
+        <label for="adminEmail">Email</label>
+        <input type="email" id="adminEmail" autocomplete="username" placeholder="you@club.com" required />
+      </div>
+      <div class="field">
+        <label for="adminPass">Password</label>
+        <input type="password" id="adminPass" autocomplete="current-password" placeholder="••••••••" required />
+      </div>
+
+      <div class="alert" id="authAlert" role="alert"></div>
+
+      <button type="submit" class="btn-lock" id="btnLogin">
+        <span class="spin" aria-hidden="true"></span><span class="btn-label">Sign In</span>
+      </button>
+      <p class="auth-fine">Staff accounts are created in Supabase → Authentication → Users.</p>
+    </form>
+  </div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <div class="dash" id="dash" hidden>
+    <header class="dash-head">
+      <div>
+        <p class="auth-kicker" style="margin-bottom:2px">Monsoon Pickle League · Season 1</p>
+        <h1 class="dash-title">Registrations</h1>
+      </div>
+      <div class="dash-actions">
+        <button class="btn-mini" id="btnRefresh" type="button">↻ Refresh</button>
+        <button class="btn-mini" id="btnCsv" type="button">⬇ Export CSV</button>
+        <button class="btn-mini ghost" id="btnLogout" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <section class="stats" id="stats"></section>
+
+    <section class="filters">
+      <input type="search" id="q" placeholder="Search name / phone / reg code…" />
+      <select id="fCat"><option value="">All categories</option></select>
+      <select id="fPay">
+        <option value="">All payments</option>
+        <option>Online</option>
+        <option>Cash</option>
+      </select>
+      <select id="fStatus">
+        <option value="">All statuses</option>
+        <option value="pending">Pending</option>
+        <option value="verified">Verified</option>
+        <option value="checked-in">Checked-in</option>
+        <option value="rejected">Rejected</option>
+      </select>
+    </section>
+
+    <section class="table-wrap">
+      <table class="regs" id="regTable">
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Contact</th>
+            <th>Category</th>
+            <th>DUPR</th>
+            <th>Jersey</th>
+            <th>Payment</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="regBody"></tbody>
+      </table>
+      <p class="empty" id="emptyMsg" hidden>No registrations match.</p>
+    </section>
+  </div>
+
+  <!-- ================= IMAGE LIGHTBOX ================= -->
+  <div class="lightbox" id="lightbox" hidden>
+    <img alt="Attachment preview" id="lightboxImg" />
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="js/config.js"></script>
+  <script src="js/admin.js" defer></script>
+</body>
+</html>

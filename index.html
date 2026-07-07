@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Monsoon Pickle League — Season 1 · Register</title>
+  <meta name="description" content="Register for Monsoon Pickle League Season 1 — 22–23 August 2026, Sportsplex Kolkata. Champion takes the glory." />
+  <meta name="theme-color" content="#070707" />
+  <meta property="og:title" content="Monsoon Pickle League — Season 1" />
+  <meta property="og:description" content="22–23 August 2026 · Sportsplex, Kolkata · Champion takes the glory. Lock in your spot." />
+  <meta property="og:image" content="assets/poster.jpg" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%23e5262d'/%3E%3Ccircle cx='35' cy='38' r='6' fill='%23070707'/%3E%3Ccircle cx='60' cy='30' r='6' fill='%23070707'/%3E%3Ccircle cx='70' cy='55' r='6' fill='%23070707'/%3E%3Ccircle cx='48' cy='62' r='6' fill='%23070707'/%3E%3Ccircle cx='30' cy='64' r='6' fill='%23070707'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="preload" as="image" href="assets/poster.jpg" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ambient rain -->
+  <canvas id="rain" aria-hidden="true"></canvas>
+
+  <!-- ============ SPLASH / LOADING PREVIEW (the poster) ============ -->
+  <div id="splash" role="status" aria-label="Loading Monsoon Pickle League">
+    <div class="splash-poster-wrap">
+      <img class="splash-poster" src="assets/poster.jpg" alt="Monsoon Pickle League Season 1 poster — 22–23 August 2026, Sportsplex Kolkata" />
+      <div class="splash-vignette"></div>
+      <div class="splash-bottom">
+        <div class="splash-status" id="splashStatus">Loading the court</div>
+        <div class="splash-bar"><i id="splashBarFill"></i></div>
+        <button class="splash-enter" id="btnEnter" type="button">Enter&nbsp;the&nbsp;league&nbsp;→</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div id="app">
+
+    <!-- ========================= REGISTER PAGE ========================= -->
+    <main class="page active" id="page-form">
+      <div class="shell">
+
+        <header class="hero">
+          <p class="hero-presents" id="heroPresents"></p>
+          <p class="hero-kicker">Monsoon</p>
+          <h1 class="hero-title">Pickle</h1>
+          <p class="hero-sub">League</p>
+          <p class="hero-season" id="heroSeason"></p>
+
+          <div class="hero-meta">
+            <span class="meta-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              <b id="metaDates"></b>
+            </span>
+            <span class="meta-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              <b id="metaVenue"></b>
+            </span>
+            <span class="meta-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21 1.18.54 2.03 2.03 2.03 3.79M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+              <span id="metaTagline"></span>
+            </span>
+          </div>
+
+          <div class="hero-scroll" aria-hidden="true"></div>
+        </header>
+
+        <form id="regForm" class="card" novalidate>
+
+          <div class="demo-note" id="demoNote">
+            <b>Demo mode</b> — Supabase isn't configured yet, so entries are saved
+            in this browser only. Add your keys in <b>js/config.js</b> to go live
+            (see README).
+          </div>
+
+          <!-- 1 · PLAYER -->
+          <section class="section reveal">
+            <div class="sec-head">
+              <span class="sec-num">1</span>
+              <h2 class="sec-title">Player Details</h2>
+              <span class="sec-line"></span>
+            </div>
+
+            <div class="field" data-field="full_name">
+              <label for="fullName">Player's Name <span class="req">*</span></label>
+              <input type="text" id="fullName" name="full_name" placeholder="Full name" autocomplete="name" />
+              <p class="ferr">Please enter the player's name.</p>
+            </div>
+
+            <div class="grid2">
+              <div class="field" data-field="phone">
+                <label for="phone">WhatsApp Number <span class="req">*</span></label>
+                <input type="tel" id="phone" name="phone" placeholder="+91 98xxx xxxxx" inputmode="tel" autocomplete="tel" />
+                <p class="ferr">Please enter a valid 10-digit mobile number.</p>
+              </div>
+              <div class="field" data-field="email">
+                <label for="email">Email <span class="hint">(optional)</span></label>
+                <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" />
+                <p class="ferr">That email doesn't look right.</p>
+              </div>
+            </div>
+
+            <div class="field" data-field="gender">
+              <label>Gender <span class="req">*</span></label>
+              <div class="pills" id="genderPills" role="radiogroup" aria-label="Gender">
+                <button type="button" class="pill" data-value="Male">Male</button>
+                <button type="button" class="pill" data-value="Female">Female</button>
+                <button type="button" class="pill" data-value="Other">Other</button>
+              </div>
+              <p class="ferr">Please select a gender.</p>
+            </div>
+
+            <div class="field" data-field="dupr" style="margin-bottom:0">
+              <label for="dupr">DUPR Rating <span class="hint">(enter 0 or leave blank if unrated)</span></label>
+              <input type="number" id="dupr" name="dupr" placeholder="e.g. 3.5" step="0.001" min="0" max="8" inputmode="decimal" />
+              <p class="ferr">DUPR ratings range from 2.000 to 8.000.</p>
+            </div>
+          </section>
+
+          <!-- 2 · EVENT -->
+          <section class="section reveal">
+            <div class="sec-head">
+              <span class="sec-num">2</span>
+              <h2 class="sec-title">Event Category</h2>
+              <span class="sec-line"></span>
+            </div>
+
+            <div class="field" data-field="category" style="margin-bottom:0">
+              <div class="cat-grid" id="catGrid" role="radiogroup" aria-label="Event category"></div>
+              <p class="ferr">Please pick your event category.</p>
+            </div>
+
+            <div class="slide" id="partnerSlide">
+              <div>
+                <div class="field" data-field="partner_name">
+                  <label for="partnerName">Partner's Name <span class="req">*</span></label>
+                  <input type="text" id="partnerName" name="partner_name" placeholder="Who's on your side of the net?" />
+                  <p class="ferr">Doubles needs a partner — enter their name.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3 · JERSEY -->
+          <section class="section reveal">
+            <div class="sec-head">
+              <span class="sec-num">3</span>
+              <h2 class="sec-title">Jersey</h2>
+              <span class="sec-line"></span>
+            </div>
+
+            <div class="jersey-row">
+              <div>
+                <div class="field" data-field="jersey_size">
+                  <label>Jersey Size <span class="req">*</span></label>
+                  <div class="pills" id="sizePills" role="radiogroup" aria-label="Jersey size"></div>
+                  <p class="ferr">Please pick a jersey size.</p>
+                </div>
+                <div class="field" data-field="jersey_name" style="margin-bottom:0">
+                  <label for="jerseyName">Name on Jersey <span class="req">*</span> <span class="hint">(max 12 characters)</span></label>
+                  <input type="text" id="jerseyName" name="jersey_name" placeholder="SMASH" maxlength="12" autocapitalize="characters" />
+                  <p class="ferr">What should we print on the back?</p>
+                </div>
+              </div>
+
+              <div class="jersey-preview" aria-hidden="true">
+                <svg viewBox="0 0 120 132">
+                  <path d="M38 8 L18 20 L6 44 L24 52 L26 40 L26 118 a6 6 0 0 0 6 6 H88 a6 6 0 0 0 6-6 V40 L96 52 L114 44 L102 20 L82 8 a22 14 0 0 1-44 0 Z"
+                        fill="#141416" stroke="#303034" stroke-width="2" stroke-linejoin="round"/>
+                  <path d="M38 8 a22 14 0 0 0 44 0" fill="none" stroke="#e5262d" stroke-width="2.5"/>
+                  <path d="M26 118 H94" stroke="#e5262d" stroke-width="2.5"/>
+                  <text id="jPrevName" class="j-name" x="60" y="68" font-size="13" text-anchor="middle">NAME</text>
+                  <text id="jPrevSize" class="j-size" x="60" y="92" font-size="11" text-anchor="middle">—</text>
+                </svg>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4 · PROFILE PICTURE -->
+          <section class="section reveal">
+            <div class="sec-head">
+              <span class="sec-num">4</span>
+              <h2 class="sec-title">Profile Picture</h2>
+              <span class="sec-line"></span>
+            </div>
+
+            <div class="field" data-field="profile_pic" style="margin-bottom:0">
+              <label>Player Photo <span class="req">*</span> <span class="hint">used for your player card & draws</span></label>
+              <div class="upload avatar" id="upProfile">
+                <input type="file" accept="image/*" id="fileProfile" aria-label="Attach profile picture" />
+                <svg class="up-icon" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
+                <span class="up-text">Tap to attach your photo</span>
+                <span class="up-sub">Clear front-facing shot · JPG / PNG / HEIC</span>
+                <div class="thumb">
+                  <img alt="Profile picture preview" />
+                  <div class="thumb-bar"><span class="fname"></span><button type="button" class="rm">Remove</button></div>
+                </div>
+              </div>
+              <p class="ferr">Please attach a profile picture.</p>
+            </div>
+          </section>
+
+          <!-- 5 · PAYMENT -->
+          <section class="section reveal">
+            <div class="sec-head">
+              <span class="sec-num">5</span>
+              <h2 class="sec-title">Payment Option</h2>
+              <span class="sec-line"></span>
+            </div>
+
+            <div class="field" data-field="payment_method" style="margin-bottom:0">
+              <div class="seg" id="paySeg" role="radiogroup" aria-label="Payment option">
+                <button type="button" class="seg-btn" data-value="Cash">Cash</button>
+                <button type="button" class="seg-btn on" data-value="Online">Online</button>
+              </div>
+            </div>
+
+            <!-- online -->
+            <div class="paybox" id="payOnline">
+              <p class="paybox-title">Scan &amp; Pay</p>
+              <div class="qr-frame" id="qrFrame">
+                <img src="assets/qr.png" alt="UPI payment QR code" id="qrImg" />
+              </div>
+              <p class="upi-id" id="upiId" hidden></p>
+              <p class="pay-note" id="payNote">Pay the entry fee, then attach the screenshot below.</p>
+
+              <div class="field" data-field="payment_screenshot">
+                <label>Payment Screenshot <span class="req">*</span></label>
+                <div class="upload" id="upPayment">
+                  <input type="file" accept="image/*" id="filePayment" aria-label="Attach payment screenshot" />
+                  <svg class="up-icon" viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+                  <span class="up-text">Tap to attach the transaction screenshot</span>
+                  <span class="up-sub">UPI / bank confirmation · JPG / PNG</span>
+                  <div class="thumb">
+                    <img alt="Payment screenshot preview" />
+                    <div class="thumb-bar"><span class="fname"></span><button type="button" class="rm">Remove</button></div>
+                  </div>
+                </div>
+                <p class="ferr">Please attach the payment screenshot.</p>
+              </div>
+            </div>
+
+            <!-- cash -->
+            <div class="cashbox" id="payCash" hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>
+              <div>
+                <b style="color:var(--text)">Pay at the venue desk.</b><br />
+                Your spot is reserved once the entry fee is paid in cash at check-in.
+                Bring exact change if you can — the desk gets busy on match morning.
+              </div>
+            </div>
+          </section>
+
+          <div class="alert" id="formAlert" role="alert"></div>
+
+          <div class="submit-wrap">
+            <button type="submit" class="btn-lock" id="btnSubmit">
+              <span class="spin" aria-hidden="true"></span><span class="btn-label">Lock In My Spot</span>
+            </button>
+            <p class="secure-note">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              Your details go straight to the organisers
+            </p>
+          </div>
+        </form>
+
+        <footer class="footer reveal">
+          <p class="footer-rule">For More Details</p>
+          <div class="footer-phones" id="footerPhones"></div>
+          <p class="footer-fine" id="footerFine"></p>
+        </footer>
+      </div>
+    </main>
+
+    <!-- ========================= SUCCESS PAGE ========================= -->
+    <main class="page" id="page-success">
+      <div class="shell">
+        <div class="check-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5" /></svg>
+        </div>
+        <h2 class="success-title">You're In!</h2>
+        <p class="success-sub" id="successSub"></p>
+
+        <div class="ticket" role="group" aria-label="Registration summary">
+          <div class="ticket-top">
+            <span class="t-league">Monsoon Pickle League</span>
+            <span class="t-season" id="ticketSeason"></span>
+          </div>
+          <div class="ticket-body" id="ticketBody"></div>
+          <div class="ticket-foot" id="ticketFoot"></div>
+        </div>
+
+        <button type="button" class="btn-ghost" id="btnAnother">Register Another Player</button>
+      </div>
+    </main>
+  </div>
+
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="js/config.js"></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>
