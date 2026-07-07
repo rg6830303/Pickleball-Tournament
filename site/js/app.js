@@ -283,9 +283,9 @@
   /* ------------------------------------------------------------
      FILE UPLOADS (attach, preview, remove, drag & drop)
      ------------------------------------------------------------ */
-  function bindUpload(boxId, inputId, key) {
+  function bindUpload(boxId, inputSel, key) {
     const box = $(boxId);
-    const input = $(inputId);
+    const inputs = (Array.isArray(inputSel) ? inputSel : [inputSel]).map((s) => $(s)).filter(Boolean);
     const thumbImg = $(".thumb img", box);
     const fname = $(".fname", box);
 
@@ -307,13 +307,25 @@
       clearError(box.closest(".field"));
     }
 
-    input.addEventListener("change", () => setFile(input.files[0]));
+    inputs.forEach((input) =>
+      input.addEventListener("change", () => setFile(input.files[0]))
+    );
+
+    // explicit camera / gallery buttons (each button targets one input by id)
+    $$(".up-btn", box).forEach((btn) =>
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const target = document.getElementById(btn.dataset.target);
+        if (target) target.click();
+      })
+    );
 
     $(".rm", box).addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
       state[key] = null;
-      input.value = "";
+      inputs.forEach((input) => (input.value = ""));
       thumbImg.removeAttribute("src");
       box.classList.remove("filled");
     });
@@ -333,7 +345,7 @@
     );
   }
 
-  bindUpload("#upProfile", "#fileProfile", "profileFile");
+  bindUpload("#upProfile", ["#fileProfileCam", "#fileProfile"], "profileFile");
   bindUpload("#upPayment", "#filePayment", "paymentFile");
 
   /* client-side compression → keeps uploads fast on stadium wifi */
