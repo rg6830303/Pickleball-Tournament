@@ -507,6 +507,13 @@
     };
 
     try {
+      // late-init safety net: never silently demo-save when configured LIVE
+      if (LIVE && !sb && window.supabase) {
+        sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+      }
+      if (LIVE && !sb) {
+        throw new Error("Supabase client failed to load");
+      }
       if (LIVE && sb) {
         const stamp = Date.now();
         record.profile_pic_url = await uploadImage(

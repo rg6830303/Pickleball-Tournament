@@ -28,6 +28,26 @@ create table if not exists public.registrations (
 
 alter table public.registrations enable row level security;
 
+-- Hardening: bound every column the anonymous role can write, so the
+-- public insert policy can't be abused to stuff megabytes of junk.
+do $$
+begin
+  alter table public.registrations
+    add constraint reg_full_name_len     check (char_length(full_name)    between 1 and 120),
+    add constraint reg_phone_len         check (char_length(phone)        between 7 and 20),
+    add constraint reg_email_len         check (email is null or char_length(email) <= 160),
+    add constraint reg_gender_valid      check (gender in ('Male','Female','Other')),
+    add constraint reg_dupr_range        check (dupr is null or (dupr >= 0 and dupr <= 8)),
+    add constraint reg_category_len      check (char_length(category)     between 1 and 60),
+    add constraint reg_partner_len       check (partner_name is null or char_length(partner_name) <= 120),
+    add constraint reg_jersey_size_valid check (jersey_size in ('XS','S','M','L','XL','XXL')),
+    add constraint reg_jersey_name_len   check (char_length(jersey_name)  between 1 and 12),
+    add constraint reg_code_len          check (char_length(reg_code)     between 6 and 24),
+    add constraint reg_pic_url_len       check (profile_pic_url is null or char_length(profile_pic_url) <= 500),
+    add constraint reg_shot_url_len      check (payment_screenshot_url is null or char_length(payment_screenshot_url) <= 500);
+exception when duplicate_object then null;
+end $$;
+
 -- Anyone (the public form) may INSERT a registration…
 drop policy if exists "public can register" on public.registrations;
 create policy "public can register"
@@ -64,7 +84,7 @@ create policy "staff can delete"
 create table if not exists public.event_settings (
   id                 int primary key check (id = 1),
   registration_open  boolean not null default true,
-  banner_message     text,
+  banner_message     text check (banner_message is null or char_length(banner_message) <= 200),
   updated_at         timestamptz not null default now()
 );
 
@@ -102,9 +122,16 @@ exception when duplicate_object then null;
 end $$;
 
 -- 4) Storage bucket for profile photos + payment screenshots ---------------
-insert into storage.buckets (id, name, public)
-values ('registrations', 'registrations', true)
-on conflict (id) do nothing;
+-- Hardened: 8 MB cap per file, images only.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'registrations', 'registrations', true,
+  8388608,
+  array['image/jpeg','image/png','image/webp','image/heic','image/heif']
+)
+on conflict (id) do update
+  set file_size_limit   = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
 
 -- The public form may upload into profile/ and payment/ folders only.
 drop policy if exists "public can upload registration images" on storage.objects;
