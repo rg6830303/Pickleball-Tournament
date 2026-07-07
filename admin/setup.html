@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MPL Setup &amp; Diagnostics</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#070707" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='84' height='84' rx='18' fill='%23e5262d'/%3E%3Cpath d='M50 26v28M50 62v8' stroke='%23070707' stroke-width='11' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/admin.css" />
+  <style>
+    .setup-wrap { max-width: 640px; margin: 0 auto; padding: 40px 20px 90px; }
+    .setup-card {
+      background: linear-gradient(180deg, var(--panel), var(--bg-2));
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 30px 28px;
+      margin-bottom: 16px;
+      animation: pageIn 0.6s var(--ease-out) both;
+      position: relative;
+      overflow: hidden;
+    }
+    .setup-card::before {
+      content: "";
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, transparent, var(--red), transparent);
+    }
+    .setup-step {
+      font-family: var(--font-display);
+      font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase;
+      color: var(--red); margin-bottom: 8px;
+    }
+    .setup-title {
+      font-family: var(--font-display);
+      font-size: 24px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+    .setup-sub { font-size: 13.5px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.65; }
+    .setup-sub b { color: var(--text); }
+    .setup-sub code {
+      background: var(--panel-2); border: 1px solid var(--line);
+      border-radius: 6px; padding: 1px 7px; font-size: 12px; color: #ffb3b5;
+    }
+    .keynote {
+      display: flex; gap: 10px; align-items: flex-start;
+      border: 1px dashed rgba(229,38,45,0.5); border-radius: var(--radius-sm);
+      padding: 12px 14px; font-size: 12.5px; color: var(--text-dim); margin-bottom: 18px;
+    }
+    .keynote svg { width: 16px; height: 16px; stroke: var(--warn); flex: none; margin-top: 2px; }
+    .checks { list-style: none; margin: 4px 0 0; }
+    .checks li {
+      display: flex; gap: 13px; align-items: flex-start;
+      padding: 13px 4px; border-bottom: 1px dashed var(--line);
+      font-size: 14px;
+    }
+    .checks li:last-child { border-bottom: none; }
+    .chk-ic {
+      flex: none; width: 24px; height: 24px; border-radius: 50%;
+      display: grid; place-items: center;
+      border: 1.5px solid var(--line-strong);
+      font-size: 12px; font-weight: 700; margin-top: 1px;
+      transition: all 0.3s var(--ease-out);
+    }
+    li.ok   .chk-ic { border-color: var(--ok); color: var(--ok); background: rgba(47,191,113,0.1); }
+    li.fail .chk-ic { border-color: var(--red); color: #ff8b8e; background: rgba(229,38,45,0.1); }
+    li.warn .chk-ic { border-color: var(--warn); color: var(--warn); background: rgba(232,195,90,0.08); }
+    li.run  .chk-ic { border-color: var(--text-dim); }
+    li.run  .chk-ic i {
+      width: 10px; height: 10px; border: 2px solid var(--text-dim);
+      border-top-color: transparent; border-radius: 50%;
+      animation: rot 0.8s linear infinite; display: block;
+    }
+    .chk-name { font-weight: 600; }
+    .chk-msg { font-size: 12.5px; color: var(--text-dim); margin-top: 3px; line-height: 1.55; }
+    li.fail .chk-msg { color: #ff9a9d; }
+    li.ok   .chk-msg { color: var(--text-faint); }
+    .setup-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+    .result-banner {
+      display: none; margin-top: 18px; border-radius: var(--radius-sm);
+      padding: 14px 17px; font-size: 14px; line-height: 1.6;
+    }
+    .result-banner.ok {
+      display: block;
+      border: 1px solid rgba(47,191,113,0.5); background: rgba(47,191,113,0.08); color: #b8ecd0;
+    }
+    .result-banner.err {
+      display: block;
+      border: 1px solid rgba(229,38,45,0.55); background: rgba(229,38,45,0.07); color: #ffd7d8;
+    }
+    .back-link { display: inline-block; margin-bottom: 18px; color: var(--text-dim); font-size: 13px; text-decoration: none; }
+    .back-link:hover { color: var(--red); }
+  </style>
+</head>
+<body>
+  <div class="setup-wrap">
+    <a class="back-link" href="index.html">← Back to console login</a>
+
+    <!-- STEP 1: key -->
+    <section class="setup-card">
+      <p class="setup-step">Step 1 · Connect</p>
+      <h1 class="setup-title">Setup &amp; Diagnostics</h1>
+      <p class="setup-sub">
+        This tool verifies your Supabase backend end-to-end and repairs the
+        organiser login. It talks to <b id="projHost"></b> directly from this
+        browser.
+      </p>
+      <div class="keynote">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z"/></svg>
+        <span>Your <b>secret key</b> is used in this tab's memory only — it is never
+        stored, logged, or sent anywhere except your own Supabase project.
+        Find it under <b>Project Settings → API keys</b>.</span>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label for="secretKey">Supabase secret key <span class="hint">(sb_secret_… or service_role JWT)</span></label>
+        <input type="password" id="secretKey" autocomplete="off" placeholder="sb_secret_…" />
+      </div>
+    </section>
+
+    <!-- STEP 2: checks -->
+    <section class="setup-card">
+      <p class="setup-step">Step 2 · Verify backend</p>
+      <p class="setup-sub" style="margin-bottom:12px">
+        Runs five live checks against your project. Anything red tells you the
+        exact fix — usually running <code>supabase/schema.sql</code> once in the
+        SQL&nbsp;Editor.
+      </p>
+      <ul class="checks">
+        <li id="c-reach"><span class="chk-ic">·</span><div><div class="chk-name">Project reachable</div><div class="chk-msg">Waiting to run…</div></div></li>
+        <li id="c-table"><span class="chk-ic">·</span><div><div class="chk-name">Table <b>registrations</b></div><div class="chk-msg">Waiting to run…</div></div></li>
+        <li id="c-settings"><span class="chk-ic">·</span><div><div class="chk-name">Table <b>event_settings</b> + controls row</div><div class="chk-msg">Waiting to run…</div></div></li>
+        <li id="c-bucket"><span class="chk-ic">·</span><div><div class="chk-name">Storage bucket <b>registrations</b></div><div class="chk-msg">Waiting to run…</div></div></li>
+        <li id="c-user"><span class="chk-ic">·</span><div><div class="chk-name">Organiser account</div><div class="chk-msg">Waiting to run…</div></div></li>
+      </ul>
+      <div class="setup-actions">
+        <button type="button" class="btn-primary sm" id="btnRunChecks">
+          <span class="spin" aria-hidden="true"></span><span class="btn-label">Run Checks</span>
+        </button>
+      </div>
+      <div class="result-banner" id="checksBanner"></div>
+    </section>
+
+    <!-- STEP 3: login fix -->
+    <section class="setup-card">
+      <p class="setup-step">Step 3 · Organiser login</p>
+      <p class="setup-sub" style="margin-bottom:14px">
+        Creates the account if it's missing, or force-resets the password and
+        confirms the email if it exists — then proves it works with a real
+        sign-in test.
+      </p>
+      <div class="field">
+        <label for="fixEmail">Admin email</label>
+        <input type="email" id="fixEmail" autocomplete="off" value="ishanvashistha.1993@gmail.com" />
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label for="fixPass">Admin password <span class="hint">(min 6 characters)</span></label>
+        <input type="password" id="fixPass" autocomplete="new-password" placeholder="choose the console password" />
+      </div>
+      <div class="setup-actions">
+        <button type="button" class="btn-primary sm" id="btnFixLogin">
+          <span class="spin" aria-hidden="true"></span><span class="btn-label">Create / Reset Login</span>
+        </button>
+        <button type="button" class="btn-mini" id="btnTestLogin">▶ Test sign-in</button>
+      </div>
+      <div class="result-banner" id="loginBanner"></div>
+    </section>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/setup.js" defer></script>
+</body>
+</html>
