@@ -225,14 +225,7 @@
     $("#jPrevSize").textContent = b.dataset.value;
   });
 
-  /* payment segmented toggle */
-  bindRadioGroup($("#paySeg"), (b) => {
-    state.payment = b.dataset.value;
-    const online = state.payment === "Online";
-    $("#payOnline").hidden = !online;
-    $("#payCash").hidden = online;
-    if (!online) clearError($("[data-field='payment_screenshot']"));
-  });
+  /* payment is online-only: screenshot is always required */
 
   /* jersey live preview */
   $("#jerseyName").addEventListener("input", (e) => {
@@ -416,7 +409,7 @@
       $("#upProfile").classList.remove("error");
     }
 
-    if (state.payment === "Online" && !state.paymentFile) {
+    if (!state.paymentFile) {
       fieldEl("payment_screenshot").classList.add("error");
       $("#upPayment").classList.add("error");
       problems.push("Please attach the payment screenshot.");
@@ -492,7 +485,7 @@
           state.profileFile,
           `profile/${id}-${stamp}.jpg`
         );
-        if (state.payment === "Online" && state.paymentFile) {
+        if (state.paymentFile) {
           record.payment_screenshot_url = await uploadImage(
             state.paymentFile,
             `payment/${id}-${stamp}.jpg`
@@ -509,15 +502,52 @@
       showSuccess(record);
     } catch (err) {
       console.error(err);
-      showAlert(
-        "Something went wrong while locking your spot — please try again. " +
-          "If it keeps failing, WhatsApp us on " + EV.phones[0] + "."
-      );
+      showAlert(submitErrorMessage(err));
     } finally {
       btn.disabled = false;
       btn.classList.remove("busy");
       label.textContent = "Lock In My Spot";
     }
+  }
+
+  /* Turn raw Supabase/Storage errors into a message that says exactly what to
+     fix. Setup errors (missing table/bucket/policy) name the one-time SQL step;
+     everything else gets the friendly retry line for real players. */
+  function submitErrorMessage(err) {
+    const msg = (err && (err.message || err.error_description || err.error)) || String(err);
+    const code = err && (err.code || err.statusCode || err.status);
+    const s = msg.toLowerCase();
+
+    if (
+      code === "42P01" || code === "PGRST205" ||
+      s.includes("does not exist") ||
+      s.includes("schema cache") ||
+      (s.includes("could not find the table") )
+    ) {
+      return "Setup needed: the registration database hasn't been created yet. " +
+        "Organiser — run supabase/schema.sql once in Supabase → SQL Editor, then this form goes live.";
+    }
+    if (s.includes("bucket not found") || s.includes("bucket")) {
+      return "Setup needed: photo storage isn't created yet. " +
+        "Organiser — run supabase/schema.sql (it creates the storage bucket), then try again.";
+    }
+    if (code === "42501" || s.includes("row-level security") || s.includes("violates row-level")) {
+      return "The database is blocking new sign-ups (row-level security). " +
+        "Organiser — re-run supabase/schema.sql to apply the public-registration policy.";
+    }
+    if (code === "PGRST204" || (s.includes("column") && s.includes("find"))) {
+      return "The database is missing a column. " +
+        "Organiser — re-run the latest supabase/schema.sql to update the table.";
+    }
+    if (s.includes("failed to fetch") || s.includes("networkerror") || s.includes("load failed")) {
+      return "Couldn't reach the server — check your internet connection and try again.";
+    }
+    if (code === 401 || code === 403 || s.includes("invalid api key") || s.includes("jwt")) {
+      return "The site can't authenticate with the database (API key issue). " +
+        "Organiser — verify SUPABASE_ANON_KEY in site/js/config.js.";
+    }
+    return "Something went wrong while locking your spot — please try again. " +
+      "If it keeps failing, WhatsApp us on " + EV.phones[0] + ".";
   }
 
   $("#regForm").addEventListener("submit", submit);
@@ -538,16 +568,15 @@
   }
 
   function showSuccess(r) {
-    $("#successSub").innerHTML = state.payment === "Online"
-      ? `Your registration is in, <b>${r.full_name}</b>. We'll verify your payment and confirm on WhatsApp shortly.`
-      : `Your registration is in, <b>${r.full_name}</b>. Pay the entry fee in cash at the venue desk to confirm your spot.`;
+    $("#successSub").innerHTML =
+      `Your registration is in, <b>${r.full_name}</b>. We'll verify your payment and confirm on WhatsApp shortly.`;
 
     const rows = [
       ["Reg. Code", r.reg_code, "mono"],
       ["Player", r.full_name],
       r.dupr != null ? ["DUPR", r.dupr.toFixed(3)] : ["DUPR", "Unrated"],
       ["Jersey", `${r.jersey_size} · “${r.jersey_name}”`],
-      ["Payment", r.payment_method === "Online" ? "Online · screenshot received" : "Cash at venue"],
+      ["Payment", "Online · screenshot received"],
     ].filter(Boolean);
 
     $("#ticketBody").innerHTML = rows
