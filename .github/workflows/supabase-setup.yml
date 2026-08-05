@@ -55,10 +55,24 @@ jobs:
           psql --version
 
       - name: Check the connection secret is present
+        id: precheck
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           if [ -z "$DB_URL" ]; then
+            # On an automatic push run, skip quietly instead of failing the
+            # commit status. Only a deliberate "Run workflow" hard-fails.
+            if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+              echo "has_secret=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::SUPABASE_DB_URL is not configured - skipping the Supabase setup."
+              {
+                echo "## ⏭️ Skipped — \`SUPABASE_DB_URL\` not configured"
+                echo
+                echo "Add the secret under **Settings → Secrets and variables → Actions**,"
+                echo "then run this workflow manually to apply the schema."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             echo "::error::Repository secret SUPABASE_DB_URL is not set."
             {
               echo "## ❌ Missing secret: \`SUPABASE_DB_URL\`"
@@ -73,9 +87,11 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+          echo "has_secret=true" >> "$GITHUB_OUTPUT"
           echo "Secret is present."
 
       - name: Verify database connectivity
+        if: ${{ steps.precheck.outputs.has_secret == 'true' }}
         env:
           PGCONN: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -85,7 +101,7 @@ jobs:
             "select 'connected to ' || current_database() || ' as ' || current_user"
 
       - name: Apply setup-all.sql
-        if: ${{ inputs.verify_only != true }}
+        if: ${{ steps.precheck.outputs.has_secret == 'true' && inputs.verify_only != true }}
         env:
           PGCONN: ${{ secrets.SUPABASE_DB_URL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -110,6 +126,7 @@ jobs:
           echo "Schema applied."
 
       - name: Verify installation
+        if: ${{ steps.precheck.outputs.has_secret == 'true' }}
         env:
           PGCONN: ${{ secrets.SUPABASE_DB_URL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
