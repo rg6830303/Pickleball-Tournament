@@ -57,11 +57,61 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${PGCONN:-}" ]; then
-            echo "::error::SUPABASE_DB_URL secret is missing."; exit 1
+            echo "::error::SUPABASE_DB_URL is not set - the doctor cannot reach your database."
+            {
+              echo "# ❌ Cannot connect: \`SUPABASE_DB_URL\` secret is missing"
+              echo
+              echo "Nothing has been applied to Supabase, and nothing can be checked."
+              echo
+              echo "**Settings → Secrets and variables → Actions → New repository secret**"
+              echo "- Name: \`SUPABASE_DB_URL\`"
+              echo "- Value: Supabase → Project Settings → Database → Connection string →"
+              echo "  **Session pooler** (\`...pooler.supabase.com:5432...\`)"
+              echo
+              echo "Use the Session pooler string — the direct \`db.*.supabase.co\` host is"
+              echo "IPv6-only and GitHub runners cannot reach it."
+              echo
+              echo "_Alternative with no secret at all: paste \`supabase/setup-all.sql\` into"
+              echo "the Supabase SQL Editor and press Run._"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
           psql "$PGCONN" -v ON_ERROR_STOP=1 -c "notify pgrst, 'reload schema';"
           echo "Reload requested; giving PostgREST a moment to pick it up."
           sleep 8
+
+      - name: 1b · Has the setup ever run?
+        env:
+          PGCONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          MISSING=$(psql "$PGCONN" -tAc "
+            select string_agg(t, ', ') from unnest(array[
+              'auction_teams','auction_lots','auction_state','auction_bids','auction_team_logins'
+            ]) t where to_regclass('public.'||t) is null;
+          ")
+          if [ -n "$MISSING" ]; then
+            echo "::error::Auction tables missing: $MISSING - the setup has never been applied."
+            {
+              echo "# ❌ The database setup has never run"
+              echo
+              echo "Missing tables: \`$MISSING\`"
+              echo
+              echo "This is the whole problem: with no tables there are no captain accounts,"
+              echo "so the auction login is rejected and the console reports the auction as"
+              echo "not installed. The organiser login works because it was created"
+              echo "separately from the console's \"Set up my login\" panel."
+              echo
+              echo "## Fix"
+              echo "**Actions → Supabase Setup → Run workflow** — and check that run takes"
+              echo "1-2 minutes, not ~20 seconds. A ~20s run means it never connected."
+              echo
+              echo "_Or, with no secret needed: paste \`supabase/setup-all.sql\` into the"
+              echo "Supabase SQL Editor and press Run._"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "All five auction tables exist."
 
       - name: 2 · Database health
         env:
@@ -157,11 +207,18 @@ jobs:
           REGS=$(curl -s -H "apikey: $ANON" -H "Authorization: Bearer $TOKEN" \
             "$URL/rest/v1/registrations?select=phone&limit=5")
           echo "captain reads auction_lots -> $LOTS"
-          echo "captain reads registrations -> $REGS"
-          case "$REGS" in
-            "[]") echo "RLS: captain correctly blocked from player PII" ;;
-            *)    echo "::error::RLS LEAK - captain can read registrations: $REGS"; exit 1 ;;
-          esac
+
+          # A JSON array with rows is a leak. An empty array, or an error object
+          # (permission denied), both mean the captain is correctly blocked.
+          ROWS=$(printf '%s' "$REGS" | jq 'if type=="array" then length else -1 end' 2>/dev/null || echo -1)
+          if [ "$ROWS" = "-1" ]; then
+            echo "RLS: captain blocked from player PII (request rejected)"
+          elif [ "$ROWS" = "0" ]; then
+            echo "RLS: captain correctly blocked from player PII (no rows)"
+          else
+            echo "::error::RLS LEAK - captain read $ROWS registration row(s)"
+            exit 1
+          fi
 
       - name: 5 · Organiser account check
         env:
