@@ -165,58 +165,68 @@ end $$;
 
 -- 4) Storage bucket for profile photos + payment screenshots ---------------
 -- Hardened: 8 MB cap per file, images only.
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'registrations', 'registrations', true,
-  8388608,
-  array['image/jpeg','image/png','image/webp','image/heic','image/heif']
-)
-on conflict (id) do update
-  set file_size_limit   = excluded.file_size_limit,
-      allowed_mime_types = excluded.allowed_mime_types;
+do $$
+begin
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values (
+    'registrations', 'registrations', true,
+    8388608,
+    array['image/jpeg','image/png','image/webp','image/heic','image/heif']
+  )
+  on conflict (id) do update
+    set file_size_limit    = excluded.file_size_limit,
+        allowed_mime_types = excluded.allowed_mime_types;
+exception when others then
+  raise notice 'Could not create the storage bucket (%). Create it manually in Storage if uploads fail.', sqlerrm;
+end $$;
 
 -- The public form may upload into profile/ and payment/ folders only.
-drop policy if exists "public can upload registration images" on storage.objects;
-create policy "public can upload registration images"
-  on storage.objects for insert
-  to anon
-  with check (
-    bucket_id = 'registrations'
-    and (storage.foldername(name))[1] in ('profile', 'payment')
-  );
-
--- Staff may upload/replace images from the admin console.
-drop policy if exists "staff can upload registration images" on storage.objects;
-create policy "staff can upload registration images"
-  on storage.objects for insert
-  to authenticated
-  with check (bucket_id = 'registrations');
-
-drop policy if exists "staff can replace registration images" on storage.objects;
-create policy "staff can replace registration images"
-  on storage.objects for update
-  to authenticated
-  using (bucket_id = 'registrations');
-
--- Image reads: the bucket's `public` flag already serves any *known* object URL
--- (that's how the admin panel loads thumbnails), so we do NOT grant the anon role
--- a blanket SELECT here. Without it, an anonymous visitor cannot LIST/enumerate
--- the bucket — so profile photos and payment screenshots can't be scraped, even
--- though staff and known direct URLs keep working. Only signed-in staff may list.
-drop policy if exists "public can view registration images" on storage.objects;
-drop policy if exists "staff can view registration images" on storage.objects;
-create policy "staff can view registration images"
-  on storage.objects for select
-  to authenticated
-  using (bucket_id = 'registrations');
-
--- Staff may clean up images.
-drop policy if exists "staff can delete registration images" on storage.objects;
-create policy "staff can delete registration images"
-  on storage.objects for delete
-  to authenticated
-  using (bucket_id = 'registrations');
-
+do $$
+begin
+  drop policy if exists "public can upload registration images" on storage.objects;
+  create policy "public can upload registration images"
+    on storage.objects for insert
+    to anon
+    with check (
+      bucket_id = 'registrations'
+      and (storage.foldername(name))[1] in ('profile', 'payment')
+    );
+  
+  -- Staff may upload/replace images from the admin console.
+  drop policy if exists "staff can upload registration images" on storage.objects;
+  create policy "staff can upload registration images"
+    on storage.objects for insert
+    to authenticated
+    with check (bucket_id = 'registrations');
+  
+  drop policy if exists "staff can replace registration images" on storage.objects;
+  create policy "staff can replace registration images"
+    on storage.objects for update
+    to authenticated
+    using (bucket_id = 'registrations');
+  
+  -- Image reads: the bucket's `public` flag already serves any *known* object URL
+  -- (that's how the admin panel loads thumbnails), so we do NOT grant the anon role
+  -- a blanket SELECT here. Without it, an anonymous visitor cannot LIST/enumerate
+  -- the bucket — so profile photos and payment screenshots can't be scraped, even
+  -- though staff and known direct URLs keep working. Only signed-in staff may list.
+  drop policy if exists "public can view registration images" on storage.objects;
+  drop policy if exists "staff can view registration images" on storage.objects;
+  create policy "staff can view registration images"
+    on storage.objects for select
+    to authenticated
+    using (bucket_id = 'registrations');
+  
+  -- Staff may clean up images.
+  drop policy if exists "staff can delete registration images" on storage.objects;
+  create policy "staff can delete registration images"
+    on storage.objects for delete
+    to authenticated
+    using (bucket_id = 'registrations');
+  
+exception when others then
+  raise notice 'Storage policies skipped (%). Set them in Storage -> Policies if uploads fail.', sqlerrm;
+end $$;
 -- ============================================================
 -- NEXT: create the organiser login.
 -- Easiest: Dashboard → Authentication → Users → "Add user"
@@ -710,25 +720,18 @@ to authenticated;
 -- ============================================================
 -- 7) Realtime — live updates on every auction screen
 -- ============================================================
+-- Realtime is a nicety: if the publication is missing or owned by another
+-- role, skip it rather than aborting the whole install.
 do $$
+declare t text;
 begin
-  alter publication supabase_realtime add table public.auction_lots;
-exception when duplicate_object then null; when undefined_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table public.auction_teams;
-exception when duplicate_object then null; when undefined_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table public.auction_state;
-exception when duplicate_object then null; when undefined_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table public.auction_bids;
-exception when duplicate_object then null; when undefined_object then null;
+  foreach t in array array['auction_lots','auction_teams','auction_state','auction_bids'] loop
+    begin
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    exception when others then
+      raise notice 'Realtime not enabled for % (%). The app still works.', t, sqlerrm;
+    end;
+  end loop;
 end $$;
 
 -- ============================================================

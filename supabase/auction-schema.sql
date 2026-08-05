@@ -480,25 +480,18 @@ to authenticated;
 -- ============================================================
 -- 7) Realtime — live updates on every auction screen
 -- ============================================================
+-- Realtime is a nicety: if the publication is missing or owned by another
+-- role, skip it rather than aborting the whole install.
 do $$
+declare t text;
 begin
-  alter publication supabase_realtime add table public.auction_lots;
-exception when duplicate_object then null; when undefined_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table public.auction_teams;
-exception when duplicate_object then null; when undefined_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table public.auction_state;
-exception when duplicate_object then null; when undefined_object then null;
-end $$;
-do $$
-begin
-  alter publication supabase_realtime add table public.auction_bids;
-exception when duplicate_object then null; when undefined_object then null;
+  foreach t in array array['auction_lots','auction_teams','auction_state','auction_bids'] loop
+    begin
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    exception when others then
+      raise notice 'Realtime not enabled for % (%). The app still works.', t, sqlerrm;
+    end;
+  end loop;
 end $$;
 
 -- ============================================================
