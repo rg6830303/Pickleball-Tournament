@@ -38,19 +38,28 @@ are already configured in `site/js/config.js` and `admin/js/config.js`.
 - **Event Controls**: open/close registrations + announcement banner
 - CSV export (filtered or full backup), bulk-delete rejected entries
 
-## One-time database setup
+## One-time database setup — a single paste
 
-Open your Supabase project → **SQL Editor** and run, in order:
+Open your Supabase project → **SQL Editor**, paste all of
+[`supabase/setup-all.sql`](supabase/setup-all.sql), and press **Run**. That one
+file installs everything and prints a verification table at the end (every row
+should read `OK`):
 
-1. [`supabase/schema.sql`](supabase/schema.sql) — creates the `registrations` and
-   `event_settings` tables, the storage bucket, the realtime feed, and all
-   row-level-security policies.
-2. [`supabase/create-admin.sql`](supabase/create-admin.sql) — creates the
-   organiser login. **Change this password after your first sign-in**
-   (Authentication → Users → ⋯ → Reset password).
+1. Registration schema — `registrations`, `event_settings`, storage bucket, RLS
+2. Auction schema — teams, lots, state, bids, credentials, RPCs, realtime
+3. Organiser login — `ishanvashistha.1993@gmail.com` / `Pickle2026`
+4. All 16 captain logins — `Team1`…`Team16` with their passwords, linked to
+   their teams
 
-That's it — the deployed site starts writing registrations immediately, and the
-console can manage them.
+It is **idempotent** — re-running it repairs accounts and policies without
+touching live registrations, purses, or squads.
+
+The individual scripts are still there if you prefer to run them piecemeal
+(`schema.sql`, `auction-schema.sql`, `create-admin.sql`, `team-logins.sql`);
+`setup-all.sql` is generated from them by `build-setup-all.sh`.
+
+**Change the passwords after the event** — organiser: Authentication → Users;
+captains: Console → Auction → Team Logins.
 
 ## Security model
 
