@@ -93,6 +93,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab on" data-tab="registrations" role="tab" aria-selected="true">Registrations</button>
       <button class="tab" data-tab="grid" role="tab" aria-selected="false">Full Table (Live)</button>
+      <button class="tab" data-tab="auction" role="tab" aria-selected="false">Auction</button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">Event Controls</button>
     </nav>
 
@@ -157,6 +158,150 @@
         </table>
         <p class="empty" id="gridEmpty" hidden>No registrations yet.</p>
       </section>
+    </section>
+
+    <!-- ---------- TAB: AUCTION ---------- -->
+    <section class="tabpane" id="tab-auction" hidden>
+
+      <!-- not-installed notice -->
+      <div class="auc-missing" id="aucMissing" hidden>
+        <b>Auction tables aren't installed yet.</b>
+        <span>Run <code>supabase/auction-schema.sql</code> once in Supabase → SQL Editor, then reload this page.</span>
+      </div>
+
+      <div id="aucBody" hidden>
+        <!-- live auctioneer stage -->
+        <section class="auc-stage">
+          <div class="auc-stage-main">
+            <p class="auc-tag" id="aucTag">Nobody on the block</p>
+            <h2 class="auc-player" id="aucPlayer">—</h2>
+            <p class="auc-meta" id="aucMeta"></p>
+            <div class="auc-price">
+              <div>
+                <p class="auc-price-label">Current Bid</p>
+                <p class="auc-price-value" id="aucPrice">—</p>
+              </div>
+              <div>
+                <p class="auc-price-label">Highest Bidder</p>
+                <p class="auc-lead" id="aucLead">—</p>
+              </div>
+            </div>
+          </div>
+          <div class="auc-stage-side">
+            <div class="field">
+              <label for="aucSellTeam">Sell to</label>
+              <select id="aucSellTeam"></select>
+            </div>
+            <div class="field">
+              <label for="aucSellPrice">Final price</label>
+              <input type="number" id="aucSellPrice" min="0" step="100" placeholder="uses current bid" />
+            </div>
+            <button class="btn-primary sm" id="btnAucSell" type="button">
+              <span class="spin" aria-hidden="true"></span><span class="btn-label">✓ Sell Player</span>
+            </button>
+            <div class="auc-side-actions">
+              <button class="btn-mini" id="btnAucUnsold" type="button">Mark unsold</button>
+              <button class="btn-mini ghost" id="btnAucClear" type="button">Clear block</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="auc-grid">
+          <!-- player pool -->
+          <div class="panel">
+            <h2 class="panel-title">Player Pool <span class="count" id="aucPoolCount">0</span></h2>
+            <p class="panel-sub">Put players on the block one by one. Sold players move to their team automatically.</p>
+            <div class="auc-pool-bar">
+              <input type="search" id="aucPoolQ" placeholder="Search players…" />
+              <select id="aucPoolFilter">
+                <option value="pool">In pool</option>
+                <option value="unsold">Unsold</option>
+                <option value="sold">Sold</option>
+                <option value="">All</option>
+              </select>
+              <input type="number" id="aucBase" min="0" step="100" placeholder="Base ₹" title="Base price used when putting a player on the block" />
+            </div>
+            <div class="auc-pool" id="aucPool"></div>
+          </div>
+
+          <!-- teams -->
+          <div class="panel">
+            <h2 class="panel-title">Teams &amp; Purses</h2>
+            <p class="panel-sub">Wallets update automatically on every sale. Edit any value inline.</p>
+            <div class="table-wrap">
+              <table class="regs auc-teams">
+                <thead>
+                  <tr><th>Team</th><th>Captain</th><th>Purse</th><th>Spent</th><th>Left</th><th>Squad</th><th></th></tr>
+                </thead>
+                <tbody id="aucTeamsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- setup + controls -->
+        <div class="auc-grid">
+          <div class="panel">
+            <h2 class="panel-title">Auction Setup</h2>
+            <p class="panel-sub">Sync registered players into the pool, set the bid step, and create the 16 captain logins.</p>
+            <div class="auc-setup-row">
+              <button class="btn-mini" id="btnAucSync" type="button">⟳ Sync registered players</button>
+              <label class="auc-inline"><input type="checkbox" id="aucOnlyVerified" /> verified only</label>
+            </div>
+            <div class="auc-setup-row" style="margin-top:14px">
+              <div class="field" style="margin:0">
+                <label for="aucIncrement">Bid increment</label>
+                <input type="number" id="aucIncrement" min="1" step="100" />
+              </div>
+              <div class="field" style="margin:0">
+                <label for="aucPurseAll">Purse for every team</label>
+                <input type="number" id="aucPurseAll" min="0" step="1000" />
+              </div>
+              <div class="field" style="margin:0">
+                <label for="aucSquadAll">Max squad size</label>
+                <input type="number" id="aucSquadAll" min="1" step="1" />
+              </div>
+            </div>
+            <div class="auc-setup-row" style="margin-top:12px">
+              <button class="btn-primary sm" id="btnAucApply" type="button">
+                <span class="spin" aria-hidden="true"></span><span class="btn-label">Apply to all teams</span>
+              </button>
+              <button class="btn-mini" id="btnAucCreds" type="button">🔑 Create 16 team logins</button>
+              <button class="btn-mini" id="btnAucCsv" type="button">⬇ Auction CSV</button>
+            </div>
+
+            <div class="repair-panel" id="aucCredsPanel" hidden style="margin-top:14px">
+              <p class="repair-title">Create team logins</p>
+              <p class="repair-help">
+                Paste your Supabase <b>secret key</b> once. This creates
+                <code>team1…team16</code> accounts (email pre-confirmed), links them to the
+                teams, and shows you the credentials to hand out. Used in this tab only —
+                never stored.
+              </p>
+              <div class="field">
+                <label for="aucCredKey">Supabase secret key</label>
+                <input type="password" id="aucCredKey" autocomplete="off" placeholder="service_role JWT or sb_secret_…" />
+              </div>
+              <div class="field">
+                <label for="aucCredPass">Shared captain password</label>
+                <input type="text" id="aucCredPass" autocomplete="off" />
+              </div>
+              <div class="alert" id="aucCredAlert" role="alert"></div>
+              <button type="button" class="btn-primary sm" id="btnAucCredsRun">
+                <span class="spin" aria-hidden="true"></span><span class="btn-label">Create / reset 16 logins</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="panel danger">
+            <h2 class="panel-title">Auction Danger Zone</h2>
+            <p class="panel-sub">Resets every purse to full and returns all players to the pool.</p>
+            <div class="panel-actions">
+              <button class="btn-mini danger" id="btnAucReset" type="button">Reset entire auction</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ---------- TAB: EVENT CONTROLS ---------- -->

@@ -270,6 +270,7 @@
       });
       $$(".tabpane").forEach((p) => (p.hidden = p.id !== `tab-${t.dataset.tab}`));
       if (t.dataset.tab === "grid") renderGrid();
+      if (t.dataset.tab === "auction") loadAuction();
     })
   );
 
@@ -793,6 +794,409 @@
   $("#btnCsvAll").addEventListener("click", () =>
     exportCsv(rows, `mpl-full-backup-${stamp()}.csv`)
   );
+
+  /* ============================================================
+     AUCTION — master control for the team auction
+     ============================================================ */
+  const AUC = CFG.AUCTION || {};
+  const aucMoney = (n) =>
+    (AUC.CURRENCY || "₹") +
+    Number(n || 0).toLocaleString(AUC.LOCALE || "en-IN", { maximumFractionDigits: 0 });
+
+  let aTeams = [];
+  let aLots = [];
+  let aState = null;
+  let aucReady = false;
+  let aucRealtime = false;
+
+  async function loadAuction() {
+    const [t, l, s] = await Promise.all([
+      sb.from("auction_teams").select("*").order("id"),
+      sb.from("auction_lots").select("*").order("lot_order", { nullsFirst: false }),
+      sb.from("auction_state").select("*").eq("id", 1).maybeSingle(),
+    ]);
+
+    if (t.error || l.error) {
+      $("#aucMissing").hidden = false;
+      $("#aucBody").hidden = true;
+      aucReady = false;
+      return;
+    }
+    $("#aucMissing").hidden = true;
+    $("#aucBody").hidden = false;
+
+    aTeams = t.data || [];
+    aLots = l.data || [];
+    aState = s.data || null;
+
+    if (!aucReady) {
+      aucReady = true;
+      $("#aucIncrement").value = aState?.bid_increment ?? 500;
+      $("#aucPurseAll").value = aTeams[0]?.purse_total ?? 100000;
+      $("#aucSquadAll").value = aTeams[0]?.max_squad ?? 8;
+      $("#aucCredPass").value = AUC.DEFAULT_PASSWORD || "";
+      startAuctionRealtime();
+    }
+    renderAuction();
+  }
+
+  function startAuctionRealtime() {
+    if (aucRealtime) return;
+    aucRealtime = true;
+    try {
+      sb.channel("auction-admin")
+        .on("postgres_changes", { event: "*", schema: "public", table: "auction_state" }, (p) => {
+          aState = p.new;
+          renderAucStage();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "auction_teams" }, (p) => {
+          const i = aTeams.findIndex((x) => x.id === p.new.id);
+          if (i > -1) aTeams[i] = p.new;
+          renderAucTeams();
+          renderAucStage();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "auction_lots" }, (p) => {
+          if (p.eventType === "DELETE") aLots = aLots.filter((x) => x.id !== p.old.id);
+          else {
+            const i = aLots.findIndex((x) => x.id === p.new.id);
+            if (i > -1) aLots[i] = p.new;
+            else aLots.push(p.new);
+          }
+          renderAucPool();
+          renderAucTeams();
+          renderAucStage();
+        })
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "auction_bids" }, (p) => {
+          const team = aTeams.find((x) => x.id === p.new.team_id);
+          toast(`${team ? team.name : "Team " + p.new.team_id} bid ${aucMoney(p.new.amount)}`, "info");
+        })
+        .subscribe();
+    } catch {
+      /* realtime is a nicety — polling via Refresh still works */
+    }
+  }
+
+  const aucSquad = (teamId) =>
+    aLots.filter((l) => l.sold_to_team_id === teamId && l.status === "sold");
+
+  function renderAuction() {
+    renderAucStage();
+    renderAucPool();
+    renderAucTeams();
+    const sel = $("#aucSellTeam");
+    const keep = sel.value;
+    sel.innerHTML =
+      `<option value="">— highest bidder —</option>` +
+      aTeams.map((t) => `<option value="${t.id}">${esc(t.name)} · ${aucMoney(t.purse_left)}</option>`).join("");
+    if (keep) sel.value = keep;
+  }
+
+  function renderAucStage() {
+    const live = aState && aState.status === "live" && aState.current_lot_id;
+    const lot = live ? aLots.find((l) => l.id === aState.current_lot_id) : null;
+
+    $("#aucTag").textContent = lot ? "On the block" : "Nobody on the block";
+    $("#aucPlayer").textContent = lot ? lot.player_name : "—";
+    $("#aucMeta").textContent = lot
+      ? [
+          lot.dupr != null ? "DUPR " + Number(lot.dupr).toFixed(3) : "Unrated",
+          lot.gender,
+          lot.jersey_size ? "Jersey " + lot.jersey_size : null,
+          "Base " + aucMoney(lot.base_price),
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : "Pick a player from the pool and press “On the block”.";
+    $("#aucPrice").textContent = lot ? aucMoney(aState.current_price) : "—";
+    const lead = aState && aState.leading_team_id;
+    $("#aucLead").textContent = lead ? aTeams.find((t) => t.id === lead)?.name || "—" : "No bids yet";
+
+    ["btnAucSell", "btnAucUnsold", "btnAucClear"].forEach((id) => ($("#" + id).disabled = !lot));
+  }
+
+  function renderAucPool() {
+    const q = ($("#aucPoolQ").value || "").trim().toLowerCase();
+    const f = $("#aucPoolFilter").value;
+    const list = aLots.filter((l) => {
+      if (f && l.status !== f) return false;
+      if (q && !l.player_name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    $("#aucPoolCount").textContent = aLots.filter((l) => l.status === "pool").length;
+
+    $("#aucPool").innerHTML = list.length
+      ? list
+          .map((l) => {
+            const isLive = aState && aState.current_lot_id === l.id;
+            const team = l.sold_to_team_id ? aTeams.find((t) => t.id === l.sold_to_team_id) : null;
+            let right = "";
+            if (l.status === "sold") {
+              right = `<span class="sold-tag">${esc(team ? team.name : "Sold")} · ${aucMoney(l.sold_price)}</span>
+                       <button class="icon-btn" data-auc-undo="${esc(l.id)}" title="Undo sale">↺</button>`;
+            } else if (isLive) {
+              right = `<span class="sold-tag" style="color:var(--red);border-color:rgba(229,38,45,0.5)">LIVE</span>`;
+            } else {
+              if (l.status === "unsold") right += `<span class="unsold-tag">unsold</span>`;
+              right += `<button class="btn-mini" data-auc-start="${esc(l.id)}">On the block</button>`;
+            }
+            return `<div class="auc-lot ${isLive ? "is-live" : ""} ${l.status === "sold" ? "is-sold" : ""}">
+              ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy" />` : `<span class="noimg">🥒</span>`}
+              <div>
+                <div class="nm">${esc(l.player_name)}</div>
+                <div class="meta">${l.dupr != null ? "DUPR " + Number(l.dupr).toFixed(3) : "Unrated"}${
+              l.jersey_size ? " · " + esc(l.jersey_size) : ""
+            }</div>
+              </div>
+              <div class="right">${right}</div>
+            </div>`;
+          })
+          .join("")
+      : `<p class="empty">No players here yet. Use “Sync registered players” to fill the pool.</p>`;
+  }
+
+  function renderAucTeams() {
+    $("#aucTeamsBody").innerHTML = aTeams
+      .map((t) => {
+        const n = aucSquad(t.id).length;
+        return `<tr data-team="${t.id}">
+          <td><b>${esc(t.name)}</b><div class="linked ${t.auth_user_id ? "" : "nolink"}">${
+          t.auth_user_id ? "login linked" : "no login yet"
+        }</div></td>
+          <td><input class="wide" data-tf="captain_name" value="${esc(t.captain_name || "")}" placeholder="captain" /></td>
+          <td><input type="number" data-tf="purse_total" value="${Number(t.purse_total)}" /></td>
+          <td>${aucMoney(t.purse_spent)}</td>
+          <td class="left-cell">${aucMoney(t.purse_left)}</td>
+          <td>${n}/${t.max_squad}</td>
+          <td><button class="btn-mini" data-auc-squad="${t.id}">Squad</button></td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  /* ---- pool filters ---- */
+  ["aucPoolQ", "aucPoolFilter"].forEach((id) =>
+    $("#" + id).addEventListener("input", () => aucReady && renderAucPool())
+  );
+
+  /* ---- delegated auction actions ---- */
+  document.addEventListener("click", async (e) => {
+    const start = e.target.closest("[data-auc-start]");
+    if (start) {
+      const base = $("#aucBase").value ? Number($("#aucBase").value) : null;
+      const { error } = await sb.rpc("auction_start_lot", {
+        p_lot_id: start.dataset.aucStart,
+        p_base: base,
+      });
+      if (error) return toast(error.message, "err");
+      toast("Player is on the block", "ok");
+      loadAuction();
+      return;
+    }
+
+    const undo = e.target.closest("[data-auc-undo]");
+    if (undo) {
+      const lot = aLots.find((l) => l.id === undo.dataset.aucUndo);
+      confirmDialog(
+        `Undo the sale of ${lot ? lot.player_name : "this player"}? The team's purse will be refunded.`,
+        async () => {
+          const { error } = await sb.rpc("auction_undo_sale", { p_lot_id: undo.dataset.aucUndo });
+          if (error) return toast(error.message, "err");
+          toast("Sale undone and purse refunded", "ok");
+          loadAuction();
+        }
+      );
+      return;
+    }
+
+    const squad = e.target.closest("[data-auc-squad]");
+    if (squad) {
+      const id = Number(squad.dataset.aucSquad);
+      const team = aTeams.find((t) => t.id === id);
+      const list = aucSquad(id);
+      alert(
+        `${team.name} — ${aucMoney(team.purse_left)} left\n\n` +
+          (list.length
+            ? list.map((l) => `• ${l.player_name} — ${aucMoney(l.sold_price)}`).join("\n")
+            : "No players bought yet.")
+      );
+    }
+  });
+
+  /* ---- inline team edits ---- */
+  document.addEventListener("change", async (e) => {
+    const inp = e.target.closest("[data-tf]");
+    if (!inp) return;
+    const id = Number(inp.closest("tr").dataset.team);
+    const field = inp.dataset.tf;
+    const value = inp.type === "number" ? Number(inp.value) : inp.value.trim() || null;
+    const { error } = await sb.from("auction_teams").update({ [field]: value }).eq("id", id);
+    if (error) return toast(error.message, "err");
+    toast("Team updated", "ok");
+    loadAuction();
+  });
+
+  /* ---- stage controls ---- */
+  $("#btnAucSell").addEventListener("click", async () => {
+    const btn = $("#btnAucSell");
+    const teamSel = $("#aucSellTeam").value;
+    const priceIn = $("#aucSellPrice").value;
+    busy(btn, true);
+    const { error } = await sb.rpc("auction_sell", {
+      p_lot_id: null,
+      p_team_id: teamSel ? Number(teamSel) : null,
+      p_price: priceIn ? Number(priceIn) : null,
+    });
+    busy(btn, false);
+    if (error) return toast(error.message, "err");
+    $("#aucSellPrice").value = "";
+    $("#aucSellTeam").value = "";
+    toast("Sold — wallet deducted and squad updated", "ok");
+    loadAuction();
+  });
+
+  $("#btnAucUnsold").addEventListener("click", async () => {
+    const { error } = await sb.rpc("auction_mark_unsold", { p_lot_id: null });
+    if (error) return toast(error.message, "err");
+    toast("Marked unsold", "info");
+    loadAuction();
+  });
+
+  $("#btnAucClear").addEventListener("click", async () => {
+    const { error } = await sb
+      .from("auction_state")
+      .update({ status: "idle", current_lot_id: null, current_price: 0, leading_team_id: null })
+      .eq("id", 1);
+    if (error) return toast(error.message, "err");
+    const live = aLots.find((l) => aState && l.id === aState.current_lot_id);
+    if (live && live.status === "live") {
+      await sb.from("auction_lots").update({ status: "pool" }).eq("id", live.id);
+    }
+    toast("Block cleared", "info");
+    loadAuction();
+  });
+
+  /* ---- setup ---- */
+  $("#btnAucSync").addEventListener("click", async () => {
+    const { data, error } = await sb.rpc("auction_sync_players", {
+      p_only_verified: $("#aucOnlyVerified").checked,
+    });
+    if (error) return toast(error.message, "err");
+    toast(data ? `Added ${data} player${data === 1 ? "" : "s"} to the pool` : "Pool is already up to date", "ok");
+    loadAuction();
+  });
+
+  $("#btnAucApply").addEventListener("click", async () => {
+    const btn = $("#btnAucApply");
+    busy(btn, true);
+    const purse = Number($("#aucPurseAll").value);
+    const squad = Number($("#aucSquadAll").value);
+    const inc = Number($("#aucIncrement").value);
+    const e1 = await sb.from("auction_teams").update({ purse_total: purse, max_squad: squad }).gte("id", 1);
+    const e2 = await sb.from("auction_state").update({ bid_increment: inc }).eq("id", 1);
+    busy(btn, false);
+    if (e1.error || e2.error) return toast((e1.error || e2.error).message, "err");
+    toast("Applied to all 16 teams", "ok");
+    loadAuction();
+  });
+
+  $("#btnAucReset").addEventListener("click", () =>
+    confirmDialog(
+      "Reset the ENTIRE auction? Every player returns to the pool and all purses are refilled. This cannot be undone.",
+      async () => {
+        const { error } = await sb.rpc("auction_reset");
+        if (error) return toast(error.message, "err");
+        toast("Auction reset", "ok");
+        loadAuction();
+      }
+    )
+  );
+
+  $("#btnAucCsv").addEventListener("click", () => {
+    const cols = ["player_name", "dupr", "gender", "jersey_size", "status", "base_price", "sold_price", "team"];
+    const cell = (v) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const body = aLots.map((l) => {
+      const t = aTeams.find((x) => x.id === l.sold_to_team_id);
+      return cols
+        .map((c) => cell(c === "team" ? (t ? t.name : "") : l[c]))
+        .join(",");
+    });
+    const csv = [cols.join(","), ...body].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `mpl-auction-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  /* ---- create the 16 captain logins ---- */
+  $("#btnAucCreds").addEventListener("click", () => {
+    const p = $("#aucCredsPanel");
+    p.hidden = !p.hidden;
+    if (!p.hidden) $("#aucCredKey").focus();
+  });
+
+  $("#btnAucCredsRun").addEventListener("click", async () => {
+    const btn = $("#btnAucCredsRun");
+    const key = $("#aucCredKey").value.trim();
+    const pass = $("#aucCredPass").value;
+    const domain = AUC.TEAM_EMAIL_DOMAIN;
+    const count = AUC.TEAM_COUNT || 16;
+
+    if (!(key.startsWith("sb_secret_") || key.startsWith("eyJ")))
+      return alertBox($("#aucCredAlert"), "Paste your Supabase secret key (starts with sb_secret_ or eyJ).");
+    if (!pass || pass.length < 6)
+      return alertBox($("#aucCredAlert"), "Captain password must be at least 6 characters.");
+
+    busy(btn, true);
+    const done = [];
+    try {
+      for (let i = 1; i <= count; i++) {
+        const email = `team${i}@${domain}`;
+        const existing = await findAuthUser(key, email);
+        let uid;
+        if (existing) {
+          const r = await adminApi(key, `/auth/v1/admin/users/${existing.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ password: pass, email_confirm: true }),
+          });
+          if (!r.ok) throw new Error(`Team ${i}: ${(await r.json()).msg || r.status}`);
+          uid = existing.id;
+        } else {
+          const r = await adminApi(key, "/auth/v1/admin/users", {
+            method: "POST",
+            body: JSON.stringify({ email, password: pass, email_confirm: true }),
+          });
+          if (!r.ok) throw new Error(`Team ${i}: ${(await r.json()).msg || r.status}`);
+          uid = (await r.json()).id;
+        }
+        const { error } = await sb.from("auction_teams").update({ auth_user_id: uid }).eq("id", i);
+        if (error) throw new Error(`Team ${i} link failed: ${error.message}`);
+        done.push(`Team ${i}  ·  password: ${pass}`);
+      }
+
+      let out = $("#aucCredsOut");
+      if (!out) {
+        out = document.createElement("div");
+        out.className = "auc-creds-out";
+        out.id = "aucCredsOut";
+        $("#aucCredsPanel").appendChild(out);
+      }
+      out.textContent =
+        `All ${count} captain logins are ready.\n` +
+        `Auction site: monsoonpickleauction.vercel.app\n\n` +
+        done.join("\n");
+      $("#aucCredAlert").classList.remove("show");
+      toast(`${count} team logins created`, "ok");
+      loadAuction();
+    } catch (err) {
+      alertBox($("#aucCredAlert"), err.message || String(err));
+    } finally {
+      busy(btn, false);
+    }
+  });
 
   window.addEventListener("DOMContentLoaded", boot);
 })();

@@ -7,7 +7,12 @@
       "destination": "/admin/:path"
     },
     {
-      "source": "/:path((?!site/|site$|admin/|admin$).*)",
+      "source": "/:path((?!auction/|auction$).*)",
+      "has": [{ "type": "host", "value": "monsoonpickleauction.vercel.app" }],
+      "destination": "/auction/:path"
+    },
+    {
+      "source": "/:path((?!site/|site$|admin/|admin$|auction/|auction$).*)",
       "destination": "/site/:path"
     }
   ],
@@ -27,8 +32,11 @@
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {
-      "source": "/admin/(.*)",
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "monsoonpickleauction.vercel.app" }],
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    }
+    },
+    { "source": "/admin/(.*)",   "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/auction/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
   ]
 }

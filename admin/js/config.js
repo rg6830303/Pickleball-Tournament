@@ -21,4 +21,13 @@ window.MPL_ADMIN_CONFIG = {
 
   JERSEY_SIZES: ["XS", "S", "M", "L", "XL", "XXL"],
   STATUSES: ["pending", "verified", "checked-in", "rejected"],
+
+  /* ---- Team auction (auction/ app + Auction tab) ---- */
+  AUCTION: {
+    TEAM_COUNT: 16,
+    TEAM_EMAIL_DOMAIN: "monsoonpickleleague.in",
+    DEFAULT_PASSWORD: "SmashPoint@26",
+    CURRENCY: "\u20b9",
+    LOCALE: "en-IN",
+  },
 };
