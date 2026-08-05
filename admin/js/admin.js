@@ -837,6 +837,7 @@
       startAuctionRealtime();
     }
     renderAuction();
+    loadLogins();
   }
 
   function startAuctionRealtime() {
@@ -1236,74 +1237,264 @@
     URL.revokeObjectURL(a.href);
   });
 
-  /* ---- create the 16 captain logins ---- */
-  $("#btnAucCreds").addEventListener("click", () => {
-    const p = $("#aucCredsPanel");
-    p.hidden = !p.hidden;
-    if (!p.hidden) $("#aucCredKey").focus();
-  });
+  /* ============================================================
+     TEAM LOGINS — check current credentials, reset any password
+     ============================================================ */
+  let aLogins = [];          // rows from auction_team_logins
+  let aAuthStatus = {};      // teamId -> "missing" | "unconfirmed" | "ok"
+  let loginsRevealed = false;
 
-  $("#btnAucCredsRun").addEventListener("click", async () => {
-    const btn = $("#btnAucCredsRun");
-    const key = $("#aucCredKey").value.trim();
-    const domain = AUC.TEAM_EMAIL_DOMAIN;
+  const teamUsername = (i) => `Team${i}`;
+  const teamEmail = (i) => `team${i}@${AUC.TEAM_EMAIL_DOMAIN}`;
+  const loginKey = () => $("#aucLoginKey").value.trim();
+  const keyLooksValid = (k) => k.startsWith("sb_secret_") || k.startsWith("eyJ");
+
+  /* readable password: word + 4 digits, easy to type, not guessable across teams */
+  const PW_WORDS = [
+    "Dink", "Rally", "Volley", "Smash", "Lob", "Ace", "Drive", "Slice",
+    "Spin", "Serve", "Court", "NetPlay", "Kitchen", "Paddle", "Baseline", "Topspin",
+    "Backhand", "Forehand", "Poach", "Stack", "Erne", "Flick", "Reset", "Punch",
+  ];
+  function makePassword(used) {
+    for (let tries = 0; tries < 200; tries++) {
+      const w = PW_WORDS[Math.floor(Math.random() * PW_WORDS.length)];
+      const n = Math.floor(1000 + Math.random() * 9000);
+      const pw = `${w}${n}`;
+      if (!used.has(pw)) { used.add(pw); return pw; }
+    }
+    return `Pickle${Date.now().toString().slice(-4)}`;
+  }
+
+  /* password shown for a team: stored value wins, else the config default */
+  function passwordFor(i) {
+    const row = aLogins.find((l) => l.team_id === i);
+    if (row) return row.password;
+    return (AUC.TEAM_PASSWORDS || [])[i - 1] || "";
+  }
+
+  async function loadLogins() {
+    const { data, error } = await sb.from("auction_team_logins").select("*").order("team_id");
+    aLogins = error ? [] : data || [];
+    renderLogins();
+  }
+
+  function renderLogins() {
     const count = AUC.TEAM_COUNT || 16;
-    const passwords = AUC.TEAM_PASSWORDS || [];
+    $("#aucLoginCount").textContent = count;
+    const mask = (p) => (loginsRevealed ? p : "•".repeat(Math.min(p.length, 10)));
 
-    if (!(key.startsWith("sb_secret_") || key.startsWith("eyJ")))
-      return alertBox($("#aucCredAlert"), "Paste your Supabase secret key (starts with sb_secret_ or eyJ).");
-    if (passwords.length < count)
-      return alertBox($("#aucCredAlert"), `Need ${count} passwords in admin/js/config.js → AUCTION.TEAM_PASSWORDS.`);
+    let html = "";
+    for (let i = 1; i <= count; i++) {
+      const pw = passwordFor(i);
+      const st = aAuthStatus[i];
+      const team = aTeams.find((t) => t.id === i);
+      const linked = team && team.auth_user_id;
+      const badge =
+        st === "ok"
+          ? `<span class="lg-badge ok">active</span>`
+          : st === "unconfirmed"
+          ? `<span class="lg-badge warn">email unconfirmed</span>`
+          : st === "missing"
+          ? `<span class="lg-badge bad">not created</span>`
+          : linked
+          ? `<span class="lg-badge ok">linked</span>`
+          : `<span class="lg-badge">unknown</span>`;
 
+      html += `<tr data-login="${i}">
+        <td><b>${teamUsername(i)}</b><div class="sub">${esc(teamEmail(i))}</div></td>
+        <td><code class="lg-pw" data-pw="${i}">${esc(mask(pw))}</code></td>
+        <td>${badge}</td>
+        <td>
+          <div class="lg-reset">
+            <input type="text" class="lg-input" data-newpw="${i}" placeholder="new password" />
+            <button class="btn-mini" data-login-reset="${i}">Reset</button>
+          </div>
+        </td>
+      </tr>`;
+    }
+    $("#aucLoginBody").innerHTML = html;
+    $("#btnLoginReveal").textContent = loginsRevealed ? "🙈 Hide passwords" : "👁 Show passwords";
+  }
+
+  /* persist a password to the staff-only table */
+  async function storePassword(i, pw) {
+    return sb.from("auction_team_logins").upsert({
+      team_id: i,
+      username: teamUsername(i),
+      email: teamEmail(i),
+      password: pw,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  /* create-or-reset one team's auth account, link it, and record the password */
+  async function applyLogin(key, i, pw) {
+    const email = teamEmail(i);
+    const existing = await findAuthUser(key, email);
+    let uid;
+    if (existing) {
+      const r = await adminApi(key, `/auth/v1/admin/users/${existing.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ password: pw, email_confirm: true }),
+      });
+      if (!r.ok) throw new Error(`Team ${i}: ${(await r.json()).msg || r.status}`);
+      uid = existing.id;
+    } else {
+      const r = await adminApi(key, "/auth/v1/admin/users", {
+        method: "POST",
+        body: JSON.stringify({ email, password: pw, email_confirm: true }),
+      });
+      if (!r.ok) throw new Error(`Team ${i}: ${(await r.json()).msg || r.status}`);
+      uid = (await r.json()).id;
+    }
+    const { error } = await sb.from("auction_teams").update({ auth_user_id: uid }).eq("id", i);
+    if (error) throw new Error(`Team ${i} link failed: ${error.message}`);
+    const { error: e2 } = await storePassword(i, pw);
+    if (e2) throw new Error(`Team ${i} credential save failed: ${e2.message}`);
+    aAuthStatus[i] = "ok";
+  }
+
+  /* ---- check every login against Supabase Auth ---- */
+  $("#btnLoginCheck").addEventListener("click", async () => {
+    const btn = $("#btnLoginCheck");
+    const key = loginKey();
+    await loadLogins();
+    if (!keyLooksValid(key)) {
+      alertBox(
+        $("#aucLoginAlert"),
+        "Paste the Supabase secret key above to check whether each account really exists. " +
+          "Stored passwords are shown below regardless."
+      );
+      return;
+    }
     busy(btn, true);
-    const done = [];
     try {
+      const count = AUC.TEAM_COUNT || 16;
       for (let i = 1; i <= count; i++) {
-        const email = `team${i}@${domain}`;
-        const pass = passwords[i - 1];
-        const existing = await findAuthUser(key, email);
-        let uid;
-        if (existing) {
-          const r = await adminApi(key, `/auth/v1/admin/users/${existing.id}`, {
-            method: "PUT",
-            body: JSON.stringify({ password: pass, email_confirm: true }),
-          });
-          if (!r.ok) throw new Error(`Team ${i}: ${(await r.json()).msg || r.status}`);
-          uid = existing.id;
-        } else {
-          const r = await adminApi(key, "/auth/v1/admin/users", {
-            method: "POST",
-            body: JSON.stringify({ email, password: pass, email_confirm: true }),
-          });
-          if (!r.ok) throw new Error(`Team ${i}: ${(await r.json()).msg || r.status}`);
-          uid = (await r.json()).id;
-        }
-        const { error } = await sb.from("auction_teams").update({ auth_user_id: uid }).eq("id", i);
-        if (error) throw new Error(`Team ${i} link failed: ${error.message}`);
-        done.push(`Team${String(i).padStart(2, " ")}   ${pass}`);
+        const u = await findAuthUser(key, teamEmail(i));
+        aAuthStatus[i] = !u ? "missing" : u.email_confirmed_at || u.confirmed_at ? "ok" : "unconfirmed";
       }
-
-      let out = $("#aucCredsOut");
-      if (!out) {
-        out = document.createElement("div");
-        out.className = "auc-creds-out";
-        out.id = "aucCredsOut";
-        $("#aucCredsPanel").appendChild(out);
-      }
-      out.textContent =
-        `All ${count} captain logins are ready.\n` +
-        `Auction site: https://monsoonpickleauction.vercel.app\n\n` +
-        `USERNAME   PASSWORD\n` +
-        `------------------------\n` +
-        done.join("\n");
-      $("#aucCredAlert").classList.remove("show");
-      toast(`${count} team logins created`, "ok");
-      loadAuction();
+      const missing = Object.values(aAuthStatus).filter((s) => s === "missing").length;
+      $("#aucLoginAlert").classList.remove("show");
+      toast(missing ? `${missing} login(s) not created yet` : "All team logins are active", missing ? "info" : "ok");
+      renderLogins();
     } catch (err) {
-      alertBox($("#aucCredAlert"), err.message || String(err));
+      alertBox($("#aucLoginAlert"), err.message || String(err));
     } finally {
       busy(btn, false);
     }
+  });
+
+  /* ---- reset one team ---- */
+  document.addEventListener("click", async (e) => {
+    const rst = e.target.closest("[data-login-reset]");
+    if (!rst) return;
+    const i = Number(rst.dataset.loginReset);
+    const key = loginKey();
+    if (!keyLooksValid(key))
+      return alertBox($("#aucLoginAlert"), "Paste the Supabase secret key above before resetting a password.");
+    const input = $(`[data-newpw="${i}"]`);
+    const pw = (input.value || "").trim() || passwordFor(i);
+    if (pw.length < 6)
+      return alertBox($("#aucLoginAlert"), "Password must be at least 6 characters.");
+    rst.disabled = true;
+    try {
+      await applyLogin(key, i, pw);
+      input.value = "";
+      await loadLogins();
+      toast(`${teamUsername(i)} password reset`, "ok");
+      $("#aucLoginAlert").classList.remove("show");
+    } catch (err) {
+      alertBox($("#aucLoginAlert"), err.message || String(err));
+    } finally {
+      rst.disabled = false;
+    }
+  });
+
+  /* ---- create / reset all 16 ---- */
+  $("#btnLoginApplyAll").addEventListener("click", () => {
+    const key = loginKey();
+    if (!keyLooksValid(key))
+      return alertBox($("#aucLoginAlert"), "Paste the Supabase secret key above first.");
+    confirmDialog(
+      "Create or reset all 16 captain logins to the passwords shown below? Captains using an old password will be signed out.",
+      async () => {
+        const btn = $("#btnLoginApplyAll");
+        btn.disabled = true;
+        try {
+          const count = AUC.TEAM_COUNT || 16;
+          for (let i = 1; i <= count; i++) await applyLogin(key, i, passwordFor(i));
+          await loadLogins();
+          loadAuction();
+          $("#aucLoginAlert").classList.remove("show");
+          toast(`All ${count} captain logins are ready`, "ok");
+        } catch (err) {
+          alertBox($("#aucLoginAlert"), err.message || String(err));
+        } finally {
+          btn.disabled = false;
+        }
+      }
+    );
+  });
+
+  /* ---- generate fresh passwords (stored, then applied) ---- */
+  $("#btnLoginRandom").addEventListener("click", () => {
+    confirmDialog(
+      "Generate a brand-new password for all 16 teams? They are saved here immediately — press “Create / reset all 16” to push them to the captains' accounts.",
+      async () => {
+        const count = AUC.TEAM_COUNT || 16;
+        const used = new Set();
+        for (let i = 1; i <= count; i++) {
+          const { error } = await storePassword(i, makePassword(used));
+          if (error) return alertBox($("#aucLoginAlert"), error.message);
+        }
+        await loadLogins();
+        loginsRevealed = true;
+        renderLogins();
+        toast("New passwords generated — now press “Create / reset all 16”", "info");
+      }
+    );
+  });
+
+  $("#btnLoginReveal").addEventListener("click", () => {
+    loginsRevealed = !loginsRevealed;
+    renderLogins();
+  });
+
+  function loginLines() {
+    const count = AUC.TEAM_COUNT || 16;
+    const out = ["Monsoon Pickle League — Team Auction", "https://monsoonpickleauction.vercel.app", "", "USERNAME   PASSWORD"];
+    for (let i = 1; i <= count; i++) out.push(`${teamUsername(i).padEnd(10)} ${passwordFor(i)}`);
+    return out.join("\n");
+  }
+
+  $("#btnLoginCopy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(loginLines());
+      toast("Credentials copied to clipboard", "ok");
+    } catch {
+      loginsRevealed = true;
+      renderLogins();
+      toast("Clipboard blocked — passwords revealed below instead", "info");
+    }
+  });
+
+  $("#btnLoginCsv").addEventListener("click", () => {
+    const count = AUC.TEAM_COUNT || 16;
+    const rows = ["username,email,password"];
+    for (let i = 1; i <= count; i++) rows.push(`${teamUsername(i)},${teamEmail(i)},${passwordFor(i)}`);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+    a.download = `mpl-team-logins-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  /* ---- legacy quick-create button (kept in Auction Setup) ---- */
+  $("#btnAucCreds").addEventListener("click", () => {
+    $("#aucLoginKey").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#aucLoginKey").focus();
+    toast("Manage every captain login in the Team Logins panel below", "info");
   });
 
   window.addEventListener("DOMContentLoaded", boot);

@@ -254,28 +254,7 @@
               <button class="btn-mini" id="btnAucCsv" type="button">⬇ Auction CSV</button>
             </div>
 
-            <div class="repair-panel" id="aucCredsPanel" hidden style="margin-top:14px">
-              <p class="repair-title">Create team logins</p>
-              <p class="repair-help">
-                Paste your Supabase <b>secret key</b> once. This creates
-                <code>team1…team16</code> accounts (email pre-confirmed), links them to the
-                teams, and shows you the credentials to hand out. Used in this tab only —
-                never stored.
-              </p>
-              <div class="field">
-                <label for="aucCredKey">Supabase secret key</label>
-                <input type="password" id="aucCredKey" autocomplete="off" placeholder="service_role JWT or sb_secret_…" />
-              </div>
-              <p class="repair-help" style="margin-bottom:12px">
-                Each team gets its own password from
-                <code>admin/js/config.js → AUCTION.TEAM_PASSWORDS</code>. The full
-                list is printed below once the accounts are created.
-              </p>
-              <div class="alert" id="aucCredAlert" role="alert"></div>
-              <button type="button" class="btn-primary sm" id="btnAucCredsRun">
-                <span class="spin" aria-hidden="true"></span><span class="btn-label">Create / reset 16 logins</span>
-              </button>
-            </div>
+            <!-- captain logins are managed in the Team Logins panel below -->
           </div>
 
         </div>
@@ -292,6 +271,44 @@
             <button class="btn-mini" id="btnAucExpandAll" type="button">Expand all squads</button>
           </div>
           <div class="team-cards" id="aucTeamCards"></div>
+        </div>
+
+        <!-- team logins: check & reset -->
+        <div class="panel">
+          <h2 class="panel-title">Team Logins <span class="count" id="aucLoginCount">0</span></h2>
+          <p class="panel-sub">
+            Check every captain's credentials and reset any password. Passwords are
+            stored in a staff-only table — captains and the public can never read them.
+          </p>
+
+          <div class="login-key-row">
+            <div class="field" style="margin:0; flex:1; min-width:220px">
+              <label for="aucLoginKey">Supabase secret key <span class="hint">(needed to create or reset accounts · used in this tab only)</span></label>
+              <input type="password" id="aucLoginKey" autocomplete="off" placeholder="service_role JWT or sb_secret_…" />
+            </div>
+          </div>
+
+          <div class="login-actions">
+            <button class="btn-primary sm" id="btnLoginCheck" type="button">
+              <span class="spin" aria-hidden="true"></span><span class="btn-label">⟳ Check all logins</span>
+            </button>
+            <button class="btn-mini" id="btnLoginApplyAll" type="button">Create / reset all 16</button>
+            <button class="btn-mini" id="btnLoginRandom" type="button">🎲 Generate new passwords</button>
+            <button class="btn-mini" id="btnLoginReveal" type="button">👁 Show passwords</button>
+            <button class="btn-mini" id="btnLoginCopy" type="button">⧉ Copy list</button>
+            <button class="btn-mini" id="btnLoginCsv" type="button">⬇ CSV</button>
+          </div>
+
+          <div class="alert" id="aucLoginAlert" role="alert"></div>
+
+          <div class="table-wrap">
+            <table class="regs login-table">
+              <thead>
+                <tr><th>Username</th><th>Password</th><th>Account</th><th class="th-actions">Reset</th></tr>
+              </thead>
+              <tbody id="aucLoginBody"></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="panel danger">

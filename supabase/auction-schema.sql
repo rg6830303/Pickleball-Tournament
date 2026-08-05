@@ -100,6 +100,22 @@ create table if not exists public.auction_state (
 insert into public.auction_state (id) values (1) on conflict (id) do nothing;
 
 -- ------------------------------------------------------------
+-- 3b) Team login credentials — STAFF ONLY.
+--     Supabase stores only a bcrypt hash of each password, so it can
+--     never be read back. The organiser still needs to look up and
+--     re-issue captain credentials during the event, so the console
+--     keeps the current password here. RLS makes this table invisible
+--     to captains and to the public — only staff can read or write it.
+-- ------------------------------------------------------------
+create table if not exists public.auction_team_logins (
+  team_id     int primary key references public.auction_teams(id) on delete cascade,
+  username    text not null,
+  email       text not null,
+  password    text not null,
+  updated_at  timestamptz not null default now()
+);
+
+-- ------------------------------------------------------------
 -- 4) Bid log — audit trail + live ticker
 -- ------------------------------------------------------------
 create table if not exists public.auction_bids (
@@ -150,6 +166,16 @@ create policy "auth can read state"
 drop policy if exists "staff manage state" on public.auction_state;
 create policy "staff manage state"
   on public.auction_state for all to authenticated
+  using (public.is_auction_staff()) with check (public.is_auction_staff());
+
+-- Team logins: STAFF ONLY — captains must never see another team's password
+-- (or their own, via the API). No policy exists for anon, so it is unreachable
+-- from the public site.
+alter table public.auction_team_logins enable row level security;
+
+drop policy if exists "staff manage team logins" on public.auction_team_logins;
+create policy "staff manage team logins"
+  on public.auction_team_logins for all to authenticated
   using (public.is_auction_staff()) with check (public.is_auction_staff());
 
 -- Bids: readable by all signed in; inserts happen through auction_bid().
