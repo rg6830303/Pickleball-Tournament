@@ -38,7 +38,25 @@ are already configured in `site/js/config.js` and `admin/js/config.js`.
 - **Event Controls**: open/close registrations + announcement banner
 - CSV export (filtered or full backup), bulk-delete rejected entries
 
-## One-time database setup — a single paste
+## One-time database setup
+
+### Option A — GitHub Actions (recommended)
+
+1. Add one repository secret: **Settings → Secrets and variables → Actions →
+   New repository secret**
+   - Name: `SUPABASE_DB_URL`
+   - Value: Supabase → Project Settings → Database → Connection string →
+     **Session pooler** (the `...pooler.supabase.com:5432...` one, with your
+     database password in it)
+2. **Actions → Supabase Setup → Run workflow**
+
+The workflow applies `supabase/setup-all.sql` to the live project, then verifies
+it: object inventory, all 16 captain logins (account exists, email confirmed,
+linked to its team, password hash matches) and the organiser login. It fails
+loudly if anything is off, and writes the results to the run summary. It re-runs
+automatically whenever `supabase/**.sql` changes on `main`.
+
+### Option B — SQL Editor
 
 Open your Supabase project → **SQL Editor**, paste all of
 [`supabase/setup-all.sql`](supabase/setup-all.sql), and press **Run**. That one

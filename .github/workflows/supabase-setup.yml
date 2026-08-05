@@ -1,0 +1,176 @@
+name: Supabase Setup
+
+# Applies supabase/setup-all.sql to the live Supabase project:
+# registration schema, auction schema, RLS, storage, the organiser login
+# and all 16 captain logins. The script is idempotent, so re-running is safe.
+#
+# ── ONE-TIME PREREQUISITE ────────────────────────────────────────────
+# Add a repository secret named SUPABASE_DB_URL:
+#   GitHub → Settings → Secrets and variables → Actions → New repository secret
+#   Name:  SUPABASE_DB_URL
+#   Value: your Supabase "Session pooler" connection string, e.g.
+#          postgres://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+#   (Supabase → Project Settings → Database → Connection string → Session pooler)
+# ─────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      verify_only:
+        description: "Only run the verification checks (do not modify the database)"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**.sql"
+      - ".github/workflows/supabase-setup.yml"
+
+concurrency:
+  group: supabase-setup
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    name: Apply schema & seed logins
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          psql --version
+
+      - name: Check the connection secret is present
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::Repository secret SUPABASE_DB_URL is not set."
+            {
+              echo "## ❌ Missing secret: \`SUPABASE_DB_URL\`"
+              echo
+              echo "Add it under **Settings → Secrets and variables → Actions → New repository secret**."
+              echo
+              echo "Value = your Supabase **Session pooler** connection string:"
+              echo '```'
+              echo 'postgres://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require'
+              echo '```'
+              echo "Find it in Supabase → Project Settings → Database → Connection string → **Session pooler**."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "Secret is present."
+
+      - name: Verify database connectivity
+        env:
+          PGCONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          echo "Connecting to Supabase…"
+          psql "$PGCONN" -v ON_ERROR_STOP=1 -tAc \
+            "select 'connected to ' || current_database() || ' as ' || current_user"
+
+      - name: Apply setup-all.sql
+        if: ${{ inputs.verify_only != true }}
+        env:
+          PGCONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$PGCONN" -v ON_ERROR_STOP=1 -f supabase/setup-all.sql 2>&1 | tee /tmp/apply.log
+          echo "Schema applied."
+
+      - name: Verify installation
+        env:
+          PGCONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+
+          # --- object inventory ---
+          psql "$PGCONN" -v ON_ERROR_STOP=1 -P pager=off -c "
+            select 'tables'   as item, count(*)::text as value from pg_tables where schemaname='public'
+            union all select 'auction RPCs', count(*)::text from pg_proc p
+              join pg_namespace n on n.oid=p.pronamespace
+              where n.nspname='public' and p.proname like 'auction%'
+            union all select 'tables with RLS', count(*)::text from pg_tables t
+              join pg_class c on c.relname=t.tablename where t.schemaname='public' and c.relrowsecurity
+            union all select 'policies', count(*)::text from pg_policies where schemaname in ('public','storage')
+            union all select 'storage buckets', count(*)::text from storage.buckets where id='registrations'
+            union all select 'teams', count(*)::text from public.auction_teams
+            union all select 'registrations (untouched)', count(*)::text from public.registrations;
+          " | tee /tmp/inventory.txt
+
+          # --- captain logins: every row must read OK ---
+          psql "$PGCONN" -v ON_ERROR_STOP=1 -P pager=off -c "
+            select l.username, l.email,
+              case
+                when u.id is null then 'MISSING ACCOUNT'
+                when u.email_confirmed_at is null then 'EMAIL NOT CONFIRMED'
+                when t.auth_user_id is distinct from u.id then 'NOT LINKED TO TEAM'
+                when u.encrypted_password <> crypt(l.password, u.encrypted_password) then 'PASSWORD MISMATCH'
+                else 'OK'
+              end as status
+            from public.auction_team_logins l
+            left join auth.users u on u.email = l.email
+            left join public.auction_teams t on t.id = l.team_id
+            order by l.team_id;
+          " | tee /tmp/logins.txt
+
+          # --- hard assertions ---
+          BAD=$(psql "$PGCONN" -v ON_ERROR_STOP=1 -tAc "
+            select count(*) from public.auction_team_logins l
+            left join auth.users u on u.email = l.email
+            left join public.auction_teams t on t.id = l.team_id
+            where u.id is null
+               or u.email_confirmed_at is null
+               or t.auth_user_id is distinct from u.id
+               or u.encrypted_password <> crypt(l.password, u.encrypted_password);
+          ")
+          TOTAL=$(psql "$PGCONN" -tAc "select count(*) from public.auction_team_logins;")
+          ADMIN_OK=$(psql "$PGCONN" -tAc "
+            select count(*) from auth.users
+            where email='ishanvashistha.1993@gmail.com'
+              and encrypted_password = crypt('Pickle2026', encrypted_password)
+              and email_confirmed_at is not null;
+          ")
+
+          {
+            echo "## Supabase setup result"
+            echo
+            echo '### Inventory'
+            echo '```'
+            cat /tmp/inventory.txt
+            echo '```'
+            echo '### Captain logins'
+            echo '```'
+            cat /tmp/logins.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          FAILED=0
+          if [ "$TOTAL" -ne 16 ]; then
+            echo "::error::Expected 16 captain logins, found $TOTAL"; FAILED=1
+          fi
+          if [ "$BAD" -ne 0 ]; then
+            echo "::error::$BAD captain login(s) failed verification"; FAILED=1
+          fi
+          if [ "$ADMIN_OK" -ne 1 ]; then
+            echo "::error::Organiser login did not verify"; FAILED=1
+          fi
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo "❌ Verification failed — see the errors above." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          {
+            echo
+            echo "✅ **All 16 captain logins verified**, organiser login verified."
+            echo
+            echo "Captains sign in at <https://monsoonpickleauction.vercel.app> with usernames \`Team1\`…\`Team16\`."
+            echo "Passwords are visible in the Organiser Console → **Auction → Team Logins**."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "All checks passed."

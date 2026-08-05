@@ -17,6 +17,21 @@
 --    schema.sql · auction-schema.sql · create-admin.sql · team-logins.sql
 -- ============================================================
 
+-- pgcrypto provides crypt()/gen_salt() used to hash the login passwords.
+-- Supabase keeps it in the "extensions" schema; a plain psql connection
+-- does not have that on its search_path, so make it reachable either way.
+do $$
+begin
+  create extension if not exists pgcrypto with schema extensions;
+exception when others then
+  begin
+    create extension if not exists pgcrypto;
+  exception when others then null;
+  end;
+end $$;
+
+select set_config('search_path', current_setting('search_path') || ', extensions', false);
+
 
 
 -- ############################################################
@@ -961,7 +976,6 @@ end $$;
 select
   l.username,
   l.email,
-  l.password,
   case
     when u.id is null                                   then 'MISSING ACCOUNT'
     when u.email_confirmed_at is null                   then 'EMAIL NOT CONFIRMED'

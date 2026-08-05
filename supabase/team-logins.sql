@@ -115,7 +115,6 @@ end $$;
 select
   l.username,
   l.email,
-  l.password,
   case
     when u.id is null                                   then 'MISSING ACCOUNT'
     when u.email_confirmed_at is null                   then 'EMAIL NOT CONFIRMED'
