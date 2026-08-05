@@ -233,6 +233,19 @@ end $$;
 -- Or run supabase/create-admin.sql for a ready-made account.
 -- ============================================================
 
+-- ------------------------------------------------------------
+-- Tell PostgREST to reload its schema cache.
+-- The Supabase SQL Editor does this for you; a direct psql/CI
+-- connection does NOT, and without it the REST API keeps replying
+-- "table not found" for everything created above.
+-- ------------------------------------------------------------
+do $$
+begin
+  notify pgrst, 'reload schema';
+exception when others then
+  raise notice 'Could not notify PostgREST (%). Reload it from Settings -> API if the app cannot see the tables.', sqlerrm;
+end $$;
+
 
 -- ############################################################
 -- ### auction-schema.sql
@@ -740,6 +753,19 @@ end $$;
 -- (paste the Supabase secret key once).
 -- Or run supabase/auction-team-logins.sql in this SQL Editor.
 -- ============================================================
+
+-- ------------------------------------------------------------
+-- Tell PostgREST to reload its schema cache.
+-- The Supabase SQL Editor does this for you; a direct psql/CI
+-- connection does NOT, and without it the REST API keeps replying
+-- "table not found" for everything created above.
+-- ------------------------------------------------------------
+do $$
+begin
+  notify pgrst, 'reload schema';
+exception when others then
+  raise notice 'Could not notify PostgREST (%). Reload it from Settings -> API if the app cannot see the tables.', sqlerrm;
+end $$;
 
 
 -- ############################################################
