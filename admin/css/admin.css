@@ -1088,6 +1088,106 @@ table.grid {
 /* Grid children default to min-width:auto, so a wide table stretches the
    column and pushes the whole page sideways. Let them shrink and scroll. */
 .auc-grid > *, .auc-stage > * { min-width: 0; }
-table.auc-teams { min-width: 640px; }
 .panel > .table-wrap { border: none; border-radius: 0; background: transparent; }
 .tabs { flex-wrap: wrap; }
+
+/* ---------- teams · wallets · squads ---------- */
+.auc-team-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.auc-team-bar input {
+  flex: 1; min-width: 180px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-size: 14px; padding: 10px 13px; outline: none;
+}
+.auc-team-bar input:focus { border-color: var(--red); }
+
+.team-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.team-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  padding: 14px 15px;
+  min-width: 0;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.team-card.is-leading {
+  border-color: var(--red);
+  box-shadow: 0 0 0 1px rgba(229,38,45,0.35), 0 8px 26px rgba(229,38,45,0.16);
+}
+.tc-head { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
+.tc-badge {
+  flex: none; width: 34px; height: 34px; border-radius: 10px;
+  background: radial-gradient(circle at 32% 30%, #ff5a5f, var(--red-deep));
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 15px; color: #fff;
+}
+.tc-id { min-width: 0; flex: 1; }
+.tc-name {
+  font-family: var(--font-display); font-weight: 600; font-size: 15px;
+  letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+}
+.tc-live {
+  font-family: var(--font-body); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.14em; background: rgba(229,38,45,0.2); color: #ff9a9d;
+  border-radius: 999px; padding: 2px 8px; vertical-align: 2px;
+}
+.tc-login { font-size: 10.5px; color: var(--ok); letter-spacing: 0.06em; }
+.tc-login.nolink { color: #ff8b8e; }
+.tc-toggle {
+  appearance: none; flex: none;
+  border: 1px solid var(--line-strong); background: var(--panel);
+  color: var(--text-dim); border-radius: 999px;
+  font-size: 11.5px; font-weight: 600; padding: 6px 12px;
+  transition: all 0.2s; white-space: nowrap;
+}
+.tc-toggle:hover { border-color: var(--red); color: #fff; }
+
+.tc-wallet { display: flex; gap: 22px; }
+.tc-w-label {
+  font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-faint);
+}
+.tc-w-value {
+  font-family: var(--font-display); font-size: 22px; font-weight: 700;
+  line-height: 1.2; color: var(--ok);
+}
+.tc-w-value.dim { color: var(--text-dim); }
+.tc-bar { height: 4px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; margin: 9px 0 13px; }
+.tc-bar i {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--red), #ff7a7f);
+  transition: width 0.5s var(--ease-out);
+}
+
+.tc-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.tc-ctl { display: flex; flex-direction: column; gap: 4px; flex: 1 1 120px; min-width: 0; }
+.tc-ctl.narrow { flex: 0 1 90px; }
+.tc-ctl span { font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-faint); }
+.tc-ctl input, .tc-topup input {
+  width: 100%; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 7px; color: var(--text); font-size: 13px; padding: 7px 9px; outline: none;
+}
+.tc-ctl input:focus, .tc-topup input:focus { border-color: var(--red); }
+.tc-topup { display: flex; gap: 6px; align-items: flex-end; flex: 1 1 100%; }
+.tc-topup input { flex: 1; }
+.tc-topup .btn-mini { padding: 7px 14px; font-size: 12px; }
+
+.tc-squad { margin-top: 13px; border-top: 1px dashed var(--line); padding-top: 11px; display: flex; flex-direction: column; gap: 6px; }
+.tc-player { display: flex; align-items: center; gap: 9px; }
+.tc-player img, .tc-player .noimg {
+  width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none;
+  border: 1.5px solid var(--line-strong); background: var(--panel);
+  display: grid; place-items: center; font-size: 13px;
+}
+.tc-p-info { min-width: 0; flex: 1; }
+.tc-p-name { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.tc-p-meta { font-size: 10.5px; color: var(--text-faint); }
+.tc-p-price {
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+  color: var(--red); font-weight: 600; white-space: nowrap;
+}
+.tc-player .icon-btn { width: 26px; height: 26px; border-radius: 7px; font-size: 12px; flex: none; }
+.tc-empty { font-size: 12.5px; color: var(--text-faint); text-align: center; padding: 8px 0; }

@@ -117,12 +117,10 @@ folder paths.)
 
 ---
 
-## 🏆 Team Auction (built, NOT yet live)
+## 🏆 Team Auction
 
-A third app lives in `auction/` for the 16 team captains. It is **staged on the
-`claude/pickleball-registration-form-dszrbt` branch only** — `main` (production)
-is untouched, so nothing about the live registration site changes until you
-merge it.
+A third app lives in `auction/` for the 16 team captains, served on its own
+Vercel domain from this same project.
 
 | Domain | Serves | Folder |
 |---|---|---|
@@ -131,8 +129,8 @@ merge it.
 | **monsoonpickleauction.vercel.app** | **Team auction (16 captains)** | **`auction/`** |
 
 ### What it does
-- **16 captain logins** — `Team 1` … `Team 16`, one shared password
-  (`SmashPoint@26`, change it in `admin/js/config.js`). Captains pick their team
+- **16 captain logins** — `Team1` … `Team16`, each with its **own** password
+  (see `admin/js/config.js → AUCTION.TEAM_PASSWORDS`). Captains pick their team
   from a dropdown; the email is built for them.
 - **Auto wallet deduction** — every sale atomically deducts the winning team's
   purse and adds the player to their squad. Purse, spend, squad count and
@@ -143,20 +141,23 @@ merge it.
 - **Admin master control** (Organiser Console → **Auction** tab): sync
   registered players into the pool, put players on the block one at a time,
   sell to the highest bidder *or* directly to any team at any price, mark
-  unsold, undo a sale (auto-refund), edit purses/captains inline, reset the
-  whole auction, and export an auction CSV.
+  unsold, undo a sale (auto-refund), reset the whole auction, export an
+  auction CSV.
+- **Wallet & squad control** — a card per team showing remaining/spent purse,
+  the full player list with the price paid for each, inline captain / purse /
+  max-squad editing, ± purse top-ups, and one-click release of a player
+  (which refunds the team). A purse can never be cut below what a team has
+  already spent.
 - **Player privacy** — captains read only `auction_lots` (name, DUPR, gender,
   jersey, photo). RLS blocks them from `registrations` entirely, so phone
   numbers, emails and payment screenshots are never exposed to them.
 
-### To go live
+### Activation (one time)
 1. Run `supabase/auction-schema.sql` once in Supabase → SQL Editor
    (idempotent; safe to re-run — verified against PostgreSQL 16 with live data).
 2. Organiser Console → **Auction** → **Create 16 team logins** (paste the
-   Supabase secret key once).
-3. Add `monsoonpickleauction.vercel.app` as a domain on the existing Vercel
-   project, then merge this branch into `main`. The host rewrite in
-   `vercel.json` already routes that domain to `auction/`.
+   Supabase secret key once). The full username/password list is printed
+   on screen for you to hand out.
 
 ### Auction tables (all additive)
 `auction_teams` · `auction_lots` · `auction_state` · `auction_bids`, plus

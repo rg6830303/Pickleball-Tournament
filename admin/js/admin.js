@@ -834,7 +834,6 @@
       $("#aucIncrement").value = aState?.bid_increment ?? 500;
       $("#aucPurseAll").value = aTeams[0]?.purse_total ?? 100000;
       $("#aucSquadAll").value = aTeams[0]?.max_squad ?? 8;
-      $("#aucCredPass").value = AUC.DEFAULT_PASSWORD || "";
       startAuctionRealtime();
     }
     renderAuction();
@@ -954,21 +953,87 @@
       : `<p class="empty">No players here yet. Use “Sync registered players” to fill the pool.</p>`;
   }
 
+  const aucOpenTeams = new Set();
+
   function renderAucTeams() {
-    $("#aucTeamsBody").innerHTML = aTeams
+    const q = ($("#aucTeamQ")?.value || "").trim().toLowerCase();
+    const list = aTeams.filter(
+      (t) => !q || t.name.toLowerCase().includes(q) || (t.captain_name || "").toLowerCase().includes(q)
+    );
+    $("#aucTeamCount").textContent = aTeams.length;
+
+    $("#aucTeamCards").innerHTML = list
       .map((t) => {
-        const n = aucSquad(t.id).length;
-        return `<tr data-team="${t.id}">
-          <td><b>${esc(t.name)}</b><div class="linked ${t.auth_user_id ? "" : "nolink"}">${
-          t.auth_user_id ? "login linked" : "no login yet"
-        }</div></td>
-          <td><input class="wide" data-tf="captain_name" value="${esc(t.captain_name || "")}" placeholder="captain" /></td>
-          <td><input type="number" data-tf="purse_total" value="${Number(t.purse_total)}" /></td>
-          <td>${aucMoney(t.purse_spent)}</td>
-          <td class="left-cell">${aucMoney(t.purse_left)}</td>
-          <td>${n}/${t.max_squad}</td>
-          <td><button class="btn-mini" data-auc-squad="${t.id}">Squad</button></td>
-        </tr>`;
+        const squad = aucSquad(t.id);
+        const open = aucOpenTeams.has(t.id);
+        const pct = Math.max(0, Math.min(100, (Number(t.purse_left) / (Number(t.purse_total) || 1)) * 100));
+        const leading = aState && aState.leading_team_id === t.id;
+
+        const rows = squad.length
+          ? squad
+              .map(
+                (l) => `<div class="tc-player">
+                  ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy" />` : `<span class="noimg">🥒</span>`}
+                  <div class="tc-p-info">
+                    <div class="tc-p-name">${esc(l.player_name)}</div>
+                    <div class="tc-p-meta">${l.dupr != null ? "DUPR " + Number(l.dupr).toFixed(3) : "Unrated"}${
+                  l.jersey_size ? " · " + esc(l.jersey_size) : ""
+                }</div>
+                  </div>
+                  <span class="tc-p-price">${aucMoney(l.sold_price)}</span>
+                  <button class="icon-btn del" data-auc-release="${esc(l.id)}" title="Release player (refunds the purse)">✕</button>
+                </div>`
+              )
+              .join("")
+          : `<p class="tc-empty">No players bought yet.</p>`;
+
+        return `<div class="team-card ${leading ? "is-leading" : ""}" data-team="${t.id}">
+          <div class="tc-head">
+            <span class="tc-badge">${t.id}</span>
+            <div class="tc-id">
+              <div class="tc-name">${esc(t.name)}${leading ? ' <span class="tc-live">bidding</span>' : ""}</div>
+              <div class="tc-login ${t.auth_user_id ? "" : "nolink"}">${
+          t.auth_user_id ? "login active" : "no login yet"
+        }</div>
+            </div>
+            <button class="tc-toggle" data-auc-toggle="${t.id}" aria-expanded="${open}">
+              ${squad.length}/${t.max_squad} players ${open ? "▲" : "▼"}
+            </button>
+          </div>
+
+          <div class="tc-wallet">
+            <div>
+              <p class="tc-w-label">Remaining</p>
+              <p class="tc-w-value">${aucMoney(t.purse_left)}</p>
+            </div>
+            <div>
+              <p class="tc-w-label">Spent</p>
+              <p class="tc-w-value dim">${aucMoney(t.purse_spent)}</p>
+            </div>
+          </div>
+          <div class="tc-bar"><i style="width:${pct}%"></i></div>
+
+          <div class="tc-controls">
+            <label class="tc-ctl">
+              <span>Captain</span>
+              <input data-tf="captain_name" value="${esc(t.captain_name || "")}" placeholder="name" />
+            </label>
+            <label class="tc-ctl">
+              <span>Purse</span>
+              <input type="number" data-tf="purse_total" value="${Number(t.purse_total)}" step="1000" />
+            </label>
+            <label class="tc-ctl narrow">
+              <span>Max squad</span>
+              <input type="number" data-tf="max_squad" value="${Number(t.max_squad)}" min="1" />
+            </label>
+            <div class="tc-topup">
+              <input type="number" placeholder="+ / − ₹" data-topup="${t.id}" step="1000" />
+              <button class="btn-mini" data-auc-topup="${t.id}">Adjust</button>
+            </div>
+          </div>
+
+          <div class="tc-squad" ${open ? "" : "hidden"}>${rows}</div>
+        </div>`;
       })
       .join("");
   }
@@ -1008,25 +1073,65 @@
       return;
     }
 
-    const squad = e.target.closest("[data-auc-squad]");
-    if (squad) {
-      const id = Number(squad.dataset.aucSquad);
-      const team = aTeams.find((t) => t.id === id);
-      const list = aucSquad(id);
-      alert(
-        `${team.name} — ${aucMoney(team.purse_left)} left\n\n` +
-          (list.length
-            ? list.map((l) => `• ${l.player_name} — ${aucMoney(l.sold_price)}`).join("\n")
-            : "No players bought yet.")
-      );
+    const toggle = e.target.closest("[data-auc-toggle]");
+    if (toggle) {
+      const id = Number(toggle.dataset.aucToggle);
+      aucOpenTeams.has(id) ? aucOpenTeams.delete(id) : aucOpenTeams.add(id);
+      renderAucTeams();
+      return;
     }
+
+    const release = e.target.closest("[data-auc-release]");
+    if (release) {
+      const lot = aLots.find((l) => l.id === release.dataset.aucRelease);
+      confirmDialog(
+        `Release ${lot ? lot.player_name : "this player"} back to the pool? ` +
+          `${lot ? aucMoney(lot.sold_price) : "The fee"} will be refunded to the team.`,
+        async () => {
+          const { error } = await sb.rpc("auction_undo_sale", { p_lot_id: release.dataset.aucRelease });
+          if (error) return toast(error.message, "err");
+          toast("Player released and purse refunded", "ok");
+          loadAuction();
+        }
+      );
+      return;
+    }
+
+    const topup = e.target.closest("[data-auc-topup]");
+    if (topup) {
+      const id = Number(topup.dataset.aucTopup);
+      const input = $(`[data-topup="${id}"]`);
+      const delta = Number(input.value);
+      if (!delta) return toast("Enter an amount to add (or a negative amount to remove)", "info");
+      const team = aTeams.find((t) => t.id === id);
+      const next = Number(team.purse_total) + delta;
+      if (next < Number(team.purse_spent))
+        return toast(`Can't drop below what ${team.name} has already spent (${aucMoney(team.purse_spent)})`, "err");
+      const { error } = await sb.from("auction_teams").update({ purse_total: next }).eq("id", id);
+      if (error) return toast(error.message, "err");
+      input.value = "";
+      toast(`${team.name} purse ${delta > 0 ? "topped up" : "reduced"} → ${aucMoney(next)}`, "ok");
+      loadAuction();
+      return;
+    }
+  });
+
+  $("#aucTeamQ")?.addEventListener("input", () => aucReady && renderAucTeams());
+  $("#btnAucExpandAll")?.addEventListener("click", () => {
+    const allOpen = aTeams.every((t) => aucOpenTeams.has(t.id));
+    aucOpenTeams.clear();
+    if (!allOpen) aTeams.forEach((t) => aucOpenTeams.add(t.id));
+    $("#btnAucExpandAll").textContent = allOpen ? "Expand all squads" : "Collapse all squads";
+    renderAucTeams();
   });
 
   /* ---- inline team edits ---- */
   document.addEventListener("change", async (e) => {
     const inp = e.target.closest("[data-tf]");
     if (!inp) return;
-    const id = Number(inp.closest("tr").dataset.team);
+    const host = inp.closest("[data-team]");
+    if (!host) return;
+    const id = Number(host.dataset.team);
     const field = inp.dataset.tf;
     const value = inp.type === "number" ? Number(inp.value) : inp.value.trim() || null;
     const { error } = await sb.from("auction_teams").update({ [field]: value }).eq("id", id);
@@ -1141,20 +1246,21 @@
   $("#btnAucCredsRun").addEventListener("click", async () => {
     const btn = $("#btnAucCredsRun");
     const key = $("#aucCredKey").value.trim();
-    const pass = $("#aucCredPass").value;
     const domain = AUC.TEAM_EMAIL_DOMAIN;
     const count = AUC.TEAM_COUNT || 16;
+    const passwords = AUC.TEAM_PASSWORDS || [];
 
     if (!(key.startsWith("sb_secret_") || key.startsWith("eyJ")))
       return alertBox($("#aucCredAlert"), "Paste your Supabase secret key (starts with sb_secret_ or eyJ).");
-    if (!pass || pass.length < 6)
-      return alertBox($("#aucCredAlert"), "Captain password must be at least 6 characters.");
+    if (passwords.length < count)
+      return alertBox($("#aucCredAlert"), `Need ${count} passwords in admin/js/config.js → AUCTION.TEAM_PASSWORDS.`);
 
     busy(btn, true);
     const done = [];
     try {
       for (let i = 1; i <= count; i++) {
         const email = `team${i}@${domain}`;
+        const pass = passwords[i - 1];
         const existing = await findAuthUser(key, email);
         let uid;
         if (existing) {
@@ -1174,7 +1280,7 @@
         }
         const { error } = await sb.from("auction_teams").update({ auth_user_id: uid }).eq("id", i);
         if (error) throw new Error(`Team ${i} link failed: ${error.message}`);
-        done.push(`Team ${i}  ·  password: ${pass}`);
+        done.push(`Team${String(i).padStart(2, " ")}   ${pass}`);
       }
 
       let out = $("#aucCredsOut");
@@ -1186,7 +1292,9 @@
       }
       out.textContent =
         `All ${count} captain logins are ready.\n` +
-        `Auction site: monsoonpickleauction.vercel.app\n\n` +
+        `Auction site: https://monsoonpickleauction.vercel.app\n\n` +
+        `USERNAME   PASSWORD\n` +
+        `------------------------\n` +
         done.join("\n");
       $("#aucCredAlert").classList.remove("show");
       toast(`${count} team logins created`, "ok");

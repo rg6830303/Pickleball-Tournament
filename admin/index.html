@@ -224,23 +224,7 @@
             <div class="auc-pool" id="aucPool"></div>
           </div>
 
-          <!-- teams -->
-          <div class="panel">
-            <h2 class="panel-title">Teams &amp; Purses</h2>
-            <p class="panel-sub">Wallets update automatically on every sale. Edit any value inline.</p>
-            <div class="table-wrap">
-              <table class="regs auc-teams">
-                <thead>
-                  <tr><th>Team</th><th>Captain</th><th>Purse</th><th>Spent</th><th>Left</th><th>Squad</th><th></th></tr>
-                </thead>
-                <tbody id="aucTeamsBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- setup + controls -->
-        <div class="auc-grid">
+          <!-- auction setup -->
           <div class="panel">
             <h2 class="panel-title">Auction Setup</h2>
             <p class="panel-sub">Sync registered players into the pool, set the bid step, and create the 16 captain logins.</p>
@@ -282,10 +266,11 @@
                 <label for="aucCredKey">Supabase secret key</label>
                 <input type="password" id="aucCredKey" autocomplete="off" placeholder="service_role JWT or sb_secret_…" />
               </div>
-              <div class="field">
-                <label for="aucCredPass">Shared captain password</label>
-                <input type="text" id="aucCredPass" autocomplete="off" />
-              </div>
+              <p class="repair-help" style="margin-bottom:12px">
+                Each team gets its own password from
+                <code>admin/js/config.js → AUCTION.TEAM_PASSWORDS</code>. The full
+                list is printed below once the accounts are created.
+              </p>
               <div class="alert" id="aucCredAlert" role="alert"></div>
               <button type="button" class="btn-primary sm" id="btnAucCredsRun">
                 <span class="spin" aria-hidden="true"></span><span class="btn-label">Create / reset 16 logins</span>
@@ -293,12 +278,27 @@
             </div>
           </div>
 
-          <div class="panel danger">
-            <h2 class="panel-title">Auction Danger Zone</h2>
-            <p class="panel-sub">Resets every purse to full and returns all players to the pool.</p>
-            <div class="panel-actions">
-              <button class="btn-mini danger" id="btnAucReset" type="button">Reset entire auction</button>
-            </div>
+        </div>
+
+        <!-- teams · wallets · squads -->
+        <div class="panel">
+          <h2 class="panel-title">Teams · Wallets · Squads <span class="count" id="aucTeamCount">16</span></h2>
+          <p class="panel-sub">
+            Every wallet updates automatically on each sale. Adjust a purse, top up funds,
+            or release a player back to the pool (which refunds the team) — all live.
+          </p>
+          <div class="auc-team-bar">
+            <input type="search" id="aucTeamQ" placeholder="Find a team or captain…" />
+            <button class="btn-mini" id="btnAucExpandAll" type="button">Expand all squads</button>
+          </div>
+          <div class="team-cards" id="aucTeamCards"></div>
+        </div>
+
+        <div class="panel danger">
+          <h2 class="panel-title">Auction Danger Zone</h2>
+          <p class="panel-sub">Resets every purse to full and returns all players to the pool.</p>
+          <div class="panel-actions">
+            <button class="btn-mini danger" id="btnAucReset" type="button">Reset entire auction</button>
           </div>
         </div>
       </div>
