@@ -60,30 +60,29 @@ jobs:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           if [ -z "$DB_URL" ]; then
-            # On an automatic push run, skip quietly instead of failing the
-            # commit status. Only a deliberate "Run workflow" hard-fails.
-            if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-              echo "has_secret=false" >> "$GITHUB_OUTPUT"
-              echo "::notice::SUPABASE_DB_URL is not configured - skipping the Supabase setup."
-              {
-                echo "## ⏭️ Skipped — \`SUPABASE_DB_URL\` not configured"
-                echo
-                echo "Add the secret under **Settings → Secrets and variables → Actions**,"
-                echo "then run this workflow manually to apply the schema."
-              } >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            echo "::error::Repository secret SUPABASE_DB_URL is not set."
+            # NEVER report success when the work did not happen. A green run
+            # that silently skipped is worse than a red one: it looks done.
+            echo "::error::SUPABASE_DB_URL is not set - NOTHING was applied to Supabase."
             {
-              echo "## ❌ Missing secret: \`SUPABASE_DB_URL\`"
+              echo "# ❌ NOTHING WAS APPLIED"
               echo
-              echo "Add it under **Settings → Secrets and variables → Actions → New repository secret**."
+              echo "This run did **not** touch the database. The repository secret"
+              echo "\`SUPABASE_DB_URL\` is missing, so there is nothing to connect to."
               echo
-              echo "Value = your Supabase **Session pooler** connection string:"
-              echo '```'
-              echo 'postgres://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require'
-              echo '```'
-              echo "Find it in Supabase → Project Settings → Database → Connection string → **Session pooler**."
+              echo "## Fix it (about 30 seconds)"
+              echo
+              echo "1. **Settings → Secrets and variables → Actions → New repository secret**"
+              echo "2. Name: \`SUPABASE_DB_URL\`"
+              echo "3. Value: Supabase → Project Settings → Database → Connection string →"
+              echo "   **Session pooler** — it looks like:"
+              echo
+              echo '   ```'
+              echo '   postgres://postgres.<project-ref>:<db-password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require'
+              echo '   ```'
+              echo
+              echo "   Use the **Session pooler** string, not the direct \`db.*.supabase.co\` one —"
+              echo "   GitHub runners are IPv4-only and the direct host is IPv6-only."
+              echo "4. Re-run this workflow."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
