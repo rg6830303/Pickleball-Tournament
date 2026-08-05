@@ -3,12 +3,22 @@
   "rewrites": [
     {
       "source": "/:path((?!admin/|admin$).*)",
-      "has": [{ "type": "host", "value": "monsoonadmin.vercel.app" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "monsoonadmin.vercel.app"
+        }
+      ],
       "destination": "/admin/:path"
     },
     {
       "source": "/:path((?!auction/|auction$).*)",
-      "has": [{ "type": "host", "value": "monsoonpickleauction.vercel.app" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "monsoonpickleauction.vercel.app"
+        }
+      ],
       "destination": "/auction/:path"
     },
     {
@@ -18,25 +28,82 @@
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/((?!.*\\.(?:png|jpg|jpeg|webp|gif|svg|ico|woff2?)$).*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
       ]
     },
     {
       "source": "/(.*)",
-      "has": [{ "type": "host", "value": "monsoonadmin.vercel.app" }],
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
     },
     {
       "source": "/(.*)",
-      "has": [{ "type": "host", "value": "monsoonpickleauction.vercel.app" }],
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+      "has": [
+        {
+          "type": "host",
+          "value": "monsoonadmin.vercel.app"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
     },
-    { "source": "/admin/(.*)",   "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
-    { "source": "/auction/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "monsoonpickleauction.vercel.app"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/auction/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    }
   ]
 }
