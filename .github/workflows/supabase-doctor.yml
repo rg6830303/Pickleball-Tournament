@@ -1,0 +1,203 @@
+name: Supabase Doctor
+
+# End-to-end diagnosis and repair of the live Supabase backend.
+#
+# Runs on a GitHub runner, which has direct network access to Supabase,
+# and proves the whole chain actually works:
+#   1. repairs the PostgREST schema cache (the usual cause of the console
+#      reporting "auction tables aren't installed" after a CI install)
+#   2. checks the database objects and accounts
+#   3. checks the REST API can really see the tables (what the apps use)
+#   4. SIGNS IN as a real captain and as the organiser, then verifies
+#      row-level security from those sessions
+#
+# Requires the SUPABASE_DB_URL secret (already configured).
+# NOTE: this repository is public, so run logs are public — no password
+# is ever printed. Passwords are read into masked shell variables only.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/supabase-doctor.yml"
+
+concurrency:
+  group: supabase-doctor
+  cancel-in-progress: false
+
+jobs:
+  doctor:
+    name: Diagnose & repair
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq
+
+      - name: Read public project settings from the repo
+        id: cfg
+        run: |
+          set -euo pipefail
+          URL=$(grep -oP 'SUPABASE_URL:\s*"\K[^"]+' admin/js/config.js | head -1)
+          ANON=$(grep -oP 'SUPABASE_ANON_KEY:\s*\n?\s*"\K[^"]+' admin/js/config.js | head -1 || true)
+          if [ -z "${ANON:-}" ]; then
+            ANON=$(tr -d '\n' < admin/js/config.js | grep -oP 'SUPABASE_ANON_KEY:\s*"\K[^"]+' | head -1)
+          fi
+          echo "url=$URL"   >> "$GITHUB_OUTPUT"
+          echo "anon=$ANON" >> "$GITHUB_OUTPUT"
+          echo "Project: $URL"
+
+      - name: 1 · Repair the PostgREST schema cache
+        env:
+          PGCONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PGCONN:-}" ]; then
+            echo "::error::SUPABASE_DB_URL secret is missing."; exit 1
+          fi
+          psql "$PGCONN" -v ON_ERROR_STOP=1 -c "notify pgrst, 'reload schema';"
+          echo "Reload requested; giving PostgREST a moment to pick it up."
+          sleep 8
+
+      - name: 2 · Database health
+        env:
+          PGCONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$PGCONN" -v ON_ERROR_STOP=1 -P pager=off -c "
+            select 'auction tables' as check,
+                   count(*)::text || ' of 5' as value,
+                   case when count(*)=5 then 'OK' else 'MISSING' end as status
+            from pg_tables where schemaname='public'
+              and tablename in ('auction_teams','auction_lots','auction_state','auction_bids','auction_team_logins')
+            union all
+            select 'teams seeded', count(*)::text || ' of 16',
+                   case when count(*)=16 then 'OK' else 'INCOMPLETE' end
+            from public.auction_teams
+            union all
+            select 'captain accounts', count(*)::text || ' of 16',
+                   case when count(*)=16 then 'OK' else 'INCOMPLETE' end
+            from public.auction_team_logins l join auth.users u on u.email=l.email
+            union all
+            select 'password hashes valid', count(*)::text || ' of 16',
+                   case when count(*)=16 then 'OK' else 'MISMATCH' end
+            from public.auction_team_logins l join auth.users u on u.email=l.email
+            where u.encrypted_password = crypt(l.password, u.encrypted_password)
+              and u.email_confirmed_at is not null
+            union all
+            select 'teams linked to accounts', count(*)::text || ' of 16',
+                   case when count(*)=16 then 'OK' else 'NOT LINKED' end
+            from public.auction_teams t join auth.users u on u.id=t.auth_user_id
+            union all
+            select 'registrations', count(*)::text, 'info' from public.registrations;
+          " | tee /tmp/health.txt
+
+      - name: 3 · REST API visibility (what the apps actually call)
+        env:
+          URL: ${{ steps.cfg.outputs.url }}
+          ANON: ${{ steps.cfg.outputs.anon }}
+        run: |
+          set -euo pipefail
+          FAIL=0
+          for t in auction_teams auction_lots auction_state; do
+            CODE=$(curl -s -o /tmp/r.json -w '%{http_code}' \
+              -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
+              "$URL/rest/v1/$t?select=*&limit=1")
+            if [ "$CODE" = "200" ] || [ "$CODE" = "206" ]; then
+              echo "REST $t -> $CODE (visible)"
+            elif grep -qi "schema cache" /tmp/r.json 2>/dev/null; then
+              echo "::error::REST $t -> $CODE STALE SCHEMA CACHE: $(cat /tmp/r.json)"; FAIL=1
+            else
+              # 401/permission is fine: the table exists, RLS is doing its job
+              echo "REST $t -> $CODE $(head -c 120 /tmp/r.json)"
+            fi
+          done
+          [ "$FAIL" -eq 0 ] || { echo "::error::PostgREST still cannot see the tables."; exit 1; }
+
+      - name: 4 · Sign in as a real captain (end-to-end login test)
+        env:
+          PGCONN: ${{ secrets.SUPABASE_DB_URL }}
+          URL: ${{ steps.cfg.outputs.url }}
+          ANON: ${{ steps.cfg.outputs.anon }}
+        run: |
+          set -euo pipefail
+          EMAIL=$(psql "$PGCONN" -tAc "select email from public.auction_team_logins where team_id=1")
+          PW=$(psql "$PGCONN" -tAc "select password from public.auction_team_logins where team_id=1")
+          echo "::add-mask::$PW"
+          [ -n "$EMAIL" ] || { echo "::error::No captain credential row found."; exit 1; }
+          echo "Attempting sign-in as $EMAIL"
+
+          CODE=$(curl -s -o /tmp/login.json -w '%{http_code}' -X POST \
+            -H "apikey: $ANON" -H "Content-Type: application/json" \
+            -d "$(jq -nc --arg e "$EMAIL" --arg p "$PW" '{email:$e,password:$p}')" \
+            "$URL/auth/v1/token?grant_type=password")
+
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Captain sign-in FAILED ($CODE): $(jq -r '.error_description // .msg // .' /tmp/login.json)"
+            exit 1
+          fi
+          TOKEN=$(jq -r .access_token /tmp/login.json)
+          echo "::add-mask::$TOKEN"
+          echo "Captain sign-in: OK"
+
+          # the captain session must resolve to their team
+          TEAM=$(curl -s -X POST -H "apikey: $ANON" -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" -d '{}' \
+            "$URL/rest/v1/rpc/my_auction_team")
+          echo "my_auction_team() -> $TEAM"
+          [ "$TEAM" = "1" ] || { echo "::error::Captain is not linked to team 1 (got: $TEAM)"; exit 1; }
+
+          # and must be able to read the auction, but NOT player PII
+          LOTS=$(curl -s -o /dev/null -w '%{http_code}' -H "apikey: $ANON" \
+            -H "Authorization: Bearer $TOKEN" "$URL/rest/v1/auction_lots?select=id&limit=1")
+          REGS=$(curl -s -H "apikey: $ANON" -H "Authorization: Bearer $TOKEN" \
+            "$URL/rest/v1/registrations?select=phone&limit=5")
+          echo "captain reads auction_lots -> $LOTS"
+          echo "captain reads registrations -> $REGS"
+          case "$REGS" in
+            "[]") echo "RLS: captain correctly blocked from player PII" ;;
+            *)    echo "::error::RLS LEAK - captain can read registrations: $REGS"; exit 1 ;;
+          esac
+
+      - name: 5 · Organiser account check
+        env:
+          PGCONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          psql "$PGCONN" -v ON_ERROR_STOP=1 -P pager=off -c "
+            select email,
+                   case when email_confirmed_at is null then 'EMAIL NOT CONFIRMED' else 'confirmed' end as email_state,
+                   case when banned_until is not null then 'BANNED' else 'active' end as account_state,
+                   case when id in (select auth_user_id from public.auction_teams where auth_user_id is not null)
+                        then 'PROBLEM: linked to a team, would lose staff rights'
+                        else 'staff (correct)' end as role
+            from auth.users
+            where email not like 'team%@%'
+            order by created_at;
+          "
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Supabase Doctor"
+            echo
+            echo '### Database health'
+            echo '```'
+            cat /tmp/health.txt 2>/dev/null || echo "(health step did not run)"
+            echo '```'
+            echo
+            if [ "${{ job.status }}" = "success" ]; then
+              echo "✅ Schema cache reloaded, REST API can see the tables, a real captain"
+              echo "sign-in succeeded, and row-level security held."
+              echo
+              echo "**Captain passwords** are in the Organiser Console →"
+              echo "**Auction → Team Logins** (never printed here — this repo is public)."
+            else
+              echo "❌ Something failed above — the failing step names the exact cause."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
