@@ -1265,11 +1265,10 @@
     return `Pickle${Date.now().toString().slice(-4)}`;
   }
 
-  /* password shown for a team: stored value wins, else the config default */
+  /* password shown for a team — the database is the only source of truth */
   function passwordFor(i) {
     const row = aLogins.find((l) => l.team_id === i);
-    if (row) return row.password;
-    return (AUC.TEAM_PASSWORDS || [])[i - 1] || "";
+    return row ? row.password : "";
   }
 
   async function loadLogins() {
@@ -1285,7 +1284,7 @@
 
     let html = "";
     for (let i = 1; i <= count; i++) {
-      const pw = passwordFor(i);
+      const pw = passwordFor(i) || "—  not set yet";
       const st = aAuthStatus[i];
       const team = aTeams.find((t) => t.id === i);
       const linked = team && team.auth_user_id;
@@ -1395,8 +1394,11 @@
       return alertBox($("#aucLoginAlert"), "Paste the Supabase secret key above before resetting a password.");
     const input = $(`[data-newpw="${i}"]`);
     const pw = (input.value || "").trim() || passwordFor(i);
-    if (pw.length < 6)
-      return alertBox($("#aucLoginAlert"), "Password must be at least 6 characters.");
+    if (!pw || pw.length < 6)
+      return alertBox(
+        $("#aucLoginAlert"),
+        "Type a new password (at least 6 characters) for this team first."
+      );
     rst.disabled = true;
     try {
       await applyLogin(key, i, pw);
@@ -1423,7 +1425,10 @@
         btn.disabled = true;
         try {
           const count = AUC.TEAM_COUNT || 16;
-          for (let i = 1; i <= count; i++) await applyLogin(key, i, passwordFor(i));
+          const used = new Set(aLogins.map((l) => l.password));
+          for (let i = 1; i <= count; i++) {
+            await applyLogin(key, i, passwordFor(i) || makePassword(used));
+          }
           await loadLogins();
           loadAuction();
           $("#aucLoginAlert").classList.remove("show");
@@ -1464,7 +1469,7 @@
   function loginLines() {
     const count = AUC.TEAM_COUNT || 16;
     const out = ["Monsoon Pickle League — Team Auction", "https://monsoonpickleauction.vercel.app", "", "USERNAME   PASSWORD"];
-    for (let i = 1; i <= count; i++) out.push(`${teamUsername(i).padEnd(10)} ${passwordFor(i)}`);
+    for (let i = 1; i <= count; i++) out.push(`${teamUsername(i).padEnd(10)} ${passwordFor(i) || "(not set)"}`);
     return out.join("\n");
   }
 

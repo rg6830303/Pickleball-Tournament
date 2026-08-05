@@ -746,26 +746,42 @@ end $$;
 -- ============================================================
 -- CREATE **OR REPAIR** THE ORGANISER LOGIN
 --
---   email:    ishanvashistha.1993@gmail.com
---   password: Pickle2026
+-- NO PASSWORD IS STORED IN THIS REPOSITORY (it is public).
+-- The password is read from the session setting `mpl.admin_password`.
 --
--- Run this in Supabase → SQL Editor → New query → Run.
--- Safe to run repeatedly:
---   • account missing  → it is created, email pre-confirmed
---   • account exists   → password is reset to Pickle2026 and any
---     broken/NULL auth fields are repaired
+--   • GitHub Actions  → set the repository secret ADMIN_PASSWORD;
+--                       the workflow injects it automatically.
+--   • Supabase SQL Editor → run this first, in the same query window:
 --
--- ⚠ SECURITY: this file contains the initial password in plain
---   text. After signing in, change it (Authentication → Users →
---   ⋯ → Reset password) or delete this file from the repo.
+--         set mpl.admin_password = 'your-chosen-password';
+--
+--     (or just skip it — you can create the organiser login from the
+--      console's "Set up my login" panel instead.)
+--
+-- If the setting is absent this block does nothing and says so, so the
+-- rest of the setup still completes.
+--
+-- Email can be overridden with `mpl.admin_email`.
 -- ============================================================
 
 do $$
 declare
-  admin_email text := 'ishanvashistha.1993@gmail.com';
-  admin_pass  text := 'Pickle2026';
+  admin_email text := coalesce(
+    nullif(current_setting('mpl.admin_email', true), ''),
+    'ishanvashistha.1993@gmail.com'
+  );
+  admin_pass  text := nullif(current_setting('mpl.admin_password', true), '');
   uid uuid;
 begin
+  if admin_pass is null then
+    raise notice 'Organiser login SKIPPED - no mpl.admin_password set. Create it from the console''s "Set up my login" panel, or re-run with: set mpl.admin_password = ''...'';';
+    return;
+  end if;
+
+  if length(admin_pass) < 6 then
+    raise exception 'mpl.admin_password must be at least 6 characters';
+  end if;
+
   select id into uid from auth.users where email = admin_email;
 
   if uid is null then
@@ -787,24 +803,16 @@ begin
       is_sso_user
     ) values (
       '00000000-0000-0000-0000-000000000000',
-      uid,
-      'authenticated',
-      'authenticated',
-      admin_email,
-      crypt(admin_pass, gen_salt('bf')),
-      now(),
+      uid, 'authenticated', 'authenticated', admin_email,
+      crypt(admin_pass, gen_salt('bf')), now(),
       '{"provider":"email","providers":["email"]}',
       '{}',
       now(), now(),
-      '', '',
-      '', '',
-      '',
-      '', '',
-      '',
+      '', '', '', '', '', '', '', '',
       false
     );
 
-    raise notice 'Admin user CREATED: %', admin_email;
+    raise notice 'Organiser login CREATED for %', admin_email;
   else
     ------------------------------------------------------------------
     -- REPAIR — reset password, confirm email, fix NULL token fields
@@ -825,7 +833,7 @@ begin
       updated_at                 = now()
     where id = uid;
 
-    raise notice 'Admin user REPAIRED — password reset for %', admin_email;
+    raise notice 'Organiser login REPAIRED - password reset for %', admin_email;
   end if;
 
   ------------------------------------------------------------------
@@ -838,21 +846,13 @@ begin
       id, user_id, provider_id, identity_data,
       provider, last_sign_in_at, created_at, updated_at
     ) values (
-      gen_random_uuid(),
-      uid,
-      uid::text,
+      gen_random_uuid(), uid, uid::text,
       jsonb_build_object('sub', uid::text, 'email', admin_email, 'email_verified', true),
-      'email',
-      now(), now(), now()
+      'email', now(), now(), now()
     );
     raise notice 'Email identity created for %', admin_email;
   end if;
 end $$;
-
--- Sanity check — should return exactly one row with a confirmed email:
-select id, email, email_confirmed_at, created_at
-from auth.users
-where email = 'ishanvashistha.1993@gmail.com';
 
 
 -- ############################################################
@@ -862,34 +862,59 @@ where email = 'ishanvashistha.1993@gmail.com';
 -- ============================================================
 -- CREATE (OR REPAIR) THE 16 TEAM CAPTAIN LOGINS
 --
--- Run AFTER auction-schema.sql. Safe to run repeatedly:
---   • account missing → created, email pre-confirmed
---   • account exists  → password reset, email confirmed, unbanned
--- It also links each account to its team and records the password in
--- the staff-only auction_team_logins table so the console can show it.
+-- Run AFTER auction-schema.sql. Safe to run repeatedly.
 --
--- Usernames are Team1 … Team16. Captains sign in at
--- https://monsoonpickleauction.vercel.app by picking their team.
---
--- ⚠ Change these passwords after the event, or from
+-- NO PASSWORD IS STORED IN THIS REPOSITORY.
+-- On the first run a fresh, readable password (word + 4 digits) is
+-- generated for each team and written to the staff-only table
+-- public.auction_team_logins. Read them in
 --   Organiser Console → Auction → Team Logins.
+--
+-- Re-running does NOT churn passwords: a team that already has a
+-- stored credential keeps it, so credentials you have handed out
+-- stay valid. The account is still repaired (email confirmed,
+-- unbanned, relinked) on every run.
+--
+-- To force new passwords for everyone:
+--   delete from public.auction_team_logins;   -- then re-run this file
+-- or use "Generate new passwords" in the console.
 -- ============================================================
 
 do $$
 declare
-  r        record;
-  uid      uuid;
-  v_email  text;
+  words   text[] := array[
+    'Dink','Rally','Volley','Smash','Lob','Ace','Drive','Slice',
+    'Spin','Serve','Court','NetPlay','Kitchen','Paddle','Baseline','Topspin',
+    'Backhand','Forehand','Poach','Stack','Erne','Flick','Punch','Carry'
+  ];
+  team_no int;
+  uid     uuid;
+  v_email text;
+  v_pw    text;
+  used    text[] := array[]::text[];
+  tries   int;
 begin
-  for r in
-    select * from (values
-      ( 1, 'Dink2481'),     ( 2, 'Rally3960'),   ( 3, 'Volley5127'),   ( 4, 'Smash7314'),
-      ( 5, 'Lob4682'),      ( 6, 'Ace9053'),     ( 7, 'Drive2769'),    ( 8, 'Slice6135'),
-      ( 9, 'Spin8420'),     (10, 'Serve3517'),   (11, 'Court7948'),    (12, 'NetPlay5203'),
-      (13, 'Kitchen6871'),  (14, 'Paddle4396'),  (15, 'Baseline2754'), (16, 'Topspin9182')
-    ) as t(team_no, pw)
-  loop
-    v_email := 'team' || r.team_no || '@monsoonpickleleague.in';
+  -- keep any passwords that already exist so handed-out credentials stay valid
+  select coalesce(array_agg(password), array[]::text[]) into used
+    from public.auction_team_logins;
+
+  for team_no in 1..16 loop
+    v_email := 'team' || team_no || '@monsoonpickleleague.in';
+
+    -- reuse the stored password if there is one, else mint a unique one
+    select password into v_pw
+      from public.auction_team_logins where team_id = team_no;
+
+    if v_pw is null then
+      tries := 0;
+      loop
+        v_pw := words[1 + floor(random() * array_length(words, 1))::int]
+                || lpad((1000 + floor(random() * 9000))::int::text, 4, '0');
+        tries := tries + 1;
+        exit when not (v_pw = any(used)) or tries > 200;
+      end loop;
+      used := used || v_pw;
+    end if;
 
     select id into uid from auth.users where email = v_email;
 
@@ -913,9 +938,9 @@ begin
       ) values (
         '00000000-0000-0000-0000-000000000000',
         uid, 'authenticated', 'authenticated', v_email,
-        crypt(r.pw, gen_salt('bf')), now(),
+        crypt(v_pw, gen_salt('bf')), now(),
         '{"provider":"email","providers":["email"]}',
-        jsonb_build_object('team_no', r.team_no, 'username', 'Team' || r.team_no),
+        jsonb_build_object('team_no', team_no, 'username', 'Team' || team_no),
         now(), now(),
         '', '', '', '', '', '', '', '',
         false
@@ -925,7 +950,7 @@ begin
       -- REPAIR: reset password, confirm email, clear NULL tokens
       ----------------------------------------------------------
       update auth.users set
-        encrypted_password         = crypt(r.pw, gen_salt('bf')),
+        encrypted_password         = crypt(v_pw, gen_salt('bf')),
         email_confirmed_at         = coalesce(email_confirmed_at, now()),
         confirmation_token         = coalesce(confirmation_token, ''),
         recovery_token             = coalesce(recovery_token, ''),
@@ -936,7 +961,7 @@ begin
         phone_change_token         = coalesce(phone_change_token, ''),
         reauthentication_token     = coalesce(reauthentication_token, ''),
         raw_app_meta_data          = coalesce(raw_app_meta_data, '{"provider":"email","providers":["email"]}'),
-        raw_user_meta_data         = jsonb_build_object('team_no', r.team_no, 'username', 'Team' || r.team_no),
+        raw_user_meta_data         = jsonb_build_object('team_no', team_no, 'username', 'Team' || team_no),
         banned_until               = null,
         updated_at                 = now()
       where id = uid;
@@ -955,23 +980,25 @@ begin
     end if;
 
     -- link the account to its team
-    update public.auction_teams set auth_user_id = uid where id = r.team_no;
+    update public.auction_teams set auth_user_id = uid where id = team_no;
 
-    -- record the credential so the console can display / reissue it
+    -- record the credential (staff-only table) so the console can show it
     insert into public.auction_team_logins (team_id, username, email, password, updated_at)
-    values (r.team_no, 'Team' || r.team_no, v_email, r.pw, now())
+    values (team_no, 'Team' || team_no, v_email, v_pw, now())
     on conflict (team_id) do update
-      set username = excluded.username,
-          email    = excluded.email,
-          password = excluded.password,
+      set username   = excluded.username,
+          email      = excluded.email,
+          password   = excluded.password,
           updated_at = now();
   end loop;
 
-  raise notice 'All 16 captain logins are ready.';
+  raise notice 'All 16 captain logins are ready. Read the passwords in Organiser Console -> Auction -> Team Logins.';
 end $$;
 
 -- ------------------------------------------------------------
--- Verification — every row should read "OK"
+-- Verification — every row should read "OK".
+-- Passwords are deliberately NOT selected here: on a public repo the
+-- workflow logs are public, so they must never be printed.
 -- ------------------------------------------------------------
 select
   l.username,
