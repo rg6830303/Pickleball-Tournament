@@ -30,12 +30,6 @@ on:
         description: "Only run the verification checks (do not modify the database)"
         type: boolean
         default: false
-  push:
-    branches: [main]
-    paths:
-      - "supabase/**.sql"
-      - ".github/workflows/supabase-setup.yml"
-
 concurrency:
   group: supabase-setup
   cancel-in-progress: false

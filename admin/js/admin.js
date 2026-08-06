@@ -795,6 +795,48 @@
     exportCsv(rows, `mpl-full-backup-${stamp()}.csv`)
   );
 
+  /* ---- one-time auction install helper (shown when tables are missing) ---- */
+  (() => {
+    const btn = $("#btnCopyInstall");
+    if (!btn) return;
+    const ref = new URL(CFG.SUPABASE_URL).hostname.split(".")[0];
+    const link = $("#lnkSqlEditor");
+    if (link) link.href = `https://supabase.com/dashboard/project/${ref}/sql/new`;
+
+    let cached = null;
+    const load = async () => {
+      if (cached) return cached;
+      const r = await fetch("auction-install.sql", { cache: "no-store" });
+      if (!r.ok) throw new Error("Could not load auction-install.sql (" + r.status + ")");
+      cached = await r.text();
+      return cached;
+    };
+
+    btn.addEventListener("click", async () => {
+      busy(btn, true);
+      try {
+        const sql = await load();
+        try {
+          await navigator.clipboard.writeText(sql);
+          toast("Setup SQL copied — paste it into the Supabase SQL Editor", "ok");
+        } catch {
+          // clipboard blocked (common on mobile without a user gesture chain):
+          // show it so it can be selected manually
+          const ta = $("#installSql");
+          ta.value = sql;
+          ta.hidden = false;
+          ta.focus();
+          ta.select();
+          toast("Clipboard blocked — the SQL is shown below, select and copy it", "info");
+        }
+      } catch (e) {
+        toast(e.message || String(e), "err");
+      } finally {
+        busy(btn, false);
+      }
+    });
+  })();
+
   /* ============================================================
      AUCTION — master control for the team auction
      ============================================================ */

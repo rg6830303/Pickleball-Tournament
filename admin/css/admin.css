@@ -1217,3 +1217,13 @@ table.login-table { min-width: 620px; }
 }
 .lg-input:focus { border-color: var(--red); }
 .lg-reset .btn-mini { padding: 7px 14px; font-size: 12px; }
+
+/* one-time auction install helper */
+.auc-missing-actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 4px; }
+.install-sql {
+  width: 100%; min-height: 120px; margin-top: 10px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); color: var(--text-dim);
+  font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+  padding: 10px; resize: vertical;
+}

@@ -166,7 +166,18 @@
       <!-- not-installed notice -->
       <div class="auc-missing" id="aucMissing" hidden>
         <b>Auction tables aren't installed yet.</b>
-        <span>Run <code>supabase/auction-schema.sql</code> once in Supabase → SQL Editor, then reload this page.</span>
+        <span>
+          One-time setup: copy the SQL below, paste it into
+          <b>Supabase → SQL Editor → Run</b>, then reload this page. It creates the
+          auction tables and all 16 captain logins — the passwords appear here
+          afterwards under <b>Team Logins</b>.
+        </span>
+        <div class="auc-missing-actions">
+          <button class="btn-primary sm" id="btnCopyInstall" type="button">⧉ Copy setup SQL</button>
+          <a class="btn-mini" id="lnkInstall" href="auction-install.sql" download="mpl-auction-install.sql">⬇ Download .sql</a>
+          <a class="btn-mini ghost" id="lnkSqlEditor" href="#" target="_blank" rel="noopener">Open Supabase SQL Editor ↗</a>
+        </div>
+        <textarea id="installSql" class="install-sql" readonly hidden></textarea>
       </div>
 
       <div id="aucBody" hidden>
