@@ -1,68 +1,52 @@
--- ============================================================
--- CREATE (OR REPAIR) THE 16 TEAM CAPTAIN LOGINS
---
--- Run AFTER auction-schema.sql. Safe to run repeatedly.
---
--- NO PASSWORD IS STORED IN THIS REPOSITORY.
--- On the first run a fresh, readable password (word + 4 digits) is
--- generated for each team and written to the staff-only table
--- public.auction_team_logins. Read them in
---   Organiser Console → Auction → Team Logins.
---
--- Re-running does NOT churn passwords: a team that already has a
--- stored credential keeps it, so credentials you have handed out
--- stay valid. The account is still repaired (email confirmed,
--- unbanned, relinked) on every run.
---
--- To force new passwords for everyone:
---   delete from public.auction_team_logins;   -- then re-run this file
--- or use "Generate new passwords" in the console.
--- ============================================================
 
+-- ============================================================
+-- 16 CAPTAIN LOGINS (SQL fallback)
+--
+-- Preferred path is Organiser Console -> Auction -> Team Logins ->
+-- "Create 16 team logins", which goes through the Supabase Admin API
+-- and is the most robust option. This block exists so the whole
+-- install can still be done from one paste in the SQL Editor.
+--
+-- No password is stored in this repository: a fresh one is generated
+-- per team on first run and written to the staff-only table
+-- public.auction_team_logins. Re-running KEEPS existing passwords so
+-- credentials already handed out stay valid.
+--
+-- Captains are never added to public.app_staff, so they can never
+-- read registrations, payment screenshots or each other's passwords.
+-- ============================================================
 do $$
 declare
   words   text[] := array[
     'Dink','Rally','Volley','Smash','Lob','Ace','Drive','Slice',
-    'Spin','Serve','Court','NetPlay','Kitchen','Paddle','Baseline','Topspin',
-    'Backhand','Forehand','Poach','Stack','Erne','Flick','Punch','Carry'
+    'Spin','Serve','Court','NetPlay','Kitchen','Paddle','Baseline','Topspin'
   ];
+  alpha   text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';  -- no O/0/I/1/l
   team_no int;
   uid     uuid;
   v_email text;
   v_pw    text;
-  used    text[] := array[]::text[];
-  tries   int;
+  v_tail  text;
+  k       int;
 begin
-  -- keep any passwords that already exist so handed-out credentials stay valid
-  select coalesce(array_agg(password), array[]::text[]) into used
-    from public.auction_team_logins;
-
   for team_no in 1..16 loop
     v_email := 'team' || team_no || '@monsoonpickleleague.in';
 
-    -- reuse the stored password if there is one, else mint a unique one
     select password into v_pw
       from public.auction_team_logins where team_id = team_no;
 
     if v_pw is null then
-      tries := 0;
-      loop
-        v_pw := words[1 + floor(random() * array_length(words, 1))::int]
-                || lpad((1000 + floor(random() * 9000))::int::text, 4, '0');
-        tries := tries + 1;
-        exit when not (v_pw = any(used)) or tries > 200;
+      v_tail := '';
+      for k in 1..6 loop
+        v_tail := v_tail || substr(alpha, 1 + floor(random() * length(alpha))::int, 1);
       end loop;
-      used := used || v_pw;
+      v_pw := words[team_no] || '-' || v_tail;
     end if;
 
     select id into uid from auth.users where email = v_email;
 
     if uid is null then
-      ----------------------------------------------------------
-      -- CREATE (all GoTrue token columns must be '', never NULL)
-      ----------------------------------------------------------
       uid := gen_random_uuid();
-
       insert into auth.users (
         instance_id, id, aud, role, email,
         encrypted_password, email_confirmed_at,
@@ -77,19 +61,17 @@ begin
       ) values (
         '00000000-0000-0000-0000-000000000000',
         uid, 'authenticated', 'authenticated', v_email,
-        crypt(v_pw, gen_salt('bf')), now(),
+        -- cost 10 matches what GoTrue itself writes (gen_salt('bf') alone is cost 6)
+        extensions.crypt(v_pw, extensions.gen_salt('bf', 10)), now(),
         '{"provider":"email","providers":["email"]}',
-        jsonb_build_object('team_no', team_no, 'username', 'Team' || team_no),
+        jsonb_build_object('team_no', team_no, 'username', 'Team' || team_no, 'role', 'captain'),
         now(), now(),
         '', '', '', '', '', '', '', '',
         false
       );
     else
-      ----------------------------------------------------------
-      -- REPAIR: reset password, confirm email, clear NULL tokens
-      ----------------------------------------------------------
       update auth.users set
-        encrypted_password         = crypt(v_pw, gen_salt('bf')),
+        encrypted_password         = extensions.crypt(v_pw, extensions.gen_salt('bf', 10)),
         email_confirmed_at         = coalesce(email_confirmed_at, now()),
         confirmation_token         = coalesce(confirmation_token, ''),
         recovery_token             = coalesce(recovery_token, ''),
@@ -100,13 +82,14 @@ begin
         phone_change_token         = coalesce(phone_change_token, ''),
         reauthentication_token     = coalesce(reauthentication_token, ''),
         raw_app_meta_data          = coalesce(raw_app_meta_data, '{"provider":"email","providers":["email"]}'),
-        raw_user_meta_data         = jsonb_build_object('team_no', team_no, 'username', 'Team' || team_no),
+        raw_user_meta_data         = jsonb_build_object('team_no', team_no, 'username', 'Team' || team_no, 'role', 'captain'),
         banned_until               = null,
         updated_at                 = now()
       where id = uid;
     end if;
 
-    -- email identity row (required for password sign-in)
+    -- email identity row (required for password sign-in).
+    -- identities.email is GENERATED from identity_data - never insert it.
     if not exists (select 1 from auth.identities where user_id = uid and provider = 'email') then
       insert into auth.identities (
         id, user_id, provider_id, identity_data, provider,
@@ -118,10 +101,15 @@ begin
       );
     end if;
 
-    -- link the account to its team
+    -- Clear any stale link before claiming it: auth_user_id is UNIQUE, and a
+    -- blind assignment could abort the whole loop.
+    update public.auction_teams set auth_user_id = null
+     where auth_user_id = uid and id <> team_no;
     update public.auction_teams set auth_user_id = uid where id = team_no;
 
-    -- record the credential (staff-only table) so the console can show it
+    -- A captain must never be staff.
+    delete from public.app_staff where user_id = uid;
+
     insert into public.auction_team_logins (team_id, username, email, password, updated_at)
     values (team_no, 'Team' || team_no, v_email, v_pw, now())
     on conflict (team_id) do update
@@ -131,23 +119,28 @@ begin
           updated_at = now();
   end loop;
 
-  raise notice 'All 16 captain logins are ready. Read the passwords in Organiser Console -> Auction -> Team Logins.';
+  raise notice 'All 16 captain logins ready. Read them in Organiser Console -> Auction -> Team Logins.';
 end $$;
 
--- ------------------------------------------------------------
--- Verification — every row should read "OK".
--- Passwords are deliberately NOT selected here: on a public repo the
--- workflow logs are public, so they must never be printed.
--- ------------------------------------------------------------
+notify pgrst, 'reload schema';
+
+-- Verification. Every row should read OK. Passwords are deliberately not
+-- selected: on a public repo the CI logs would leak them.
 select
   l.username,
   l.email,
   case
-    when u.id is null                                   then 'MISSING ACCOUNT'
-    when u.email_confirmed_at is null                   then 'EMAIL NOT CONFIRMED'
-    when t.auth_user_id is distinct from u.id           then 'NOT LINKED TO TEAM'
-    when u.encrypted_password <> crypt(l.password, u.encrypted_password)
-                                                        then 'PASSWORD MISMATCH'
+    when u.id is null                              then 'MISSING ACCOUNT'
+    when u.encrypted_password is null              then 'NO PASSWORD SET'
+    when u.email_confirmed_at is null              then 'EMAIL NOT CONFIRMED'
+    when t.auth_user_id is distinct from u.id      then 'NOT LINKED TO TEAM'
+    when not exists (select 1 from auth.identities i
+                      where i.user_id = u.id and i.provider = 'email')
+                                                   then 'NO EMAIL IDENTITY'
+    when exists (select 1 from public.app_staff s where s.user_id = u.id)
+                                                   then 'WRONGLY MARKED STAFF'
+    when u.encrypted_password <> extensions.crypt(l.password, u.encrypted_password)
+                                                   then 'PASSWORD MISMATCH'
     else 'OK'
   end as status
 from public.auction_team_logins l

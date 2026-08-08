@@ -194,6 +194,75 @@ end $$;
 -- ============================================================
 
 -- ------------------------------------------------------------
+-- Do not undo the auction module's hardening.
+--
+-- The "staff can ..." policies above grant every signed-in user full
+-- access. That was fine when the organiser was the only account, but
+-- once the 16 captain logins exist it would hand them the registrant
+-- list, the payment screenshots and the event controls. If the auction
+-- module is installed, re-assert its allow-list policies here so that
+-- re-running this file standalone can never reopen that hole.
+-- ------------------------------------------------------------
+do $$
+begin
+  if to_regprocedure('public.is_auction_staff()') is null then
+    return;
+  end if;
+
+  drop policy if exists "staff can read" on public.registrations;
+  create policy "staff can read" on public.registrations
+    for select to authenticated using (public.is_auction_staff());
+
+  drop policy if exists "staff can insert" on public.registrations;
+  create policy "staff can insert" on public.registrations
+    for insert to authenticated with check (public.is_auction_staff());
+
+  drop policy if exists "staff can update" on public.registrations;
+  create policy "staff can update" on public.registrations
+    for update to authenticated
+    using (public.is_auction_staff()) with check (public.is_auction_staff());
+
+  drop policy if exists "staff can delete" on public.registrations;
+  create policy "staff can delete" on public.registrations
+    for delete to authenticated using (public.is_auction_staff());
+
+  drop policy if exists "staff can insert settings" on public.event_settings;
+  create policy "staff can insert settings" on public.event_settings
+    for insert to authenticated with check (public.is_auction_staff());
+
+  drop policy if exists "staff can update settings" on public.event_settings;
+  create policy "staff can update settings" on public.event_settings
+    for update to authenticated
+    using (public.is_auction_staff()) with check (public.is_auction_staff());
+
+  begin
+    drop policy if exists "staff can view registration images" on storage.objects;
+    create policy "staff can view registration images" on storage.objects
+      for select to authenticated
+      using (bucket_id = 'registrations' and public.is_auction_staff());
+
+    drop policy if exists "staff can upload registration images" on storage.objects;
+    create policy "staff can upload registration images" on storage.objects
+      for insert to authenticated
+      with check (bucket_id = 'registrations' and public.is_auction_staff());
+
+    drop policy if exists "staff can replace registration images" on storage.objects;
+    create policy "staff can replace registration images" on storage.objects
+      for update to authenticated
+      using (bucket_id = 'registrations' and public.is_auction_staff());
+
+    drop policy if exists "staff can delete registration images" on storage.objects;
+    create policy "staff can delete registration images" on storage.objects
+      for delete to authenticated
+      using (bucket_id = 'registrations' and public.is_auction_staff());
+  exception when insufficient_privilege then
+    raise notice 'Could not re-harden storage policies (%). Apply them from the SQL Editor.', sqlerrm;
+  end;
+
+  raise notice 'Auction module detected - staff policies kept on the allow-list.';
+end $$;
+
+-- ------------------------------------------------------------
 -- Tell PostgREST to reload its schema cache.
 -- The Supabase SQL Editor does this for you; a direct psql/CI
 -- connection does NOT, and without it the REST API keeps replying

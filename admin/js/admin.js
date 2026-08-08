@@ -858,10 +858,24 @@
       sb.from("auction_state").select("*").eq("id", 1).maybeSingle(),
     ]);
 
-    if (t.error || l.error) {
-      $("#aucMissing").hidden = false;
-      $("#aucBody").hidden = true;
+    const err = t.error || l.error;
+    if (err) {
+      // Only a genuinely absent table means "not installed yet". A network
+      // blip or an RLS denial hid the whole auctioneer screen behind a
+      // "run the installer" message that made things worse when clicked.
+      const missing =
+        err.code === "42P01" || /does not exist|schema cache/i.test(err.message || "");
+      $("#aucMissing").hidden = !missing;
+      $("#aucBody").hidden = missing;
       aucReady = false;
+      if (!missing) {
+        toast(
+          /permission|policy|denied/i.test(err.message || "")
+            ? "This account isn't on the staff list — ask the organiser to add you."
+            : "Couldn't load the auction: " + (err.message || err),
+          "err"
+        );
+      }
       return;
     }
     $("#aucMissing").hidden = true;
@@ -1484,21 +1498,45 @@
     );
   });
 
-  /* ---- generate fresh passwords (stored, then applied) ---- */
+  /* ---- generate fresh passwords AND push them to Auth in one step ----
+     These two must never drift apart: a password stored here but not
+     pushed to auth.users is one the console displays, the organiser hands
+     out, and the captain cannot log in with. */
   $("#btnLoginRandom").addEventListener("click", () => {
+    const key = loginKey();
+    if (!keyLooksValid(key))
+      return alertBox(
+        $("#aucLoginAlert"),
+        "Paste the Supabase secret key above first — new passwords have to be pushed to the captains' accounts, not just saved here."
+      );
     confirmDialog(
-      "Generate a brand-new password for all 16 teams? They are saved here immediately — press “Create / reset all 16” to push them to the captains' accounts.",
+      "Generate a brand-new password for all 16 teams and apply it to their accounts right away? Captains using an old password will be signed out.",
       async () => {
+        const btn = $("#btnLoginRandom");
+        btn.disabled = true;
         const count = AUC.TEAM_COUNT || 16;
         const used = new Set();
-        for (let i = 1; i <= count; i++) {
-          const { error } = await storePassword(i, makePassword(used));
-          if (error) return alertBox($("#aucLoginAlert"), error.message);
+        try {
+          for (let i = 1; i <= count; i++) {
+            await applyLogin(key, i, makePassword(used));
+          }
+          await loadLogins();
+          loginsRevealed = true;
+          renderLogins();
+          loadAuction();
+          $("#aucLoginAlert").classList.remove("show");
+          toast(`New passwords generated and applied to all ${count} accounts`, "ok");
+        } catch (err) {
+          await loadLogins();
+          renderLogins();
+          alertBox(
+            $("#aucLoginAlert"),
+            "Stopped part-way: " + (err.message || String(err)) +
+              " — press “Create / reset all 16” to finish pushing the passwords shown below."
+          );
+        } finally {
+          btn.disabled = false;
         }
-        await loadLogins();
-        loginsRevealed = true;
-        renderLogins();
-        toast("New passwords generated — now press “Create / reset all 16”", "info");
       }
     );
   });

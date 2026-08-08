@@ -107,4 +107,17 @@ begin
     );
     raise notice 'Email identity created for %', admin_email;
   end if;
+
+  ------------------------------------------------------------------
+  -- Put the organiser on the staff allow-list.
+  -- Staff is an explicit allow-list (public.app_staff), so an organiser
+  -- who is not listed can see nothing in the console. Skip quietly when
+  -- the auction module has not been installed yet.
+  ------------------------------------------------------------------
+  if to_regclass('public.app_staff') is not null then
+    insert into public.app_staff (user_id, email, note)
+    values (uid, admin_email, 'organiser account')
+    on conflict (user_id) do nothing;
+    raise notice 'Organiser % added to the staff allow-list', admin_email;
+  end if;
 end $$;

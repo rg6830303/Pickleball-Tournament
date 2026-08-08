@@ -111,7 +111,20 @@
   /* ---------------- enter ---------------- */
   async function enterApp() {
     const { data, error } = await sb.rpc("my_auction_team");
-    if (error || !data) {
+
+    // A failed call and "you have no team" are different problems. Only the
+    // second one is worth signing the captain out for — dropping the session
+    // on a flaky stadium connection just makes them log in again for nothing.
+    if (error) {
+      alertBox(
+        $("#authAlert"),
+        /failed to fetch|network|load failed/i.test(error.message || "")
+          ? "Signed in, but the auction server didn't answer. Check your connection and try again."
+          : "Signed in, but the auction couldn't start: " + (error.message || error)
+      );
+      return;
+    }
+    if (!data) {
       alertBox(
         $("#authAlert"),
         "This login isn't linked to a team yet. Ask the organiser to run “Create 16 team logins” in the console."
@@ -136,11 +149,26 @@
       sb.from("auction_state").select("*").eq("id", 1).maybeSingle(),
       sb.from("auction_bids").select("*").order("id", { ascending: false }).limit(12),
     ]);
+
+    // Never fall back to an empty wallet: renderStage() reads purse_left to
+    // decide whether the bid button is affordable, so silently keeping the
+    // old (or an empty) teams list would let a captain bid past their purse.
+    const failed = [t, l, s, b].find((r) => r.error);
+    if (failed) {
+      $("#bidMsg").textContent =
+        "Lost contact with the auction server — reconnecting. Bidding is paused.";
+      $("#btnBid").disabled = true;
+      $("#liveDot").classList.remove("on");
+      $("#liveLabel").textContent = "offline";
+      return false;
+    }
+
     teams = t.data || [];
     lots = l.data || [];
     state = s.data || null;
     bids = b.data || [];
     renderAll();
+    return true;
   }
 
   /* ---------------- realtime ---------------- */
@@ -148,9 +176,15 @@
     try {
       sb.channel("auction-live")
         .on("postgres_changes", { event: "*", schema: "public", table: "auction_state" }, (p) => {
+          const lotChanged = !state || state.current_lot_id !== p.new.current_lot_id;
           state = p.new;
+          // A new player on the block means the old ticker and the "leading"
+          // markers in the teams table are both stale.
+          if (lotChanged) bids = bids.filter((b) => b.lot_id === state.current_lot_id);
           renderStage();
           renderWallet();
+          renderTeams();
+          renderTicker();
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "auction_teams" }, (p) => {
           const i = teams.findIndex((x) => x.id === p.new.id);
@@ -181,11 +215,20 @@
           const on = st === "SUBSCRIBED";
           $("#liveDot").classList.toggle("on", on);
           $("#liveLabel").textContent = on ? "live" : "offline";
+          // Every gap in the socket is a gap in our copy of the auction.
+          // Re-read the whole board on (re)connect so a captain can never
+          // bid against a price that moved while they were disconnected.
+          if (on) refreshAll();
         });
     } catch {
       $("#liveLabel").textContent = "offline";
     }
   }
+
+  // Phones aggressively suspend background tabs and silently drop the socket.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && myTeamId !== null) refreshAll();
+  });
 
   function announceSale(lot) {
     if (lot.sold_to_team_id === myTeamId) {

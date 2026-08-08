@@ -14,8 +14,12 @@ cd "$(dirname "$0")"
 --  It installs, in order:
 --    1. Registration schema  (registrations, event_settings, storage, RLS)
 --    2. Auction schema       (teams, lots, state, bids, credentials, RPCs)
---    3. Organiser login      ishanvashistha.1993@gmail.com / Pickle2026
---    4. All 16 captain logins Team1…Team16 with their passwords
+--                            plus the public.app_staff allow-list that
+--                            decides who counts as staff
+--    3. Organiser login      read from `set mpl.admin_password = '...'`
+--                            (no password is stored in this repo)
+--    4. All 16 captain logins Team1…Team16, passwords generated on first
+--                            run and readable only in the console
 --
 --  The last statement prints a verification table — every row should
 --  read "OK".
