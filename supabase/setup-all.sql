@@ -344,8 +344,6 @@ end $$;
 --   * auction_undo_sale handles a NULL sold_price.
 --   * purse_total can never be set below purse_spent.
 --   * auction_sync_players continues lot_order instead of restarting.
---   * auction_lots.registration_id is ON DELETE SET NULL (was CASCADE,
---     which silently voided sold lots and corrupted team purses).
 --   * every auction RPC is revoked from PUBLIC/anon.
 -- ============================================================
 
@@ -437,33 +435,13 @@ $$;
 -- ------------------------------------------------------------
 -- 3) LOTS / STATE / BIDS / LOGINS
 -- ------------------------------------------------------------
-create table if not exists public.auction_lots (
-  id                uuid primary key default gen_random_uuid(),
-  registration_id   uuid unique references public.registrations(id) on delete set null,
-  player_name       text not null,
-  gender            text,
-  dupr              numeric(5,3),
-  jersey_size       text,
-  jersey_name       text,
-  photo_url         text,
-  base_price        numeric(12,2) not null default 1000 check (base_price >= 0),
-  lot_order         int,
-  status            text not null default 'pool'
-                    check (status in ('pool','live','sold','unsold')),
-  sold_to_team_id   int references public.auction_teams(id) on delete set null,
-  sold_price        numeric(12,2) check (sold_price is null or sold_price >= 0),
-  sold_at           timestamptz,
-  created_at        timestamptz not null default now()
-);
 
-create index if not exists auction_lots_status_idx on public.auction_lots (status);
-create index if not exists auction_lots_team_idx   on public.auction_lots (sold_to_team_id);
 
 create table if not exists public.auction_state (
   id               int primary key check (id = 1),
   status           text not null default 'idle'
                    check (status in ('idle','live','paused','done')),
-  current_lot_id   uuid references public.auction_lots(id) on delete set null,
+  current_lot_id   uuid,   -- FK added once auction_pool exists (below)
   current_price    numeric(12,2) not null default 0,
   leading_team_id  int references public.auction_teams(id) on delete set null,
   bid_increment    numeric(12,2) not null default 500 check (bid_increment > 0),
@@ -482,7 +460,7 @@ create table if not exists public.auction_team_logins (
 
 create table if not exists public.auction_bids (
   id          bigserial primary key,
-  lot_id      uuid not null references public.auction_lots(id) on delete cascade,
+  lot_id      uuid not null,   -- FK added once auction_pool exists (below)
   team_id     int  not null references public.auction_teams(id) on delete cascade,
   amount      numeric(12,2) not null check (amount >= 0),
   created_at  timestamptz not null default now()
@@ -493,7 +471,6 @@ create index if not exists auction_bids_lot_idx on public.auction_bids (lot_id, 
 -- 4) RLS on the auction tables
 -- ------------------------------------------------------------
 alter table public.auction_teams       enable row level security;
-alter table public.auction_lots        enable row level security;
 alter table public.auction_state       enable row level security;
 alter table public.auction_bids        enable row level security;
 alter table public.auction_team_logins enable row level security;
@@ -506,13 +483,7 @@ create policy "staff manage teams"
   on public.auction_teams for all to authenticated
   using (public.is_auction_staff()) with check (public.is_auction_staff());
 
-drop policy if exists "auth can read lots" on public.auction_lots;
-create policy "auth can read lots"
-  on public.auction_lots for select to authenticated using (true);
-drop policy if exists "staff manage lots" on public.auction_lots;
-create policy "staff manage lots"
-  on public.auction_lots for all to authenticated
-  using (public.is_auction_staff()) with check (public.is_auction_staff());
+
 
 drop policy if exists "auth can read state" on public.auction_state;
 create policy "auth can read state"
@@ -598,71 +569,250 @@ create policy "staff can delete registration images"
 
 commit;
 
+-- Defence in depth: RLS is the only thing standing between anon and these
+-- two tables, because Supabase grants anon/authenticated full DML on every
+-- table in public by default. Drop those grants so that disabling RLS by
+-- accident cannot expose the staff allow-list or the captain passwords.
+revoke all on public.app_staff           from anon, authenticated;
+revoke all on public.auction_team_logins from anon, authenticated;
 
+-- The console reads and writes the captain passwords as a signed-in staff
+-- user, so authenticated still needs table-level DML there; RLS then narrows
+-- it to staff only. app_staff stays reachable only via SECURITY DEFINER.
+grant select, insert, update, delete on public.auction_team_logins to authenticated;
+
+notify pgrst, 'reload schema';
 -- ============================================================
--- AUCTION RPCs (hardened)
+-- AUCTION POOL — the auction now runs off the curated player list
+-- (Sheet2 of "MPL TEAM LIST"), not off the registration form.
+--
+-- Registrations stay OPEN and untouched: players keep filling the form,
+-- and each pool entry is joined to its registration by a Player Key that
+-- the organiser types in by hand.
 -- ============================================================
 begin;
 
--- Copy registered players into the pool. lot_order CONTINUES from the
--- current maximum instead of restarting at 1 on every incremental sync.
-create or replace function public.auction_sync_players(p_only_verified boolean default false)
+-- ------------------------------------------------------------
+-- 0) Clear the console's test sale so nothing carries into the new pool.
+-- ------------------------------------------------------------
+update public.auction_state
+   set status = 'idle', current_lot_id = null, current_price = 0,
+       leading_team_id = null, updated_at = now()
+ where id = 1;
+delete from public.auction_bids where id is not null;
+update public.auction_teams set purse_spent = 0 where purse_spent <> 0;
+
+-- ------------------------------------------------------------
+-- 1) Player Key on registrations (manual, typed by the organiser).
+--    Unique only where present, so the 77 existing rows stay valid.
+-- ------------------------------------------------------------
+alter table public.registrations add column if not exists player_key text;
+
+create unique index if not exists registrations_player_key_uidx
+  on public.registrations (player_key)
+  where player_key is not null and player_key <> '';
+
+-- ------------------------------------------------------------
+-- 2) Team economics: 10 lakh purse, 9-player squad,
+--    and the per-category quota 1 A + 4 B + 4 C.
+-- ------------------------------------------------------------
+alter table public.auction_teams add column if not exists max_a int not null default 1;
+alter table public.auction_teams add column if not exists max_b int not null default 4;
+alter table public.auction_teams add column if not exists max_c int not null default 4;
+
+alter table public.auction_teams alter column purse_total set default 1000000;
+alter table public.auction_teams alter column max_squad  set default 9;
+
+update public.auction_teams
+   set purse_total = 1000000, max_squad = 9, max_a = 1, max_b = 4, max_c = 4
+ where purse_total <> 1000000 or max_squad <> 9
+    or max_a <> 1 or max_b <> 4 or max_c <> 4;
+
+-- ------------------------------------------------------------
+-- 3) Category catalogue — one place that owns the base prices.
+-- ------------------------------------------------------------
+create table if not exists public.auction_categories (
+  code       text primary key check (code in ('A','B','C')),
+  label      text not null,
+  base_price numeric(12,2) not null check (base_price >= 0),
+  per_team   int not null check (per_team >= 0),
+  sort_order int not null default 0
+);
+
+insert into public.auction_categories (code, label, base_price, per_team, sort_order) values
+  ('A', 'Advance',      50000, 1, 1),
+  ('B', 'Intermediate', 30000, 4, 2),
+  ('C', 'Beginner',     20000, 4, 3)
+on conflict (code) do update
+  set label = excluded.label,
+      base_price = excluded.base_price,
+      per_team = excluded.per_team,
+      sort_order = excluded.sort_order;
+
+-- ------------------------------------------------------------
+-- 4) The pool itself.
+--    photo_url / sex / age / dupr are OVERRIDES: left null, the player
+--    card falls back to the linked registration. Filled in, they win.
+--    That is how a player with no registration still gets a card.
+-- ------------------------------------------------------------
+create table if not exists public.auction_pool (
+  id              uuid primary key default gen_random_uuid(),
+  sl_no           int unique,
+  player_key      text,
+  name            text not null default '',
+  category        text not null references public.auction_categories(code),
+  base_price      numeric(12,2) not null check (base_price >= 0),
+
+  photo_url       text,
+  sex             text check (sex is null or sex in ('Male','Female','Other')),
+  age             int  check (age is null or (age between 5 and 100)),
+  dupr            numeric(5,3) check (dupr is null or (dupr >= 0 and dupr <= 8)),
+  notes           text,
+
+  status          text not null default 'pool'
+                  check (status in ('pool','live','sold','unsold')),
+  sold_to_team_id int references public.auction_teams(id) on delete set null,
+  sold_price      numeric(12,2) check (sold_price is null or sold_price >= 0),
+  sold_at         timestamptz,
+  created_at      timestamptz not null default now()
+);
+
+create unique index if not exists auction_pool_player_key_uidx
+  on public.auction_pool (player_key)
+  where player_key is not null and player_key <> '';
+
+create index if not exists auction_pool_status_idx   on public.auction_pool (status);
+create index if not exists auction_pool_category_idx on public.auction_pool (category);
+create index if not exists auction_pool_team_idx     on public.auction_pool (sold_to_team_id);
+
+-- ------------------------------------------------------------
+-- 5) The live block now points at a pool entry, not a registration lot.
+-- ------------------------------------------------------------
+alter table public.auction_state
+  drop constraint if exists auction_state_current_lot_id_fkey;
+alter table public.auction_state
+  add constraint auction_state_current_lot_id_fkey
+  foreign key (current_lot_id) references public.auction_pool(id) on delete set null;
+
+alter table public.auction_bids
+  drop constraint if exists auction_bids_lot_id_fkey;
+alter table public.auction_bids
+  add constraint auction_bids_lot_id_fkey
+  foreign key (lot_id) references public.auction_pool(id) on delete cascade;
+
+-- ------------------------------------------------------------
+-- 6) auction_lots was a copy of the registration table and is now
+--    replaced by auction_pool. It holds no auction result worth keeping
+--    (the sale above was reversed), so retire it rather than leave a
+--    second, silently diverging source of truth.
+-- ------------------------------------------------------------
+drop table if exists public.auction_lots cascade;
+
+-- ------------------------------------------------------------
+-- 7) RLS
+-- ------------------------------------------------------------
+alter table public.auction_pool       enable row level security;
+alter table public.auction_categories enable row level security;
+
+drop policy if exists "auth can read pool" on public.auction_pool;
+create policy "auth can read pool"
+  on public.auction_pool for select to authenticated using (true);
+
+drop policy if exists "staff manage pool" on public.auction_pool;
+create policy "staff manage pool"
+  on public.auction_pool for all to authenticated
+  using (public.is_auction_staff()) with check (public.is_auction_staff());
+
+drop policy if exists "auth can read categories" on public.auction_categories;
+create policy "auth can read categories"
+  on public.auction_categories for select to authenticated using (true);
+
+drop policy if exists "staff manage categories" on public.auction_categories;
+create policy "staff manage categories"
+  on public.auction_categories for all to authenticated
+  using (public.is_auction_staff()) with check (public.is_auction_staff());
+
+commit;
+-- ============================================================
+-- AUCTION RPCs — rebuilt on auction_pool, with category quotas
+-- ============================================================
+begin;
+
+-- How many players of one category a team already holds.
+create or replace function public.auction_team_cat_count(p_team int, p_cat text)
 returns int
-language plpgsql security definer set search_path = public
+language sql stable security definer set search_path = public
 as $$
-declare
-  v_added int;
-  v_base  int;
-begin
-  if not public.is_auction_staff() then
-    raise exception 'Only tournament staff can sync players';
-  end if;
+  select count(*)::int from public.auction_pool
+   where sold_to_team_id = p_team and status = 'sold' and category = p_cat;
+$$;
 
-  select coalesce(max(lot_order), 0) into v_base from public.auction_lots;
+-- The quota for one category on one team.
+create or replace function public.auction_team_cat_max(p_team int, p_cat text)
+returns int
+language sql stable security definer set search_path = public
+as $$
+  select case p_cat when 'A' then t.max_a when 'B' then t.max_b when 'C' then t.max_c else 0 end
+    from public.auction_teams t where t.id = p_team;
+$$;
 
-  with inserted as (
-    insert into public.auction_lots
-      (registration_id, player_name, gender, dupr, jersey_size, jersey_name, photo_url, lot_order)
-    select r.id, r.full_name, r.gender, r.dupr, r.jersey_size, r.jersey_name, r.profile_pic_url,
-           v_base + row_number() over (order by r.created_at)
-      from public.registrations r
-     where (not p_only_verified or r.status in ('verified','checked-in'))
-       and not exists (select 1 from public.auction_lots l where l.registration_id = r.id)
-    returning 1
-  )
-  select count(*) into v_added from inserted;
+-- The registration-form entry a pool player is joined to, if any.
+-- SECURITY DEFINER on purpose: it must read public.registrations, which is
+-- staff-only, but it returns ONLY the three columns a player card needs.
+-- No phone, no email, no payment screenshot ever leaves this function.
+create or replace function public.auction_player_card(p_pool_id uuid)
+returns table (
+  id uuid, sl_no int, player_key text, name text,
+  category text, category_label text, base_price numeric,
+  photo_url text, sex text, age int, dupr numeric,
+  has_registration boolean, status text,
+  sold_to_team_id int, sold_price numeric
+)
+language sql stable security definer set search_path = public
+as $$
+  select p.id, p.sl_no, p.player_key, p.name,
+         p.category, c.label, p.base_price,
+         coalesce(nullif(p.photo_url, ''), r.profile_pic_url),
+         coalesce(nullif(p.sex, ''), r.gender),
+         p.age,
+         coalesce(p.dupr, r.dupr),
+         (r.id is not null),
+         p.status, p.sold_to_team_id, p.sold_price
+    from public.auction_pool p
+    join public.auction_categories c on c.code = p.category
+    left join public.registrations r
+           on p.player_key is not null and p.player_key <> ''
+          and r.player_key = p.player_key
+   where p.id = p_pool_id;
+$$;
 
-  return v_added;
-end $$;
-
--- Put a player on the block. Refuses to re-list a SOLD lot, which
--- previously wiped the sale while leaving the buyer's purse deducted.
+-- Put a player on the block.
 create or replace function public.auction_start_lot(p_lot_id uuid, p_base numeric default null)
 returns void
 language plpgsql security definer set search_path = public
 as $$
-declare
-  v_base   numeric;
-  v_status text;
+declare v_base numeric; v_status text; v_name text;
 begin
   if not public.is_auction_staff() then
     raise exception 'Only tournament staff can start a lot';
   end if;
 
-  select status, coalesce(p_base, base_price)
-    into v_status, v_base
-    from public.auction_lots where id = p_lot_id for update;
-  if not found then raise exception 'Lot not found'; end if;
+  select status, name, coalesce(p_base, base_price)
+    into v_status, v_name, v_base
+    from public.auction_pool where id = p_lot_id for update;
+  if not found then raise exception 'Player not found in the pool'; end if;
 
   if v_status = 'sold' then
     raise exception 'That player is already sold — undo the sale first';
   end if;
+  if coalesce(trim(v_name), '') = '' then
+    raise exception 'This pool slot has no player name yet — fill it in on the Auction Pool tab first';
+  end if;
 
-  update public.auction_lots
-     set status = 'pool'
+  update public.auction_pool set status = 'pool'
    where status = 'live' and id <> p_lot_id;
 
-  update public.auction_lots
+  update public.auction_pool
      set status = 'live', base_price = v_base,
          sold_to_team_id = null, sold_price = null, sold_at = null
    where id = p_lot_id;
@@ -673,22 +823,16 @@ begin
    where id = 1;
 end $$;
 
--- Place a bid. The minimum is computed SERVER-SIDE for both the opening
--- bid and every raise, so a captain cannot POST p_amount = 0 and win a
--- player for nothing.
+-- Place a bid. Enforces purse, total squad size AND the category quota,
+-- so a team can never end up with two A players or a fifth B.
 create or replace function public.auction_bid(p_team_id int default null, p_amount numeric default null)
 returns numeric
 language plpgsql security definer set search_path = public
 as $$
 declare
-  v_team    int;
-  v_state   public.auction_state%rowtype;
-  v_amount  numeric;
-  v_min     numeric;
-  v_lotbase numeric;
-  v_left    numeric;
-  v_squad   int;
-  v_max     int;
+  v_team int; v_state public.auction_state%rowtype;
+  v_amount numeric; v_min numeric; v_lotbase numeric; v_cat text; v_catlabel text;
+  v_left numeric; v_squad int; v_max int; v_ccount int; v_cmax int;
 begin
   v_team := coalesce(public.my_auction_team(), case when public.is_auction_staff() then p_team_id end);
   if v_team is null then raise exception 'No team is linked to this login'; end if;
@@ -705,17 +849,15 @@ begin
     raise exception 'Your team is already the highest bidder';
   end if;
 
-  select base_price into v_lotbase
-    from public.auction_lots where id = v_state.current_lot_id;
+  select p.base_price, p.category, c.label into v_lotbase, v_cat, v_catlabel
+    from public.auction_pool p
+    join public.auction_categories c on c.code = p.category
+   where p.id = v_state.current_lot_id;
 
-  v_min := case
-             when v_state.leading_team_id is null
-               then greatest(v_state.current_price, coalesce(v_lotbase, 0))
-             else v_state.current_price + v_state.bid_increment
-           end;
-
+  v_min := case when v_state.leading_team_id is null
+                then greatest(v_state.current_price, coalesce(v_lotbase, 0))
+                else v_state.current_price + v_state.bid_increment end;
   v_amount := coalesce(p_amount, v_min);
-
   if v_amount < v_min then
     raise exception 'Bid must be at least %', v_min;
   end if;
@@ -727,10 +869,17 @@ begin
     raise exception 'Not enough purse left (wallet %, bid %)', v_left, v_amount;
   end if;
 
-  select count(*) into v_squad from public.auction_lots
+  select count(*) into v_squad from public.auction_pool
    where sold_to_team_id = v_team and status = 'sold';
   if v_squad >= v_max then
     raise exception 'Squad is already full (% players)', v_max;
+  end if;
+
+  v_ccount := public.auction_team_cat_count(v_team, v_cat);
+  v_cmax   := public.auction_team_cat_max(v_team, v_cat);
+  if v_ccount >= v_cmax then
+    raise exception 'Your % quota is full (% of % players in category %)',
+      v_catlabel, v_ccount, v_cmax, v_cat;
   end if;
 
   insert into public.auction_bids (lot_id, team_id, amount)
@@ -743,31 +892,22 @@ begin
   return v_amount;
 end $$;
 
--- Finalise a sale. Bound to the lot actually on the block so a stale
--- click cannot sell a different player.
 create or replace function public.auction_sell(
-  p_lot_id uuid default null,
-  p_team_id int default null,
-  p_price numeric default null
+  p_lot_id uuid default null, p_team_id int default null, p_price numeric default null
 )
 returns void
 language plpgsql security definer set search_path = public
 as $$
 declare
-  v_state  public.auction_state%rowtype;
-  v_lot    uuid;
-  v_team   int;
-  v_price  numeric;
-  v_left   numeric;
-  v_squad  int;
-  v_max    int;
+  v_state public.auction_state%rowtype;
+  v_lot uuid; v_team int; v_price numeric; v_cat text; v_catlabel text;
+  v_left numeric; v_squad int; v_max int; v_ccount int; v_cmax int;
 begin
   if not public.is_auction_staff() then
     raise exception 'Only tournament staff can finalise a sale';
   end if;
 
   select * into v_state from public.auction_state where id = 1 for update;
-
   if v_state.status <> 'live' or v_state.current_lot_id is null then
     raise exception 'No player is on the block';
   end if;
@@ -778,10 +918,14 @@ begin
   end if;
 
   v_team  := coalesce(p_team_id, v_state.leading_team_id);
-  v_price := coalesce(p_price,   v_state.current_price);
-
+  v_price := coalesce(p_price, v_state.current_price);
   if v_team is null then raise exception 'No team selected — nobody has bid yet'; end if;
   if v_price is null or v_price < 0 then raise exception 'Invalid price'; end if;
+
+  select p.category, c.label into v_cat, v_catlabel
+    from public.auction_pool p
+    join public.auction_categories c on c.code = p.category
+   where p.id = v_lot;
 
   select purse_left, max_squad into v_left, v_max
     from public.auction_teams where id = v_team for update;
@@ -790,21 +934,26 @@ begin
     raise exception 'Team has only % left in the purse', v_left;
   end if;
 
-  select count(*) into v_squad from public.auction_lots
+  select count(*) into v_squad from public.auction_pool
    where sold_to_team_id = v_team and status = 'sold';
   if v_squad >= v_max then
     raise exception 'Squad is already full (% players)', v_max;
   end if;
 
-  update public.auction_lots
+  v_ccount := public.auction_team_cat_count(v_team, v_cat);
+  v_cmax   := public.auction_team_cat_max(v_team, v_cat);
+  if v_ccount >= v_cmax then
+    raise exception 'That team already has its % players (category % limit is %)',
+      v_catlabel, v_cat, v_cmax;
+  end if;
+
+  update public.auction_pool
      set status = 'sold', sold_to_team_id = v_team,
          sold_price = v_price, sold_at = now()
    where id = v_lot and status <> 'sold';
-  if not found then raise exception 'That lot is already sold'; end if;
+  if not found then raise exception 'That player is already sold'; end if;
 
-  update public.auction_teams
-     set purse_spent = purse_spent + v_price
-   where id = v_team;
+  update public.auction_teams set purse_spent = purse_spent + v_price where id = v_team;
 
   update public.auction_state
      set status = 'idle', current_lot_id = null, current_price = 0,
@@ -816,28 +965,22 @@ create or replace function public.auction_mark_unsold(p_lot_id uuid default null
 returns void
 language plpgsql security definer set search_path = public
 as $$
-declare
-  v_state public.auction_state%rowtype;
-  v_lot   uuid;
+declare v_state public.auction_state%rowtype; v_lot uuid;
 begin
   if not public.is_auction_staff() then
     raise exception 'Only tournament staff can do that';
   end if;
-
   select * into v_state from public.auction_state where id = 1 for update;
   v_lot := coalesce(p_lot_id, v_state.current_lot_id);
   if v_lot is null then raise exception 'No player is on the block'; end if;
 
-  update public.auction_lots set status = 'unsold' where id = v_lot and status <> 'sold';
-
+  update public.auction_pool set status = 'unsold' where id = v_lot and status <> 'sold';
   update public.auction_state
      set status = 'idle', current_lot_id = null, current_price = 0,
          leading_team_id = null, updated_at = now()
    where id = 1;
 end $$;
 
--- Undo a sale. Refunds the exact sold_price; a NULL price is treated as
--- a data error rather than silently zeroing the team's whole spend.
 create or replace function public.auction_undo_sale(p_lot_id uuid)
 returns void
 language plpgsql security definer set search_path = public
@@ -849,15 +992,13 @@ begin
   end if;
 
   select sold_to_team_id, sold_price into v_team, v_price
-    from public.auction_lots where id = p_lot_id and status = 'sold' for update;
-  if v_team is null then raise exception 'That lot is not sold'; end if;
-  if v_price is null then raise exception 'That sale has no recorded price — fix it in the console first'; end if;
+    from public.auction_pool where id = p_lot_id and status = 'sold' for update;
+  if v_team is null then raise exception 'That player is not sold'; end if;
+  if v_price is null then raise exception 'That sale has no recorded price — fix it on the Auction Pool tab first'; end if;
 
   update public.auction_teams
-     set purse_spent = greatest(purse_spent - v_price, 0)
-   where id = v_team;
-
-  update public.auction_lots
+     set purse_spent = greatest(purse_spent - v_price, 0) where id = v_team;
+  update public.auction_pool
      set status = 'pool', sold_to_team_id = null, sold_price = null, sold_at = null
    where id = p_lot_id;
 end $$;
@@ -871,19 +1012,12 @@ begin
     raise exception 'Only tournament staff can reset the auction';
   end if;
 
-  -- Every statement needs an explicit WHERE: Supabase's safeupdate guard
-  -- rejects an unqualified UPDATE/DELETE with SQLSTATE 21000.
-  update public.auction_lots
+  update public.auction_pool
      set status = 'pool', sold_to_team_id = null, sold_price = null, sold_at = null
-   where status <> 'pool'
-      or sold_to_team_id is not null
-      or sold_price is not null
-      or sold_at is not null;
+   where status <> 'pool' or sold_to_team_id is not null
+      or sold_price is not null or sold_at is not null;
 
-  update public.auction_teams
-     set purse_spent = 0
-   where purse_spent <> 0;
-
+  update public.auction_teams set purse_spent = 0 where purse_spent <> 0;
   delete from public.auction_bids where id is not null;
 
   update public.auction_state
@@ -892,15 +1026,17 @@ begin
    where id = 1;
 end $$;
 
--- ------------------------------------------------------------
--- Grants: authenticated only. Strip the implicit PUBLIC grant so the
--- anon key cannot reach any auction RPC.
--- ------------------------------------------------------------
+-- The auction is no longer sourced from the registration form, so copying
+-- registrations into the lot list would corrupt the curated pool.
+drop function if exists public.auction_sync_players(boolean);
+
+commit;
+
+-- Grants: authenticated only, never anon.
 do $$
 declare fn text;
 begin
   foreach fn in array array[
-    'public.auction_sync_players(boolean)',
     'public.auction_start_lot(uuid, numeric)',
     'public.auction_bid(int, numeric)',
     'public.auction_sell(uuid, int, numeric)',
@@ -909,20 +1045,20 @@ begin
     'public.auction_reset()',
     'public.auction_team_of(uuid)',
     'public.is_auction_staff()',
-    'public.my_auction_team()'
+    'public.my_auction_team()',
+    'public.auction_team_cat_count(int, text)',
+    'public.auction_team_cat_max(int, text)',
+    'public.auction_player_card(uuid)'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
     execute format('grant execute on function %s to authenticated', fn);
   end loop;
 end $$;
 
-commit;
-
--- Realtime (best effort — never abort the install for it)
 do $$
 declare t text;
 begin
-  foreach t in array array['auction_lots','auction_teams','auction_state','auction_bids'] loop
+  foreach t in array array['auction_pool','auction_categories'] loop
     begin
       execute format('alter publication supabase_realtime add table public.%I', t);
     exception when others then
@@ -930,20 +1066,6 @@ begin
     end;
   end loop;
 end $$;
-
-notify pgrst, 'reload schema';
-
--- Defence in depth: RLS is the only thing standing between anon and these
--- two tables, because Supabase grants anon/authenticated full DML on every
--- table in public by default. Drop those grants so that disabling RLS by
--- accident cannot expose the staff allow-list or the captain passwords.
-revoke all on public.app_staff           from anon, authenticated;
-revoke all on public.auction_team_logins from anon, authenticated;
-
--- The console reads and writes the captain passwords as a signed-in staff
--- user, so authenticated still needs table-level DML there; RLS then narrows
--- it to staff only. app_staff stays reachable only via SECURITY DEFINER.
-grant select, insert, update, delete on public.auction_team_logins to authenticated;
 
 notify pgrst, 'reload schema';
 

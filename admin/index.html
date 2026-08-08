@@ -93,6 +93,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab on" data-tab="registrations" role="tab" aria-selected="true">Registrations</button>
       <button class="tab" data-tab="grid" role="tab" aria-selected="false">Full Table (Live)</button>
+      <button class="tab" data-tab="pool" role="tab" aria-selected="false">Auction Pool</button>
       <button class="tab" data-tab="auction" role="tab" aria-selected="false">Auction</button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">Event Controls</button>
     </nav>
@@ -160,6 +161,37 @@
       </section>
     </section>
 
+    <!-- ---------- TAB: AUCTION POOL ---------- -->
+    <section class="tabpane" id="tab-pool" hidden>
+      <section class="toolbar">
+        <input type="search" id="poolQ" class="search" placeholder="Filter the pool — name, key, category…" />
+        <div class="toolbar-right">
+          <span class="hint" id="poolHint">Click any cell to edit · saves instantly</span>
+          <select id="poolCatFilter" class="mini-select">
+            <option value="">All categories</option>
+            <option value="A">A · Advance</option>
+            <option value="B">B · Intermediate</option>
+            <option value="C">C · Beginner</option>
+          </select>
+          <button class="btn-ghost" id="btnPoolCsv" type="button">⬇ Download CSV</button>
+          <button class="btn-primary" id="btnPoolAdd" type="button">+ Add player</button>
+        </div>
+      </section>
+
+      <section class="stats" id="poolStats" aria-label="Pool statistics"></section>
+
+      <section class="grid-wrap">
+        <table class="grid">
+          <thead><tr id="poolHead"></tr></thead>
+          <tbody id="poolBody"></tbody>
+        </table>
+        <p class="empty" id="poolEmpty" hidden>The auction pool is empty.</p>
+      </section>
+
+      <!-- hidden input used by the per-row "upload photo" button -->
+      <input type="file" id="poolPhotoInput" accept="image/*" hidden />
+    </section>
+
     <!-- ---------- TAB: AUCTION ---------- -->
     <section class="tabpane" id="tab-auction" hidden>
 
@@ -185,6 +217,29 @@
         <section class="auc-stage">
           <div class="auc-stage-main">
             <p class="auc-tag" id="aucTag">Nobody on the block</p>
+
+            <!-- digital player card -->
+            <div class="pcard" id="aucCard" hidden>
+              <div class="pcard-photo">
+                <img id="aucCardImg" alt="" hidden />
+                <div class="pcard-noimg" id="aucCardNoImg">
+                  <span>NO PHOTO</span>
+                  <small id="aucCardNoImgWhy">not registered yet</small>
+                </div>
+              </div>
+              <div class="pcard-body">
+                <p class="pcard-kicker">Auction Player Card · Season 1</p>
+                <h2 class="pcard-name" id="aucCardName">—</h2>
+                <dl class="pcard-stats">
+                  <div class="pcard-stat"><dt>Category</dt><dd id="aucCardCat">—</dd></div>
+                  <div class="pcard-stat"><dt>Age</dt><dd id="aucCardAge">—</dd></div>
+                  <div class="pcard-stat"><dt>Sex</dt><dd id="aucCardSex">—</dd></div>
+                  <div class="pcard-stat"><dt>DUPR</dt><dd id="aucCardDupr">—</dd></div>
+                  <div class="pcard-stat wide"><dt>Base Price</dt><dd id="aucCardBase">—</dd></div>
+                </dl>
+              </div>
+            </div>
+
             <h2 class="auc-player" id="aucPlayer">—</h2>
             <p class="auc-meta" id="aucMeta"></p>
             <div class="auc-price">
@@ -238,11 +293,18 @@
           <!-- auction setup -->
           <div class="panel">
             <h2 class="panel-title">Auction Setup</h2>
-            <p class="panel-sub">Sync registered players into the pool, set the bid step, and create the 16 captain logins.</p>
+            <p class="panel-sub">
+              Call a player up by their Player Key, set the bid step and purse, and create the 16 captain logins.
+              The pool itself is edited on the <b>Auction Pool</b> tab.
+            </p>
             <div class="auc-setup-row">
-              <button class="btn-mini" id="btnAucSync" type="button">⟳ Sync registered players</button>
-              <label class="auc-inline"><input type="checkbox" id="aucOnlyVerified" /> verified only</label>
+              <div class="field" style="margin:0;flex:1">
+                <label for="aucKeyLookup">Call player by Player Key</label>
+                <input type="search" id="aucKeyLookup" placeholder="e.g. MPL-014" autocomplete="off" />
+              </div>
+              <button class="btn-mini" id="btnAucKeyGo" type="button">→ On the block</button>
             </div>
+            <p class="auc-keyhint" id="aucKeyHint"></p>
             <div class="auc-setup-row" style="margin-top:14px">
               <div class="field" style="margin:0">
                 <label for="aucIncrement">Bid increment</label>
@@ -255,6 +317,20 @@
               <div class="field" style="margin:0">
                 <label for="aucSquadAll">Max squad size</label>
                 <input type="number" id="aucSquadAll" min="1" step="1" />
+              </div>
+            </div>
+            <div class="auc-setup-row" style="margin-top:12px">
+              <div class="field" style="margin:0">
+                <label for="aucMaxA">A · Advance per team</label>
+                <input type="number" id="aucMaxA" min="0" step="1" />
+              </div>
+              <div class="field" style="margin:0">
+                <label for="aucMaxB">B · Intermediate per team</label>
+                <input type="number" id="aucMaxB" min="0" step="1" />
+              </div>
+              <div class="field" style="margin:0">
+                <label for="aucMaxC">C · Beginner per team</label>
+                <input type="number" id="aucMaxC" min="0" step="1" />
               </div>
             </div>
             <div class="auc-setup-row" style="margin-top:12px">

@@ -270,6 +270,7 @@
       });
       $$(".tabpane").forEach((p) => (p.hidden = p.id !== `tab-${t.dataset.tab}`));
       if (t.dataset.tab === "grid") renderGrid();
+      if (t.dataset.tab === "pool") loadPool();
       if (t.dataset.tab === "auction") loadAuction();
     })
   );
@@ -413,6 +414,7 @@
   /* ---------------- FULL TABLE: live, Excel-style editable grid ---------------- */
   const GRID_COLS = [
     { key: "reg_code",             label: "Reg Code",   type: "code" },
+    { key: "player_key",           label: "Player Key", type: "text" },
     { key: "created_at",           label: "Created",    type: "date" },
     { key: "full_name",            label: "Name",       type: "text" },
     { key: "phone",                label: "Phone",      type: "text" },
@@ -494,6 +496,9 @@
     let value = el.value;
     if (field === "dupr") value = value === "" ? null : Number(value);
     else if (field === "email") value = value.trim() || null;
+    // Store a cleared key as NULL, never "", so the uniqueness index does not
+    // treat every blank row as a collision.
+    else if (field === "player_key") value = value.trim().toUpperCase() || null;
     else if (field === "jersey_name") value = value.trim().toUpperCase();
     else if (typeof value === "string") value = value.trim();
 
@@ -511,6 +516,7 @@
     }
     row[field] = value;
     if (field === "jersey_name") el.value = value;                 // reflect UPPERCASE
+    if (field === "player_key") el.value = value ?? "";            // reflect UPPERCASE / cleared
     if (el.classList.contains("g-status")) el.className = "g-sel g-status s-" + value;
     el.classList.add("g-ok");
     setTimeout(() => el.classList.remove("g-ok"), 900);
@@ -848,15 +854,18 @@
   let aTeams = [];
   let aLots = [];
   let aState = null;
+  let aCats = [];
   let aucReady = false;
   let aucRealtime = false;
 
   async function loadAuction() {
-    const [t, l, s] = await Promise.all([
+    const [t, l, s, c] = await Promise.all([
       sb.from("auction_teams").select("*").order("id"),
-      sb.from("auction_lots").select("*").order("lot_order", { nullsFirst: false }),
+      sb.from("auction_pool").select("*").order("sl_no", { nullsFirst: false }),
       sb.from("auction_state").select("*").eq("id", 1).maybeSingle(),
+      sb.from("auction_categories").select("*").order("sort_order"),
     ]);
+    if (c.data) aCats = c.data;
 
     const err = t.error || l.error;
     if (err) {
@@ -888,8 +897,11 @@
     if (!aucReady) {
       aucReady = true;
       $("#aucIncrement").value = aState?.bid_increment ?? 500;
-      $("#aucPurseAll").value = aTeams[0]?.purse_total ?? 100000;
-      $("#aucSquadAll").value = aTeams[0]?.max_squad ?? 8;
+      $("#aucPurseAll").value = aTeams[0]?.purse_total ?? 1000000;
+      $("#aucSquadAll").value = aTeams[0]?.max_squad ?? 9;
+      $("#aucMaxA").value = aTeams[0]?.max_a ?? 1;
+      $("#aucMaxB").value = aTeams[0]?.max_b ?? 4;
+      $("#aucMaxC").value = aTeams[0]?.max_c ?? 4;
       startAuctionRealtime();
     }
     renderAuction();
@@ -911,7 +923,7 @@
           renderAucTeams();
           renderAucStage();
         })
-        .on("postgres_changes", { event: "*", schema: "public", table: "auction_lots" }, (p) => {
+        .on("postgres_changes", { event: "*", schema: "public", table: "auction_pool" }, (p) => {
           if (p.eventType === "DELETE") aLots = aLots.filter((x) => x.id !== p.old.id);
           else {
             const i = aLots.findIndex((x) => x.id === p.new.id);
@@ -952,17 +964,9 @@
     const lot = live ? aLots.find((l) => l.id === aState.current_lot_id) : null;
 
     $("#aucTag").textContent = lot ? "On the block" : "Nobody on the block";
-    $("#aucPlayer").textContent = lot ? lot.player_name : "—";
-    $("#aucMeta").textContent = lot
-      ? [
-          lot.dupr != null ? "DUPR " + Number(lot.dupr).toFixed(3) : "Unrated",
-          lot.gender,
-          lot.jersey_size ? "Jersey " + lot.jersey_size : null,
-          "Base " + aucMoney(lot.base_price),
-        ]
-          .filter(Boolean)
-          .join(" · ")
-      : "Pick a player from the pool and press “On the block”.";
+    $("#aucPlayer").textContent = lot ? lot.name : "—";
+    $("#aucMeta").textContent = lot ? "" : "Pick a player from the pool and press “On the block”.";
+    renderPlayerCard(lot);
     $("#aucPrice").textContent = lot ? aucMoney(aState.current_price) : "—";
     const lead = aState && aState.leading_team_id;
     $("#aucLead").textContent = lead ? aTeams.find((t) => t.id === lead)?.name || "—" : "No bids yet";
@@ -970,12 +974,78 @@
     ["btnAucSell", "btnAucUnsold", "btnAucClear"].forEach((id) => ($("#" + id).disabled = !lot));
   }
 
+  /* ---- digital player card ----
+     The pool row only carries the organiser's overrides. The photo, sex and
+     DUPR usually live on the player's registration, joined by Player Key, so
+     ask the server to resolve the two into one card. */
+  let cardFor = null;
+  async function renderPlayerCard(lot) {
+    const card = $("#aucCard");
+    if (!lot) {
+      card.hidden = true;
+      cardFor = null;
+      return;
+    }
+    card.hidden = false;
+    if (cardFor === lot.id) return;                  // already showing this player
+    cardFor = lot.id;
+
+    // paint what we already know so the card never sits blank
+    paintCard({
+      name: lot.name,
+      category: lot.category,
+      category_label: catLabel(lot.category),
+      base_price: lot.base_price,
+      photo_url: lot.photo_url,
+      sex: lot.sex,
+      age: lot.age,
+      dupr: lot.dupr,
+      has_registration: false,
+      player_key: lot.player_key,
+    });
+
+    const { data, error } = await sb.rpc("auction_player_card", { p_pool_id: lot.id });
+    if (error || cardFor !== lot.id) return;         // stale response, a new player is up
+    const c = Array.isArray(data) ? data[0] : data;
+    if (c) paintCard(c);
+  }
+
+  function paintCard(c) {
+    const img = $("#aucCardImg");
+    const no = $("#aucCardNoImg");
+    if (c.photo_url) {
+      img.src = c.photo_url;
+      img.hidden = false;
+      no.hidden = true;
+    } else {
+      img.hidden = true;
+      no.hidden = false;
+      $("#aucCardNoImgWhy").textContent = !c.player_key
+        ? "no Player Key set"
+        : c.has_registration
+        ? "registered, no photo"
+        : "not registered yet";
+    }
+    $("#aucCardName").textContent = c.name || "—";
+    $("#aucCardCat").textContent = c.category
+      ? `${c.category} · ${c.category_label || catLabel(c.category)}`
+      : "—";
+    $("#aucCardAge").textContent = c.age != null ? c.age : "NA";
+    $("#aucCardSex").textContent = c.sex || "NA";
+    $("#aucCardDupr").textContent = c.dupr != null ? Number(c.dupr).toFixed(3) : "NA";
+    $("#aucCardBase").textContent = aucMoney(c.base_price);
+  }
+
+  const catLabel = (code) =>
+    aCats.find((x) => x.code === code)?.label ||
+    ({ A: "Advance", B: "Intermediate", C: "Beginner" }[code] || "");
+
   function renderAucPool() {
     const q = ($("#aucPoolQ").value || "").trim().toLowerCase();
     const f = $("#aucPoolFilter").value;
     const list = aLots.filter((l) => {
       if (f && l.status !== f) return false;
-      if (q && !l.player_name.toLowerCase().includes(q)) return false;
+      if (q && !`${l.name} ${l.player_key || ""} ${l.category}`.toLowerCase().includes(q)) return false;
       return true;
     });
     $("#aucPoolCount").textContent = aLots.filter((l) => l.status === "pool").length;
@@ -995,19 +1065,20 @@
               if (l.status === "unsold") right += `<span class="unsold-tag">unsold</span>`;
               right += `<button class="btn-mini" data-auc-start="${esc(l.id)}">On the block</button>`;
             }
+            const unnamed = !String(l.name || "").trim();
             return `<div class="auc-lot ${isLive ? "is-live" : ""} ${l.status === "sold" ? "is-sold" : ""}">
               ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy" />` : `<span class="noimg">🥒</span>`}
               <div>
-                <div class="nm">${esc(l.player_name)}</div>
-                <div class="meta">${l.dupr != null ? "DUPR " + Number(l.dupr).toFixed(3) : "Unrated"}${
-              l.jersey_size ? " · " + esc(l.jersey_size) : ""
-            }</div>
+                <div class="nm">${unnamed ? `<i class="tbd">slot ${l.sl_no} · name not filled in</i>` : esc(l.name)}</div>
+                <div class="meta"><span class="cat-chip c-${esc(l.category)}">${esc(l.category)}</span> ${esc(
+              catLabel(l.category)
+            )} · Base ${aucMoney(l.base_price)}${l.player_key ? " · " + esc(l.player_key) : ""}</div>
               </div>
               <div class="right">${right}</div>
             </div>`;
           })
           .join("")
-      : `<p class="empty">No players here yet. Use “Sync registered players” to fill the pool.</p>`;
+      : `<p class="empty">No players match. The pool is managed on the Auction Pool tab.</p>`;
   }
 
   const aucOpenTeams = new Set();
@@ -1032,7 +1103,7 @@
                 (l) => `<div class="tc-player">
                   ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy" />` : `<span class="noimg">🥒</span>`}
                   <div class="tc-p-info">
-                    <div class="tc-p-name">${esc(l.player_name)}</div>
+                    <div class="tc-p-name">${esc(l.name)}</div>
                     <div class="tc-p-meta">${l.dupr != null ? "DUPR " + Number(l.dupr).toFixed(3) : "Unrated"}${
                   l.jersey_size ? " · " + esc(l.jersey_size) : ""
                 }</div>
@@ -1119,7 +1190,7 @@
     if (undo) {
       const lot = aLots.find((l) => l.id === undo.dataset.aucUndo);
       confirmDialog(
-        `Undo the sale of ${lot ? lot.player_name : "this player"}? The team's purse will be refunded.`,
+        `Undo the sale of ${lot ? lot.name : "this player"}? The team's purse will be refunded.`,
         async () => {
           const { error } = await sb.rpc("auction_undo_sale", { p_lot_id: undo.dataset.aucUndo });
           if (error) return toast(error.message, "err");
@@ -1142,7 +1213,7 @@
     if (release) {
       const lot = aLots.find((l) => l.id === release.dataset.aucRelease);
       confirmDialog(
-        `Release ${lot ? lot.player_name : "this player"} back to the pool? ` +
+        `Release ${lot ? lot.name : "this player"} back to the pool? ` +
           `${lot ? aucMoney(lot.sold_price) : "The fee"} will be refunded to the team.`,
         async () => {
           const { error } = await sb.rpc("auction_undo_sale", { p_lot_id: release.dataset.aucRelease });
@@ -1231,29 +1302,83 @@
     if (error) return toast(error.message, "err");
     const live = aLots.find((l) => aState && l.id === aState.current_lot_id);
     if (live && live.status === "live") {
-      await sb.from("auction_lots").update({ status: "pool" }).eq("id", live.id);
+      await sb.from("auction_pool").update({ status: "pool" }).eq("id", live.id);
     }
     toast("Block cleared", "info");
     loadAuction();
   });
 
-  /* ---- setup ---- */
-  $("#btnAucSync").addEventListener("click", async () => {
-    const { data, error } = await sb.rpc("auction_sync_players", {
-      p_only_verified: $("#aucOnlyVerified").checked,
-    });
-    if (error) return toast(error.message, "err");
-    toast(data ? `Added ${data} player${data === 1 ? "" : "s"} to the pool` : "Pool is already up to date", "ok");
+  /* ---- call a player up by their Player Key ---- */
+  async function callByKey() {
+    const raw = ($("#aucKeyLookup").value || "").trim().toUpperCase();
+    const hint = $("#aucKeyHint");
+    hint.className = "auc-keyhint";
+    if (!raw) {
+      hint.textContent = "Type the Player Key printed on the player's card.";
+      return;
+    }
+    const hit = aLots.find((l) => (l.player_key || "").toUpperCase() === raw);
+    if (!hit) {
+      hint.classList.add("bad");
+      hint.textContent = `No pool player has the key “${raw}”. Set it on the Auction Pool tab.`;
+      return;
+    }
+    if (hit.status === "sold") {
+      hint.classList.add("bad");
+      const t = aTeams.find((x) => x.id === hit.sold_to_team_id);
+      hint.textContent = `${hit.name} is already sold to ${t ? t.name : "a team"}.`;
+      return;
+    }
+    const base = Number($("#aucBase").value) || null;
+    const { error } = await sb.rpc("auction_start_lot", { p_lot_id: hit.id, p_base: base });
+    if (error) {
+      hint.classList.add("bad");
+      hint.textContent = error.message;
+      return;
+    }
+    hint.classList.add("ok");
+    hint.textContent = `${hit.name} is on the block.`;
+    $("#aucKeyLookup").value = "";
     loadAuction();
+  }
+  $("#btnAucKeyGo").addEventListener("click", callByKey);
+  $("#aucKeyLookup").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      callByKey();
+    }
   });
 
   $("#btnAucApply").addEventListener("click", async () => {
     const btn = $("#btnAucApply");
-    busy(btn, true);
     const purse = Number($("#aucPurseAll").value);
     const squad = Number($("#aucSquadAll").value);
     const inc = Number($("#aucIncrement").value);
-    const e1 = await sb.from("auction_teams").update({ purse_total: purse, max_squad: squad }).gte("id", 1);
+    const maxA = Number($("#aucMaxA").value);
+    const maxB = Number($("#aucMaxB").value);
+    const maxC = Number($("#aucMaxC").value);
+
+    // The per-category quotas are what the server actually enforces, so a
+    // squad size that disagrees with them would silently cap every team early.
+    if (maxA + maxB + maxC !== squad) {
+      return toast(
+        `Squad size ${squad} doesn't match the category quotas (${maxA}+${maxB}+${maxC}=${maxA + maxB + maxC}).`,
+        "err"
+      );
+    }
+    const overspent = aTeams.filter((t) => Number(t.purse_spent) > purse);
+    if (overspent.length) {
+      return toast(
+        `${overspent.length} team(s) have already spent more than ${aucMoney(purse)} — undo those sales first.`,
+        "err"
+      );
+    }
+
+    busy(btn, true);
+    const e1 = await sb
+      .from("auction_teams")
+      .update({ purse_total: purse, max_squad: squad, max_a: maxA, max_b: maxB, max_c: maxC })
+      .gte("id", 1);
     const e2 = await sb.from("auction_state").update({ bid_increment: inc }).eq("id", 1);
     busy(btn, false);
     if (e1.error || e2.error) return toast((e1.error || e2.error).message, "err");
@@ -1274,7 +1399,7 @@
   );
 
   $("#btnAucCsv").addEventListener("click", () => {
-    const cols = ["player_name", "dupr", "gender", "jersey_size", "status", "base_price", "sold_price", "team"];
+    const cols = ["sl_no", "player_key", "name", "category", "base_price", "status", "sold_price", "team"];
     const cell = (v) => {
       const s = String(v ?? "");
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -1292,6 +1417,286 @@
     a.click();
     URL.revokeObjectURL(a.href);
   });
+
+  /* ============================================================
+     AUCTION POOL — the curated player list the auction runs on.
+     This is NOT the registration table: registrations stay open and
+     are joined to a pool entry by the Player Key typed in by hand.
+     ============================================================ */
+  let pRows = [];
+  let pPhotoTarget = null;   // pool row id awaiting a file from #poolPhotoInput
+
+  const POOL_COLS = [
+    { key: "sl_no",      label: "#",           type: "ro" },
+    { key: "player_key", label: "Player Key",  type: "text" },
+    { key: "name",       label: "Name",        type: "text" },
+    { key: "category",   label: "Cat",         type: "select", opts: ["A", "B", "C"] },
+    { key: "base_price", label: "Base ₹",      type: "number", step: "100" },
+    { key: "sex",        label: "Sex",         type: "select", opts: ["", "Male", "Female", "Other"] },
+    { key: "age",        label: "Age",         type: "number", step: "1" },
+    { key: "dupr",       label: "DUPR",        type: "number", step: "0.001" },
+    { key: "photo_url",  label: "Photo",       type: "photo" },
+    { key: "status",     label: "Status",      type: "badge" },
+    { key: "sold",       label: "Sold To",     type: "sold" },
+  ];
+
+  async function loadPool() {
+    const [p, c, t] = await Promise.all([
+      sb.from("auction_pool").select("*").order("sl_no", { nullsFirst: false }),
+      sb.from("auction_categories").select("*").order("sort_order"),
+      sb.from("auction_teams").select("id,name").order("id"),
+    ]);
+    if (p.error) {
+      $("#poolEmpty").hidden = false;
+      $("#poolEmpty").textContent = /does not exist|schema cache/i.test(p.error.message || "")
+        ? "The auction pool table isn't installed yet — run the auction install first."
+        : "Couldn't load the pool: " + p.error.message;
+      $("#poolBody").innerHTML = "";
+      return;
+    }
+    pRows = p.data || [];
+    if (c.data) aCats = c.data;
+    if (t.data && !aTeams.length) aTeams = t.data;
+    renderPool();
+  }
+
+  function poolFiltered() {
+    const q = ($("#poolQ").value || "").trim().toLowerCase();
+    const cat = $("#poolCatFilter").value;
+    return pRows.filter((r) => {
+      if (cat && r.category !== cat) return false;
+      if (!q) return true;
+      return `${r.name} ${r.player_key || ""} ${r.category} ${r.sl_no || ""}`.toLowerCase().includes(q);
+    });
+  }
+
+  function poolCell(r, col) {
+    const v = r[col.key];
+    const idf = `data-pid="${esc(r.id)}" data-pfield="${col.key}"`;
+    switch (col.type) {
+      case "ro":
+        return `<span class="g-ro">${esc(v ?? "—")}</span>`;
+      case "number":
+        return `<input class="g-in g-num" type="number" step="${col.step}" min="0" value="${v ?? ""}" ${idf} />`;
+      case "select":
+        return `<select class="g-sel" ${idf}>${col.opts
+          .map((o) => `<option value="${esc(o)}" ${o === (v ?? "") ? "selected" : ""}>${esc(o || "—")}</option>`)
+          .join("")}</select>`;
+      case "photo":
+        return `${
+          v
+            ? `<img class="g-thumb" src="${esc(v)}" alt="" data-zoom="${esc(v)}" loading="lazy" />`
+            : `<span class="g-ro">—</span>`
+        }<button type="button" class="btn-mini pool-up" data-pphoto="${esc(r.id)}" title="Upload a photo for this player">⤒</button>`;
+      case "badge":
+        return `<span class="pool-badge s-${esc(v)}">${esc(v)}</span>`;
+      case "sold": {
+        if (r.status !== "sold") return `<span class="g-ro">—</span>`;
+        const t = aTeams.find((x) => x.id === r.sold_to_team_id);
+        return `<span class="g-ro">${esc(t ? t.name : "—")} · ${aucMoney(r.sold_price)}</span>`;
+      }
+      default:
+        return `<input class="g-in" value="${esc(v ?? "")}" ${idf} autocomplete="off" spellcheck="false" />`;
+    }
+  }
+
+  function renderPool() {
+    const head = $("#poolHead");
+    if (!head) return;
+    head.innerHTML =
+      POOL_COLS.map((c) => `<th>${c.label}</th>`).join("") + `<th class="th-actions">·</th>`;
+
+    const list = poolFiltered();
+    $("#poolEmpty").hidden = list.length > 0;
+    $("#poolEmpty").textContent = pRows.length
+      ? "No players match your filter."
+      : "The auction pool is empty.";
+
+    $("#poolBody").innerHTML = list
+      .map(
+        (r) =>
+          `<tr data-pid="${esc(r.id)}" class="${r.status === "sold" ? "is-sold" : ""}">${POOL_COLS.map(
+            (c) => `<td class="g-td g-${c.type}">${poolCell(r, c)}</td>`
+          ).join("")}<td class="g-td g-actions">
+            <button type="button" class="icon-btn del" data-pdel="${esc(r.id)}" title="Remove from pool" aria-label="Remove">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            </button></td></tr>`
+      )
+      .join("");
+
+    renderPoolStats();
+  }
+
+  function renderPoolStats() {
+    const el = $("#poolStats");
+    if (!el) return;
+    const stat = (label, value, tone) =>
+      `<div class="stat ${tone || ""}"><div class="n">${value}</div><div class="l">${label}</div></div>`;
+    const named = pRows.filter((r) => String(r.name || "").trim());
+    const blank = pRows.length - named.length;
+    const linked = pRows.filter((r) => r.player_key && String(r.player_key).trim()).length;
+    const byCat = ["A", "B", "C"].map((c) => {
+      const all = pRows.filter((r) => r.category === c);
+      return stat(`${c} · ${catLabel(c)}`, `${all.filter((r) => String(r.name || "").trim()).length}/${all.length}`);
+    });
+    el.innerHTML =
+      stat("Pool slots", pRows.length) +
+      byCat.join("") +
+      stat("Player Keys set", `${linked}/${pRows.length}`, linked < pRows.length ? "warn" : "") +
+      stat("Slots needing a name", blank, blank ? "warn" : "");
+  }
+
+  /* ---- inline editing ---- */
+  async function commitPoolCell(el) {
+    const id = el.dataset.pid;
+    const field = el.dataset.pfield;
+    const row = pRows.find((r) => r.id === id);
+    if (!row) return;
+
+    let value = el.value;
+    if (field === "player_key") value = value.trim().toUpperCase() || null;
+    else if (field === "age") value = value === "" ? null : Number(value);
+    else if (field === "dupr") value = value === "" ? null : Number(value);
+    else if (field === "base_price") value = value === "" ? 0 : Number(value);
+    else if (field === "sex") value = value || null;
+    else if (typeof value === "string") value = value.trim();
+
+    if ((row[field] ?? null) === (value ?? null)) return;
+
+    const patch = { [field]: value };
+    // Category owns the default base price, so moving a player between
+    // categories should re-price them unless the organiser overrides it after.
+    if (field === "category") {
+      const cat = aCats.find((c) => c.code === value);
+      if (cat) patch.base_price = cat.base_price;
+    }
+
+    el.classList.add("g-saving");
+    const { error } = await sb.from("auction_pool").update(patch).eq("id", id);
+    el.classList.remove("g-saving");
+    if (error) {
+      toast(
+        /duplicate key|unique/i.test(error.message)
+          ? `Player Key “${value}” is already used by another pool entry.`
+          : "Couldn't save: " + error.message,
+        "err"
+      );
+      el.value = row[field] ?? "";
+      el.classList.add("g-err");
+      setTimeout(() => el.classList.remove("g-err"), 1200);
+      return;
+    }
+    Object.assign(row, patch);
+    if (field === "player_key") el.value = value ?? "";
+    el.classList.add("g-ok");
+    setTimeout(() => el.classList.remove("g-ok"), 900);
+    if (field === "category") renderPool();
+    else renderPoolStats();
+  }
+
+  document.addEventListener("change", (e) => {
+    const el = e.target.closest("[data-pfield]");
+    if (el && el.tagName === "SELECT") commitPoolCell(el);
+  });
+  document.addEventListener("blur", (e) => {
+    const el = e.target.closest && e.target.closest("[data-pfield]");
+    if (el && el.tagName === "INPUT") commitPoolCell(el);
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    const el = e.target.closest && e.target.closest("[data-pfield]");
+    if (el && e.key === "Enter" && el.tagName === "INPUT") {
+      e.preventDefault();
+      el.blur();
+    }
+  });
+
+  $("#poolQ") && $("#poolQ").addEventListener("input", renderPool);
+  $("#poolCatFilter") && $("#poolCatFilter").addEventListener("change", renderPool);
+
+  /* ---- photo upload for a pool player ---- */
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-pphoto]");
+    if (!b) return;
+    pPhotoTarget = b.dataset.pphoto;
+    $("#poolPhotoInput").click();
+  });
+
+  $("#poolPhotoInput") &&
+    $("#poolPhotoInput").addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file || !pPhotoTarget) return;
+      const id = pPhotoTarget;
+      pPhotoTarget = null;
+      const row = pRows.find((r) => r.id === id);
+      if (!row) return;
+
+      toast("Uploading photo…", "info");
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = `pool/${id}-${Date.now()}.${ext}`;
+      const up = await sb.storage
+        .from(CFG.STORAGE_BUCKET)
+        .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
+      if (up.error) return toast("Upload failed: " + up.error.message, "err");
+
+      const { data } = sb.storage.from(CFG.STORAGE_BUCKET).getPublicUrl(path);
+      const url = data.publicUrl;
+      const { error } = await sb.from("auction_pool").update({ photo_url: url }).eq("id", id);
+      if (error) return toast("Couldn't save the photo: " + error.message, "err");
+      row.photo_url = url;
+      renderPool();
+      toast(`Photo set for ${row.name || "this player"}`, "ok");
+    });
+
+  /* ---- add / remove ---- */
+  $("#btnPoolAdd") &&
+    $("#btnPoolAdd").addEventListener("click", async () => {
+      const cat = $("#poolCatFilter").value || "C";
+      const base = aCats.find((c) => c.code === cat)?.base_price ?? 20000;
+      const nextSl = pRows.reduce((m, r) => Math.max(m, r.sl_no || 0), 0) + 1;
+      const { error } = await sb
+        .from("auction_pool")
+        .insert({ sl_no: nextSl, name: "", category: cat, base_price: base });
+      if (error) return toast("Couldn't add: " + error.message, "err");
+      await loadPool();
+      toast(`Added slot ${nextSl} in category ${cat}`, "ok");
+    });
+
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-pdel]");
+    if (!b) return;
+    const row = pRows.find((r) => r.id === b.dataset.pdel);
+    if (!row) return;
+    if (row.status === "sold") return toast("That player is sold — undo the sale first.", "err");
+    confirmDialog(
+      `Remove ${row.name || `slot ${row.sl_no}`} from the auction pool?`,
+      async () => {
+        const { error } = await sb.from("auction_pool").delete().eq("id", row.id);
+        if (error) return toast("Couldn't remove: " + error.message, "err");
+        await loadPool();
+        toast("Removed from the pool", "ok");
+      }
+    );
+  });
+
+  $("#btnPoolCsv") &&
+    $("#btnPoolCsv").addEventListener("click", () => {
+      const cols = ["sl_no", "player_key", "name", "category", "base_price", "sex", "age", "dupr", "status", "sold_price"];
+      const cell = (v) => {
+        const s = String(v ?? "");
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const body = poolFiltered().map((r) => {
+        const t = aTeams.find((x) => x.id === r.sold_to_team_id);
+        return [...cols.map((c) => cell(r[c])), cell(t ? t.name : "")].join(",");
+      });
+      const csv = [[...cols, "sold_to"].join(","), ...body].join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      a.download = `mpl-auction-pool-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
 
   /* ============================================================
      TEAM LOGINS — check current credentials, reset any password

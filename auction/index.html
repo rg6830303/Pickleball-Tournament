@@ -90,15 +90,25 @@
 
       <div class="stage-live" id="stageLive" hidden>
         <p class="stage-tag">On the block</p>
-        <div class="lot">
-          <div class="lot-photo">
+        <div class="lot pcard">
+          <div class="lot-photo pcard-photo">
             <img id="lotPhoto" alt="" />
-            <span class="lot-noimg" id="lotNoImg">🥒</span>
+            <span class="lot-noimg pcard-noimg" id="lotNoImg">
+              <b>NO PHOTO</b>
+              <small id="lotNoImgWhy">not registered yet</small>
+            </span>
           </div>
-          <div class="lot-info">
-            <h2 class="lot-name" id="lotName">—</h2>
-            <div class="lot-tags" id="lotTags"></div>
-            <p class="lot-base" id="lotBase"></p>
+          <div class="lot-info pcard-body">
+            <p class="pcard-kicker">Auction Player Card · Season 1</p>
+            <h2 class="lot-name pcard-name" id="lotName">—</h2>
+            <dl class="pcard-stats">
+              <div class="pcard-stat"><dt>Category</dt><dd id="lotCat">—</dd></div>
+              <div class="pcard-stat"><dt>Age</dt><dd id="lotAge">—</dd></div>
+              <div class="pcard-stat"><dt>Sex</dt><dd id="lotSex">—</dd></div>
+              <div class="pcard-stat"><dt>DUPR</dt><dd id="lotDupr">—</dd></div>
+              <div class="pcard-stat wide"><dt>Base Price</dt><dd id="lotBase">—</dd></div>
+            </dl>
+            <div class="lot-tags" id="lotTags" hidden></div>
           </div>
         </div>
 

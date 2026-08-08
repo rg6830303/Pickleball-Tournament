@@ -145,7 +145,7 @@
   async function refreshAll() {
     const [t, l, s, b] = await Promise.all([
       sb.from("auction_teams").select("*").order("id"),
-      sb.from("auction_lots").select("*"),
+      sb.from("auction_pool").select("*"),
       sb.from("auction_state").select("*").eq("id", 1).maybeSingle(),
       sb.from("auction_bids").select("*").order("id", { ascending: false }).limit(12),
     ]);
@@ -193,7 +193,7 @@
           renderTeams();
           renderStage();
         })
-        .on("postgres_changes", { event: "*", schema: "public", table: "auction_lots" }, (p) => {
+        .on("postgres_changes", { event: "*", schema: "public", table: "auction_pool" }, (p) => {
           if (p.eventType === "DELETE") {
             lots = lots.filter((x) => x.id !== p.old.id);
           } else {
@@ -232,9 +232,9 @@
 
   function announceSale(lot) {
     if (lot.sold_to_team_id === myTeamId) {
-      toast(`🎉 You won ${lot.player_name} for ${money(lot.sold_price)}`, "gold");
+      toast(`🎉 You won ${lot.name} for ${money(lot.sold_price)}`, "gold");
     } else {
-      toast(`${lot.player_name} → ${teamName(lot.sold_to_team_id)} (${money(lot.sold_price)})`, "info");
+      toast(`${lot.name} → ${teamName(lot.sold_to_team_id)} (${money(lot.sold_price)})`, "info");
     }
   }
 
@@ -277,24 +277,8 @@
     const lot = lots.find((l) => l.id === state.current_lot_id);
     if (!lot) return;
 
-    $("#lotName").textContent = lot.player_name;
-    const img = $("#lotPhoto");
-    if (lot.photo_url) {
-      img.src = lot.photo_url;
-      img.hidden = false;
-      $("#lotNoImg").hidden = true;
-    } else {
-      img.hidden = true;
-      $("#lotNoImg").hidden = false;
-    }
-
-    const tags = [];
-    if (lot.dupr != null) tags.push(`<span class="tag dupr">DUPR ${Number(lot.dupr).toFixed(3)}</span>`);
-    if (lot.gender) tags.push(`<span class="tag">${esc(lot.gender)}</span>`);
-    if (lot.jersey_size) tags.push(`<span class="tag">Jersey ${esc(lot.jersey_size)}</span>`);
-    if (lot.jersey_name) tags.push(`<span class="tag">“${esc(lot.jersey_name)}”</span>`);
-    $("#lotTags").innerHTML = tags.join("");
-    $("#lotBase").textContent = `Base price ${money(lot.base_price)}`;
+    paintCard(lot);
+    fetchCard(lot);
 
     const price = Number(state.current_price);
     const el = $("#bidValue");
@@ -336,6 +320,45 @@
     $("#bidMsg").classList.remove("ok");
   }
 
+  /* ---------------- player card ----------------
+     The pool row carries only what the organiser typed. Photo, sex and DUPR
+     usually live on the player's registration and are joined server-side by
+     Player Key, so paint what we have, then upgrade when the card arrives. */
+  const CAT_LABEL = { A: "Advance", B: "Intermediate", C: "Beginner" };
+  let cardFor = null;
+
+  function paintCard(c) {
+    const img = $("#lotPhoto");
+    const no = $("#lotNoImg");
+    if (c.photo_url) {
+      img.src = c.photo_url;
+      img.hidden = false;
+      no.hidden = true;
+    } else {
+      img.hidden = true;
+      no.hidden = false;
+      const why = $("#lotNoImgWhy");
+      if (why) why.textContent = c.has_registration ? "registered, no photo" : "not registered yet";
+    }
+    $("#lotName").textContent = c.name || "—";
+    $("#lotCat").textContent = c.category
+      ? `${c.category} · ${c.category_label || CAT_LABEL[c.category] || ""}`
+      : "—";
+    $("#lotAge").textContent = c.age != null ? c.age : "NA";
+    $("#lotSex").textContent = c.sex || "NA";
+    $("#lotDupr").textContent = c.dupr != null ? Number(c.dupr).toFixed(3) : "NA";
+    $("#lotBase").textContent = money(c.base_price);
+  }
+
+  async function fetchCard(lot) {
+    if (cardFor === lot.id) return;
+    cardFor = lot.id;
+    const { data, error } = await sb.rpc("auction_player_card", { p_pool_id: lot.id });
+    if (error || cardFor !== lot.id) return;   // stale: a new player is already up
+    const c = Array.isArray(data) ? data[0] : data;
+    if (c) paintCard(c);
+  }
+
   function renderSquad() {
     const squad = squadOf(myTeamId).sort((a, b) => (a.sold_at || "").localeCompare(b.sold_at || ""));
     $("#squadCount").textContent = squad.length;
@@ -345,7 +368,7 @@
             (l) => `<div class="sq">
         ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy" />` : `<span class="noimg">🥒</span>`}
         <div>
-          <div class="nm">${esc(l.player_name)}</div>
+          <div class="nm">${esc(l.name)}</div>
           <div class="meta">${l.dupr != null ? "DUPR " + Number(l.dupr).toFixed(3) : "Unrated"}${
               l.jersey_size ? " · " + esc(l.jersey_size) : ""
             }</div>

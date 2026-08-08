@@ -360,3 +360,102 @@ table.teams { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
 }
+
+/* ============================================================
+   DIGITAL PLAYER CARD — the player on the block
+   Overrides the older flat .lot layout above.
+   ============================================================ */
+.lot.pcard {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 18px;
+  align-items: stretch;
+  border: 1px solid rgba(229, 38, 45, 0.45);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(229, 38, 45, 0.14), transparent 60%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: 0 0 0 1px rgba(229, 38, 45, 0.12), 0 18px 44px rgba(0, 0, 0, 0.55);
+  padding: 16px;
+  margin-bottom: 22px;
+}
+.pcard .lot-photo,
+.pcard-photo {
+  width: 100%;
+  height: auto;
+  min-height: 230px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #0a0a0b;
+  border: 1px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pcard .lot-photo img { width: 100%; height: 100%; object-fit: cover; }
+.pcard-noimg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  font-family: var(--font-display);
+  color: var(--text-faint);
+  text-align: center;
+  padding: 10px;
+}
+.pcard-noimg small {
+  font-family: var(--font-body);
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  opacity: 0.8;
+}
+.pcard-body { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+.pcard-kicker {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--red);
+  font-weight: 700;
+}
+.lot-name.pcard-name {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 7vw, 44px);
+  font-weight: 700;
+  line-height: 1.02;
+  text-transform: uppercase;
+  margin: 4px 0 12px;
+  overflow-wrap: anywhere;
+}
+.pcard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+}
+.pcard-stat {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 12px;
+}
+.pcard-stat.wide { grid-column: 1 / -1; }
+.pcard-stat dt {
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.pcard-stat dd {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+.pcard-stat.wide dd { color: var(--red); }
+
+@media (max-width: 640px) {
+  .lot.pcard { grid-template-columns: 1fr; }
+  .pcard .lot-photo, .pcard-photo { min-height: 260px; }
+}
