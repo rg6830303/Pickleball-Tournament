@@ -239,7 +239,25 @@
     location.reload();
   });
 
-  function enterDash(user) {
+  async function enterDash(user) {
+    // Being signed in is not the same as being staff. Captains hold a valid
+    // session for this same Supabase project, and RLS already returns them
+    // nothing, but they should meet a clear message rather than an empty
+    // console they are left to puzzle over.
+    const { data: staff, error } = await sb.rpc("is_auction_staff");
+    if (!error && staff !== true) {
+      await sb.auth.signOut();
+      sessionStorage.clear();
+      $("#authWrap").hidden = false;
+      $("#dash").hidden = true;
+      alertBox(
+        $("#authAlert"),
+        `${user.email} is signed in but is not on the tournament staff list, so this console has nothing to show. ` +
+          `Ask the organiser to add this account, or use the team auction app instead.`
+      );
+      return;
+    }
+
     $("#authWrap").hidden = true;
     $("#dash").hidden = false;
     $("#whoami").textContent = user.email;

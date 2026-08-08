@@ -277,8 +277,7 @@
     const lot = lots.find((l) => l.id === state.current_lot_id);
     if (!lot) return;
 
-    paintCard(lot);
-    fetchCard(lot);
+    renderCard(lot);
 
     const price = Number(state.current_price);
     const el = $("#bidValue");
@@ -350,9 +349,17 @@
     $("#lotBase").textContent = money(c.base_price);
   }
 
-  async function fetchCard(lot) {
+  // renderStage() runs on every price tick and every realtime event. Only
+  // repaint the card when the player actually changes, otherwise the pool-row
+  // fallback (which has no photo) would overwrite the resolved card each time.
+  function renderCard(lot) {
     if (cardFor === lot.id) return;
     cardFor = lot.id;
+    paintCard(lot);          // show what we already have, immediately
+    fetchCard(lot);          // then upgrade with the registration join
+  }
+
+  async function fetchCard(lot) {
     const { data, error } = await sb.rpc("auction_player_card", { p_pool_id: lot.id });
     if (error || cardFor !== lot.id) return;   // stale: a new player is already up
     const c = Array.isArray(data) ? data[0] : data;
