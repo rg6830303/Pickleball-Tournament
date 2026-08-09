@@ -939,7 +939,6 @@
 
     if (!aucReady) {
       aucReady = true;
-      $("#aucIncrement").value = aState?.bid_increment ?? 500;
       startAuctionRealtime();
     }
     renderAuction();
@@ -968,8 +967,6 @@
             if (i > -1) aLots[i] = p.new;
             else aLots.push(p.new);
           }
-          renderAucPool();
-          renderAucSold();
           renderAucTeams();
           renderAucStage();
         })
@@ -988,8 +985,6 @@
 
   function renderAuction() {
     renderAucStage();
-    renderAucPool();
-    renderAucSold();
     renderAucTeams();
     const sel = $("#aucSellTeam");
     const keep = sel.value;
@@ -1003,16 +998,72 @@
     const live = aState && aState.status === "live" && aState.current_lot_id;
     const lot = live ? aLots.find((l) => l.id === aState.current_lot_id) : null;
 
-    $("#aucTag").textContent = lot ? "On the block" : "Nobody on the block";
-    $("#aucPlayer").textContent = lot ? lot.name : "—";
-    $("#aucMeta").textContent = lot ? "" : "Pick a player from the pool and press “On the block”.";
+    $("#aucTag").textContent = lot ? "On the block" : "Waiting for the next player";
     renderPlayerCard(lot);
-    $("#aucPrice").textContent = lot ? aucMoney(aState.current_price) : "—";
-    const lead = aState && aState.leading_team_id;
-    $("#aucLead").textContent = lead ? aTeams.find((t) => t.id === lead)?.name || "—" : "No bids yet";
 
-    ["btnAucSell", "btnAucUnsold", "btnAucClear"].forEach((id) => ($("#" + id).disabled = !lot));
+    const empty = $("#aucEmptyStage");
+    if (empty) empty.hidden = !!lot;
+
+    // The final price defaults to the player's base, which is what the room
+    // opens at; the auctioneer types over it with whatever it actually sold for.
+    const price = $("#aucSellPrice");
+    if (price) price.placeholder = lot ? aucMoney(lot.base_price) : "base price";
+
+    ["btnAucSell", "btnAucUnsold"].forEach((id) => {
+      const b = $("#" + id);
+      if (b) b.disabled = !lot;
+    });
   }
+
+  /* ---- call a player up by Player Key ----
+     The only way onto the screen. No list, no per-row buttons: the auctioneer
+     reads the key off the sheet, types it, and the card appears. */
+  async function callByKey() {
+    const hint = $("#aucKeyHint");
+    const raw = ($("#aucKey").value || "").trim().toUpperCase();
+    hint.className = "auc-callhint";
+    if (!raw) {
+      hint.textContent = "Type a Player Key.";
+      return;
+    }
+
+    const hit = aLots.find((l) => (l.player_key || "").toUpperCase() === raw);
+    if (!hit) {
+      hint.classList.add("bad");
+      hint.textContent = `No player has the key ${raw}. Check it on the Auction Pool tab.`;
+      return;
+    }
+    if (hit.status === "sold") {
+      hint.classList.add("bad");
+      const t = aTeams.find((x) => x.id === hit.sold_to_team_id);
+      hint.textContent = `${hit.name} is already sold to ${t ? t.name : "a team"} for ${aucMoney(
+        hit.sold_price
+      )}.`;
+      return;
+    }
+
+    const btn = $("#btnAucCall");
+    busy(btn, true);
+    const { error } = await sb.rpc("auction_start_lot", { p_lot_id: hit.id, p_base: null });
+    busy(btn, false);
+    if (error) {
+      hint.classList.add("bad");
+      hint.textContent = error.message;
+      return;
+    }
+    hint.classList.add("ok");
+    hint.textContent = `${hit.name} · ${hit.category} · base ${aucMoney(hit.base_price)}`;
+    $("#aucKey").value = "";
+    loadAuction();
+  }
+
+  $("#btnAucCall") && $("#btnAucCall").addEventListener("click", callByKey);
+  $("#aucKey") &&
+    $("#aucKey").addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      callByKey();
+    });
 
   /* ---- digital player card ----
      The pool row only carries the organiser's overrides. The photo, sex and
@@ -1079,151 +1130,6 @@
   const catLabel = (code) =>
     aCats.find((x) => x.code === code)?.label ||
     ({ A: "Advance", B: "Intermediate", C: "Beginner" }[code] || "");
-
-  function renderAucPool() {
-    const q = ($("#aucPoolQ").value || "").trim().toLowerCase();
-    const f = $("#aucPoolFilter").value;
-    const cf = $("#aucPoolCat") ? $("#aucPoolCat").value : "";
-    const list = aLots.filter((l) => {
-      if (f && l.status !== f) return false;
-      if (cf && l.category !== cf) return false;
-      // Player ID and name only — searching the category matched 64 people at
-      // once and buried whoever the auctioneer was actually looking for.
-      if (q && !`${l.name} ${l.player_key || ""}`.toLowerCase().includes(q)) return false;
-      return true;
-    });
-
-    // Count what the filter is actually showing, plus a standing tally so the
-    // auctioneer always knows how much of the pool is left.
-    const n = (s) => aLots.filter((l) => l.status === s).length;
-    $("#aucPoolCount").textContent = list.length;
-    const tally = $("#aucPoolTally");
-    if (tally) {
-      tally.innerHTML =
-        `<span>${n("pool")} in pool</span><span>${n("sold")} sold</span>` +
-        `<span>${n("unsold")} unsold</span><span>${aLots.length} total</span>`;
-    }
-
-    $("#aucPool").innerHTML = list.length
-      ? list
-          .map((l) => {
-            const isLive = aState && aState.current_lot_id === l.id;
-            const team = l.sold_to_team_id ? aTeams.find((t) => t.id === l.sold_to_team_id) : null;
-            let right = "";
-            if (l.status === "sold") {
-              right = `<span class="sold-tag">${esc(team ? team.name : "Sold")} · ${aucMoney(l.sold_price)}</span>
-                       <button class="icon-btn" data-auc-undo="${esc(l.id)}" title="Undo the sale and return this player to the pool">↺</button>
-                       <button class="icon-btn" data-auc-tounsold="${esc(l.id)}" title="Reverse the sale and mark this player unsold">⊘</button>`;
-            } else if (isLive) {
-              right = `<span class="sold-tag" style="color:var(--red);border-color:rgba(229,38,45,0.5)">LIVE</span>`;
-            } else {
-              if (l.status === "unsold") right += `<span class="unsold-tag">unsold</span>`;
-              right += `<button class="btn-mini" data-auc-start="${esc(l.id)}">On the block</button>`;
-            }
-            const unnamed = !String(l.name || "").trim();
-            return `<div class="auc-lot ${isLive ? "is-live" : ""} ${l.status === "sold" ? "is-sold" : ""}">
-              ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy" />` : `<span class="noimg">🥒</span>`}
-              <div>
-                <div class="nm">${unnamed ? `<i class="tbd">slot ${l.sl_no} · name not filled in</i>` : esc(l.name)}</div>
-                <div class="meta"><span class="cat-chip c-${esc(l.category)}">${esc(l.category)}</span> ${esc(
-              catLabel(l.category)
-            )} · Base ${aucMoney(l.base_price)}${l.player_key ? " · " + esc(l.player_key) : ""}</div>
-              </div>
-              <div class="right">${right}</div>
-            </div>`;
-          })
-          .join("")
-      : `<p class="empty">No players match. The pool is managed on the Auction Pool tab.</p>`;
-  }
-
-  /* ---- everything sold, and who bought it ----
-     The room needs one place to answer "who has that player?" without
-     expanding sixteen team cards. */
-  function renderAucSold() {
-    const q = ($("#aucSoldQ")?.value || "").trim().toLowerCase();
-    const cat = $("#aucSoldCat")?.value || "";
-    const team = $("#aucSoldTeam")?.value || "";
-
-    const sold = aLots.filter((l) => l.status === "sold");
-    const list = sold
-      .filter((l) => {
-        if (cat && l.category !== cat) return false;
-        if (team && String(l.sold_to_team_id) !== team) return false;
-        if (!q) return true;
-        const t = aTeams.find((x) => x.id === l.sold_to_team_id);
-        return `${l.name} ${l.player_key || ""} ${t ? t.name : ""} ${l.sold_to_team_id || ""}`
-          .toLowerCase()
-          .includes(q);
-      })
-      // most recent sale first: that is what the auctioneer just did
-      .sort((a, b) => String(b.sold_at || "").localeCompare(String(a.sold_at || "")));
-
-    $("#aucSoldCount").textContent = sold.length;
-
-    const spend = sold.reduce((s, l) => s + Number(l.sold_price || 0), 0);
-    const top = sold.reduce((m, l) => (Number(l.sold_price) > Number(m?.sold_price ?? -1) ? l : m), null);
-    const tally = $("#aucSoldTally");
-    if (tally) {
-      tally.innerHTML = ["A", "B", "C"]
-        .map((c) => `<span>${sold.filter((l) => l.category === c).length} ${c}</span>`)
-        .join("") +
-        `<span>${aucMoney(spend)} spent</span>` +
-        (top ? `<span>top ${esc(top.name)} · ${aucMoney(top.sold_price)}</span>` : "");
-    }
-
-    // keep the team dropdown in step with the teams that actually own players
-    const sel = $("#aucSoldTeam");
-    if (sel) {
-      const keep = sel.value;
-      sel.innerHTML =
-        `<option value="">All teams</option>` +
-        aTeams
-          .map((t) => {
-            const n = sold.filter((l) => l.sold_to_team_id === t.id).length;
-            return `<option value="${t.id}">${esc(t.name)}${n ? ` · ${n}` : ""}</option>`;
-          })
-          .join("");
-      sel.value = keep;
-    }
-
-    $("#aucSold").innerHTML = list.length
-      ? list
-          .map((l) => {
-            const t = aTeams.find((x) => x.id === l.sold_to_team_id);
-            const card = pCards[l.id];
-            const photo = (card && card.photo_url) || l.photo_url;
-            return `<div class="auc-lot is-sold">
-              ${
-                photo
-                  ? `<img src="${esc(photo)}" alt="" loading="lazy" />`
-                  : `<span class="noimg">🥒</span>`
-              }
-              <div>
-                <div class="nm">${esc(l.name)}</div>
-                <div class="meta"><span class="cat-chip c-${esc(l.category)}">${esc(
-              l.category
-            )}</span> ${esc(catLabel(l.category))}${l.player_key ? " · " + esc(l.player_key) : ""}</div>
-              </div>
-              <div class="right">
-                <span class="team-no" title="${esc(t ? t.name : "Team")}">T${esc(l.sold_to_team_id)}</span>
-                <span class="sold-tag">${aucMoney(l.sold_price)}</span>
-                <button class="icon-btn" data-auc-undo="${esc(l.id)}" title="Undo the sale and return this player to the pool">↺</button>
-                <button class="icon-btn" data-auc-tounsold="${esc(l.id)}" title="Reverse the sale and mark this player unsold">⊘</button>
-              </div>
-            </div>`;
-          })
-          .join("")
-      : `<p class="empty">${
-          sold.length ? "No sold players match this filter." : "Nothing sold yet."
-        }</p>`;
-  }
-
-  ["aucSoldQ", "aucSoldCat", "aucSoldTeam"].forEach((id) => {
-    const el = $("#" + id);
-    if (!el) return;
-    el.addEventListener("input", () => aucReady && renderAucSold());
-    el.addEventListener("change", () => aucReady && renderAucSold());
-  });
 
   const aucOpenTeams = new Set();
 
@@ -1306,29 +1212,8 @@
       .join("");
   }
 
-  /* ---- pool filters ---- */
-  ["aucPoolQ", "aucPoolFilter", "aucPoolCat"].forEach((id) => {
-    const el = $("#" + id);
-    if (!el) return;
-    el.addEventListener("input", () => aucReady && renderAucPool());
-    el.addEventListener("change", () => aucReady && renderAucPool());
-  });
-
   /* ---- delegated auction actions ---- */
   document.addEventListener("click", async (e) => {
-    const start = e.target.closest("[data-auc-start]");
-    if (start) {
-      const base = $("#aucBase").value ? Number($("#aucBase").value) : null;
-      const { error } = await sb.rpc("auction_start_lot", {
-        p_lot_id: start.dataset.aucStart,
-        p_base: base,
-      });
-      if (error) return toast(error.message, "err");
-      toast("Player is on the block", "ok");
-      loadAuction();
-      return;
-    }
-
     const undo = e.target.closest("[data-auc-undo]");
     if (undo) {
       const lot = aLots.find((l) => l.id === undo.dataset.aucUndo);
@@ -1473,17 +1358,17 @@
     if (live && live.status === "live") {
       await sb.from("auction_pool").update({ status: "pool" }).eq("id", live.id);
     }
-    toast("Block cleared", "info");
-    loadAuction();
-  });
-
-  /* ---- bid increment (the one auction-wide setting used mid-auction) ---- */
-  $("#btnAucIncSave").addEventListener("click", async () => {
-    const inc = Number($("#aucIncrement").value);
-    if (!(inc > 0)) return toast("Bid increment must be greater than zero", "err");
-    const { error } = await sb.from("auction_state").update({ bid_increment: inc }).eq("id", 1);
-    if (error) return toast(error.message, "err");
-    toast(`Bid increment set to ${aucMoney(inc)}`, "ok");
+    const hint = $("#aucKeyHint");
+    if (hint) {
+      hint.className = "auc-callhint";
+      hint.textContent = "";
+    }
+    const key = $("#aucKey");
+    if (key) {
+      key.value = "";
+      key.focus();
+    }
+    toast("Screen cleared", "info");
     loadAuction();
   });
 

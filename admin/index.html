@@ -229,12 +229,26 @@
       </div>
 
       <div id="aucBody" hidden>
-        <!-- live auctioneer stage -->
+
+        <!-- ===== projector bar: call a player by key, or clear the block ===== -->
+        <section class="auc-callbar">
+          <div class="auc-callbar-field">
+            <label for="aucKey">Player Key</label>
+            <input type="search" id="aucKey" placeholder="MPL-A-001" autocomplete="off"
+                   spellcheck="false" autocapitalize="characters" />
+          </div>
+          <button class="btn-primary" id="btnAucCall" type="button">
+            <span class="spin" aria-hidden="true"></span><span class="btn-label">Show player</span>
+          </button>
+          <button class="btn-mini ghost" id="btnAucClear" type="button">Clear</button>
+          <p class="auc-callhint" id="aucKeyHint" role="status"></p>
+        </section>
+
+        <!-- ===== the screen everyone watches ===== -->
         <section class="auc-stage">
           <div class="auc-stage-main">
-            <p class="auc-tag" id="aucTag">Nobody on the block</p>
+            <p class="auc-tag" id="aucTag">Waiting for the next player</p>
 
-            <!-- digital player card -->
             <div class="pcard" id="aucCard" hidden>
               <div class="pcard-photo">
                 <img id="aucCardImg" alt="" hidden />
@@ -256,19 +270,11 @@
               </div>
             </div>
 
-            <h2 class="auc-player" id="aucPlayer">—</h2>
-            <p class="auc-meta" id="aucMeta"></p>
-            <div class="auc-price">
-              <div>
-                <p class="auc-price-label">Current Bid</p>
-                <p class="auc-price-value" id="aucPrice">—</p>
-              </div>
-              <div>
-                <p class="auc-price-label">Highest Bidder</p>
-                <p class="auc-lead" id="aucLead">—</p>
-              </div>
-            </div>
+            <p class="auc-emptystage" id="aucEmptyStage">
+              Type a Player Key above to put that player on screen.
+            </p>
           </div>
+
           <div class="auc-stage-side">
             <div class="field">
               <label for="aucSellTeam">Sell to</label>
@@ -276,72 +282,16 @@
             </div>
             <div class="field">
               <label for="aucSellPrice">Final price</label>
-              <input type="number" id="aucSellPrice" min="0" step="100" placeholder="uses current bid" />
+              <input type="number" id="aucSellPrice" min="0" step="100" placeholder="base price" />
             </div>
             <button class="btn-primary sm" id="btnAucSell" type="button">
               <span class="spin" aria-hidden="true"></span><span class="btn-label">✓ Sell Player</span>
             </button>
             <div class="auc-side-actions">
               <button class="btn-mini" id="btnAucUnsold" type="button">Mark unsold</button>
-              <button class="btn-mini ghost" id="btnAucClear" type="button">Clear block</button>
-            </div>
-            <div class="field auc-inc">
-              <label for="aucIncrement">Bid increment</label>
-              <div class="auc-inc-row">
-                <input type="number" id="aucIncrement" min="1" step="100" />
-                <button class="btn-mini" id="btnAucIncSave" type="button">Set</button>
-              </div>
             </div>
           </div>
         </section>
-
-        <div class="auc-grid">
-          <!-- player pool -->
-          <div class="panel">
-            <h2 class="panel-title">Player Pool <span class="count" id="aucPoolCount">0</span></h2>
-            <p class="panel-sub">Put players on the block one by one. Sold players move to their team automatically.</p>
-            <div class="auc-pool-bar">
-              <input type="search" id="aucPoolQ" placeholder="Search by Player ID or name…" />
-              <select id="aucPoolFilter">
-                <option value="pool">In pool</option>
-                <option value="unsold">Unsold</option>
-                <option value="sold">Sold</option>
-                <option value="live">On the block</option>
-                <option value="">All statuses</option>
-              </select>
-              <select id="aucPoolCat">
-                <option value="">All categories</option>
-                <option value="A">A · Advance</option>
-                <option value="B">B · Intermediate</option>
-                <option value="C">C · Beginner</option>
-              </select>
-              <input type="number" id="aucBase" min="0" step="100" placeholder="Base ₹" title="Base price used when putting a player on the block" />
-            </div>
-            <div class="auc-pool-tally" id="aucPoolTally"></div>
-            <div class="auc-pool" id="aucPool"></div>
-          </div>
-
-          <!-- everything sold so far, with the team that bought them -->
-          <div class="panel">
-            <h2 class="panel-title">Sold Players <span class="count" id="aucSoldCount">0</span></h2>
-            <p class="panel-sub">Every player bought so far and the team that bought them. Updates live as the room calls each lot.</p>
-            <div class="auc-pool-bar">
-              <input type="search" id="aucSoldQ" placeholder="Search by Player ID, name or team…" />
-              <select id="aucSoldCat">
-                <option value="">All categories</option>
-                <option value="A">A · Advance</option>
-                <option value="B">B · Intermediate</option>
-                <option value="C">C · Beginner</option>
-              </select>
-              <select id="aucSoldTeam"><option value="">All teams</option></select>
-            </div>
-            <div class="auc-pool-tally" id="aucSoldTally"></div>
-            <div class="auc-pool" id="aucSold"></div>
-          </div>
-
-        </div>
-
-        </div>
 
         <!-- teams · wallets · squads -->
         <div class="panel">
