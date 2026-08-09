@@ -9,8 +9,8 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='84' height='84' rx='18' fill='%23e5262d'/%3E%3Cpath d='M30 52l14 14 26-30' stroke='%23070707' stroke-width='10' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/admin.css?v=202608051639" />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/admin.css?v=202608091930" />
 </head>
 <body>
 
@@ -231,39 +231,64 @@
       <div id="aucBody" hidden>
 
         <!-- ===== the screen the room watches ===== -->
-        <section class="auc-stage">
+        <section class="auc-stage" id="aucStage">
+          <!-- monsoon: mist, two rain passes, floor shadow -->
+          <div class="mn-weather" aria-hidden="true">
+            <div class="mn-mist"></div>
+            <div class="mn-rain"></div>
+            <div class="mn-rain2"></div>
+            <div class="mn-floor"></div>
+          </div>
+          <div class="mn-glow" aria-hidden="true"></div>
+
+          <button class="mn-fs" id="btnAucFull" type="button"
+                  title="Show this on the projector (F)" aria-label="Toggle full screen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path class="mn-fs-in" d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>
+              <path class="mn-fs-out" d="M3 8h3a2 2 0 0 0 2-2V3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M21 16h-3a2 2 0 0 0-2 2v3"/>
+            </svg>
+            <span class="mn-fs-label">Full screen</span>
+          </button>
+
           <div class="auc-stage-main">
             <p class="auc-tag" id="aucTag">Waiting for the next player</p>
 
             <div class="pcard" id="aucCard" hidden>
-              <div class="pcard-photo">
-                <img id="aucCardImg" alt="" hidden />
-                <div class="pcard-noimg" id="aucCardNoImg">
-                  <span>NO PHOTO</span>
-                  <small id="aucCardNoImgWhy">not registered yet</small>
-                </div>
-              </div>
-              <div class="pcard-body">
-                <p class="pcard-kicker">Auction Player Card · Season 1</p>
-                <h2 class="pcard-name" id="aucCardName">—</h2>
-                <dl class="pcard-stats">
-                  <div class="pcard-stat">
-                    <dt>Category</dt>
-                    <dd><b class="cat-code" id="aucCardCatCode">—</b><span class="cat-name" id="aucCardCatName"></span></dd>
+              <div class="pcard-frame">
+                <div class="pcard-photo">
+                  <img id="aucCardImg" alt="" hidden />
+                  <div class="pcard-noimg" id="aucCardNoImg">
+                    <span class="pcard-noimg-mark" aria-hidden="true"></span>
+                    <span>No photo</span>
+                    <small id="aucCardNoImgWhy">not registered yet</small>
                   </div>
-                  <div class="pcard-stat"><dt>Age</dt><dd id="aucCardAge">—</dd></div>
-                  <div class="pcard-stat"><dt>Sex</dt><dd id="aucCardSex">—</dd></div>
-                  <div class="pcard-stat"><dt>DUPR</dt><dd id="aucCardDupr">—</dd></div>
-                </dl>
-                <div class="pcard-base">
-                  <span class="pcard-base-label">Base Price</span>
-                  <span class="pcard-base-value" id="aucCardBase">—</span>
+                  <span class="pcard-lot" id="aucCardLot">Key —</span>
+                </div>
+                <div class="pcard-rule" aria-hidden="true"></div>
+                <div class="pcard-body">
+                  <p class="pcard-league">Monsoon Premier League</p>
+                  <p class="pcard-kicker"><i class="spark" aria-hidden="true"></i>Auction Player Card · Season 1</p>
+                  <h2 class="pcard-name" id="aucCardName">—</h2>
+                  <dl class="pcard-stats">
+                    <div class="pcard-stat pcard-stat--cat">
+                      <dt>Category</dt>
+                      <dd><b class="cat-code" id="aucCardCatCode">—</b><span class="cat-name" id="aucCardCatName"></span></dd>
+                    </div>
+                    <div class="pcard-stat"><dt>Age</dt><dd id="aucCardAge">—</dd></div>
+                    <div class="pcard-stat"><dt>Sex</dt><dd id="aucCardSex">—</dd></div>
+                    <div class="pcard-stat"><dt>DUPR</dt><dd id="aucCardDupr">—</dd></div>
+                  </dl>
+                  <div class="pcard-base">
+                    <span class="pcard-base-label">Base Price</span>
+                    <span class="pcard-base-value" id="aucCardBase">—</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             <p class="auc-emptystage" id="aucEmptyStage">
-              Enter a Player Key on the right to put that player on screen.
+              Enter a Player Key to put that player on screen.
             </p>
           </div>
 
@@ -531,7 +556,7 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
   <script src="js/vendor/supabase.js" defer></script>
-  <script src="js/config.js?v=202608051639"></script>
-  <script src="js/admin.js?v=202608051639" defer></script>
+  <script src="js/config.js?v=202608091930"></script>
+  <script src="js/admin.js?v=202608091930" defer></script>
 </body>
 </html>

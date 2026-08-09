@@ -1061,6 +1061,87 @@
     loadAuction();
   }
 
+  /* ---- projector mode ----
+     Full-screens the stage only, so the Player Key box, Sell to and the
+     price field go up with the card and the auctioneer can keep working
+     without dropping out. Esc and the browser's own exit are honoured. */
+  function stageEl() { return document.getElementById("aucStage"); }
+
+  // Fallback for when the real Fullscreen API is refused — a locked-down
+  // browser, a kiosk policy, an embedded frame. Losing the projector view on
+  // auction night because of a permissions policy is not an acceptable
+  // failure, so blow the stage up to fill the window instead.
+  function setBlownUp(on) {
+    const el = stageEl();
+    if (!el) return;
+    el.classList.toggle("is-blownup", on);
+    document.body.classList.toggle("mn-blownup", on);
+    syncFullscreenButton(on);
+    if (on) setTimeout(() => $("#aucKey") && $("#aucKey").focus(), 60);
+  }
+
+  function syncFullscreenButton(on) {
+    const b = $("#btnAucFull");
+    if (!b) return;
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    const l = b.querySelector(".mn-fs-label");
+    if (l) l.textContent = on ? "Exit" : "Full screen";
+  }
+
+  async function toggleFullscreen() {
+    const el = stageEl();
+    if (!el) return;
+
+    if (el.classList.contains("is-blownup")) return setBlownUp(false);
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch { /* already out */ }
+      return;
+    }
+
+    try {
+      if (el.requestFullscreen) {
+        await el.requestFullscreen({ navigationUI: "hide" });
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      } else {
+        setBlownUp(true);
+      }
+    } catch {
+      // refused (no user gesture, kiosk policy, iframe) — use the fallback
+      setBlownUp(true);
+      toast("Full screen was blocked, so the stage is filling the window instead. Esc to exit.", "info");
+    }
+  }
+
+  // Esc leaves the fallback, matching what Esc does in real full screen.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const el = stageEl();
+    if (el && el.classList.contains("is-blownup")) setBlownUp(false);
+  });
+
+  $("#btnAucFull") && $("#btnAucFull").addEventListener("click", toggleFullscreen);
+
+  document.addEventListener("fullscreenchange", () => {
+    const on = document.fullscreenElement === stageEl();
+    syncFullscreenButton(on);
+    // Hand focus to the key box on the way in: the whole point of taking the
+    // stage full screen is to keep calling players.
+    if (on) setTimeout(() => $("#aucKey") && $("#aucKey").focus(), 60);
+  });
+
+  // F toggles it, but never while the operator is typing into a field.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "f" && e.key !== "F") return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    const pane = $("#tab-auction");
+    if (!pane || pane.hidden) return;
+    e.preventDefault();
+    toggleFullscreen();
+  });
+
   $("#btnAucCall") && $("#btnAucCall").addEventListener("click", callByKey);
   $("#aucKey") &&
     $("#aucKey").addEventListener("keydown", (e) => {
@@ -1121,6 +1202,8 @@
         ? "registered, no photo"
         : "not registered yet";
     }
+    const lot = $("#aucCardLot");
+    if (lot) lot.textContent = c.player_key ? `Key ${c.player_key}` : "Unkeyed";
     $("#aucCardName").textContent = c.name || "—";
     // Category is split into a big letter and a small word: "B · Intermediate"
     // as one string overflowed its box at projector sizes.
