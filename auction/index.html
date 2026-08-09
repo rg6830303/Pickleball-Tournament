@@ -119,11 +119,13 @@
             <p class="bid-value" id="bidValue">—</p>
             <p class="bid-holder" id="bidHolder">No bids yet</p>
           </div>
-          <button type="button" class="btn-bid" id="btnBid">
-            <span class="spin" aria-hidden="true"></span>
-            <span class="btn-label">Place Bid</span>
-            <span class="bid-next" id="bidNext"></span>
-          </button>
+          <!-- Bidding happens in the room. This screen mirrors the auctioneer
+               so captains can see the card, the price and their own limit. -->
+          <div class="bid-live" id="bidLive">
+            <p class="bid-live-label">Bid in the room</p>
+            <p class="bid-live-sub">The auctioneer records every bid — this page follows along live.</p>
+            <p class="bid-next" id="bidNext" hidden></p>
+          </div>
         </div>
         <p class="bid-msg" id="bidMsg"></p>
 

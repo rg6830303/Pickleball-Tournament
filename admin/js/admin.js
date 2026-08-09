@@ -476,9 +476,21 @@
           .map((o) => `<option value="${o}" ${o === v ? "selected" : ""}>${o}</option>`)
           .join("")}</select>`;
       case "img":
-        return v
-          ? `<img class="g-thumb" src="${esc(v)}" alt="" data-zoom="${esc(v)}" loading="lazy" />`
-          : `<span class="g-ro">—</span>`;
+        // Editable on purpose: a player card is only as good as its photo, and
+        // plenty of entries arrive without one. Upload, replace or clear here.
+        return `${
+          v
+            ? `<img class="g-thumb" src="${esc(v)}" alt="" data-zoom="${esc(v)}" loading="lazy" />`
+            : `<span class="g-ro">—</span>`
+        }<span class="g-imgbtns"><button type="button" class="btn-mini" data-regphoto="${esc(r.id)}" data-regfield="${
+          col.key
+        }" title="${v ? "Replace this photo" : "Upload a photo"}">⤒</button>${
+          v
+            ? `<button type="button" class="btn-mini danger" data-regphotodel="${esc(r.id)}" data-regfield="${esc(
+                col.key
+              )}" title="Remove this photo">✕</button>`
+            : ""
+        }</span>`;
       default:
         return `<input class="g-in" value="${esc(v ?? "")}" ${idf} autocomplete="off" spellcheck="false" />`;
     }
@@ -690,8 +702,14 @@
   });
 
   /* ---------------- delete (single + bulk) ---------------- */
-  function confirmDialog(msg, action) {
+  // `label` is the wording on the confirm button. It used to be hard-coded to
+  // "Delete", which read as destructive on confirmations that destroy nothing
+  // — linking a player, reversing a sale, generating passwords.
+  function confirmDialog(msg, action, label = "Delete", danger = true) {
     $("#confirmMsg").textContent = msg;
+    const yes = $("#btnConfirmYes");
+    yes.textContent = label;
+    yes.classList.toggle("danger", danger);
     confirmAction = action;
     $("#confirmVeil").hidden = false;
   }
@@ -1056,14 +1074,26 @@
   function renderAucPool() {
     const q = ($("#aucPoolQ").value || "").trim().toLowerCase();
     const f = $("#aucPoolFilter").value;
+    const cf = $("#aucPoolCat") ? $("#aucPoolCat").value : "";
     const list = aLots.filter((l) => {
       if (f && l.status !== f) return false;
+      if (cf && l.category !== cf) return false;
       // Player ID and name only — searching the category matched 64 people at
       // once and buried whoever the auctioneer was actually looking for.
       if (q && !`${l.name} ${l.player_key || ""}`.toLowerCase().includes(q)) return false;
       return true;
     });
-    $("#aucPoolCount").textContent = aLots.filter((l) => l.status === "pool").length;
+
+    // Count what the filter is actually showing, plus a standing tally so the
+    // auctioneer always knows how much of the pool is left.
+    const n = (s) => aLots.filter((l) => l.status === s).length;
+    $("#aucPoolCount").textContent = list.length;
+    const tally = $("#aucPoolTally");
+    if (tally) {
+      tally.innerHTML =
+        `<span>${n("pool")} in pool</span><span>${n("sold")} sold</span>` +
+        `<span>${n("unsold")} unsold</span><span>${aLots.length} total</span>`;
+    }
 
     $("#aucPool").innerHTML = list.length
       ? list
@@ -1073,7 +1103,8 @@
             let right = "";
             if (l.status === "sold") {
               right = `<span class="sold-tag">${esc(team ? team.name : "Sold")} · ${aucMoney(l.sold_price)}</span>
-                       <button class="icon-btn" data-auc-undo="${esc(l.id)}" title="Undo sale">↺</button>`;
+                       <button class="icon-btn" data-auc-undo="${esc(l.id)}" title="Undo the sale and return this player to the pool">↺</button>
+                       <button class="icon-btn" data-auc-tounsold="${esc(l.id)}" title="Reverse the sale and mark this player unsold">⊘</button>`;
             } else if (isLive) {
               right = `<span class="sold-tag" style="color:var(--red);border-color:rgba(229,38,45,0.5)">LIVE</span>`;
             } else {
@@ -1178,9 +1209,12 @@
   }
 
   /* ---- pool filters ---- */
-  ["aucPoolQ", "aucPoolFilter"].forEach((id) =>
-    $("#" + id).addEventListener("input", () => aucReady && renderAucPool())
-  );
+  ["aucPoolQ", "aucPoolFilter", "aucPoolCat"].forEach((id) => {
+    const el = $("#" + id);
+    if (!el) return;
+    el.addEventListener("input", () => aucReady && renderAucPool());
+    el.addEventListener("change", () => aucReady && renderAucPool());
+  });
 
   /* ---- delegated auction actions ---- */
   document.addEventListener("click", async (e) => {
@@ -1207,7 +1241,31 @@
           if (error) return toast(error.message, "err");
           toast("Sale undone and purse refunded", "ok");
           loadAuction();
-        }
+        },
+        "Return to pool",
+        false
+      );
+      return;
+    }
+
+    const tounsold = e.target.closest("[data-auc-tounsold]");
+    if (tounsold) {
+      const lot = aLots.find((l) => l.id === tounsold.dataset.aucTounsold);
+      confirmDialog(
+        `Reverse the sale of ${lot ? lot.name : "this player"} and mark them UNSOLD? ` +
+          `The team's purse is refunded and the player leaves that squad. ` +
+          `They stay out of the pool until you put them on the block again.`,
+        async () => {
+          const { error } = await sb.rpc("auction_undo_sale", {
+            p_lot_id: tounsold.dataset.aucTounsold,
+            p_to_status: "unsold",
+          });
+          if (error) return toast(error.message, "err");
+          toast("Sale reversed — player marked unsold and purse refunded", "ok");
+          loadAuction();
+        },
+        "Mark unsold",
+        false
       );
       return;
     }
@@ -1231,7 +1289,9 @@
           if (error) return toast(error.message, "err");
           toast("Player released and purse refunded", "ok");
           loadAuction();
-        }
+        },
+        "Release",
+        false
       );
       return;
     }
@@ -1337,9 +1397,64 @@
         if (error) return toast(error.message, "err");
         toast("Auction reset", "ok");
         loadAuction();
-      }
+      },
+      "Reset auction"
     )
   );
+
+  /* ---- photos on the Full Table: upload, replace, remove ----
+     Every player card falls back to the registration photo, so being able
+     to fix a missing or wrong one here is what makes the cards complete. */
+  let gPhotoTarget = null;   // { id, field } awaiting a file
+
+  document.addEventListener("click", (e) => {
+    const up = e.target.closest("[data-regphoto]");
+    if (up) {
+      gPhotoTarget = { id: up.dataset.regphoto, field: up.dataset.regfield };
+      $("#gridPhotoInput").click();
+      return;
+    }
+    const del = e.target.closest("[data-regphotodel]");
+    if (!del) return;
+    const id = del.dataset.regphotodel;
+    const field = del.dataset.regfield;
+    const row = rows.find((r) => r.id === id);
+    if (!row) return;
+    confirmDialog(`Remove this photo from ${row.full_name}?`, async () => {
+      const { error } = await sb.from("registrations").update({ [field]: null }).eq("id", id);
+      if (error) return toast("Couldn't remove: " + error.message, "err");
+      row[field] = null;
+      renderGrid();
+      toast("Photo removed", "ok");
+    }, "Remove photo");
+  });
+
+  $("#gridPhotoInput") &&
+    $("#gridPhotoInput").addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file || !gPhotoTarget) return;
+      const { id, field } = gPhotoTarget;
+      gPhotoTarget = null;
+      const row = rows.find((r) => r.id === id);
+      if (!row) return;
+
+      toast("Uploading photo…", "info");
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const folder = field === "profile_pic_url" ? "profile" : "payment";
+      const path = `${folder}/${id}-${Date.now()}.${ext}`;
+      const up = await sb.storage
+        .from(CFG.STORAGE_BUCKET)
+        .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
+      if (up.error) return toast("Upload failed: " + up.error.message, "err");
+
+      const url = sb.storage.from(CFG.STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+      const { error } = await sb.from("registrations").update({ [field]: url }).eq("id", id);
+      if (error) return toast("Couldn't save the photo: " + error.message, "err");
+      row[field] = url;
+      renderGrid();
+      toast(`Photo updated for ${row.full_name}`, "ok");
+    });
 
   /* ============================================================
      AUCTION POOL — the curated player list the auction runs on.
@@ -1476,6 +1591,7 @@
       .join("");
 
     renderPoolStats();
+    renderSuggestions();
   }
 
   function renderPoolStats() {
@@ -1506,6 +1622,105 @@
       stat("With age", `${withAge}/${pRows.length}`, withAge < pRows.length ? "warn" : "ok") +
       stat("Slots needing a name", blank, blank ? "warn" : "");
   }
+
+  /* ---- suggested links ----
+     Exact-name auto-linking only gets the easy ones. The rest differ by a
+     letter or two ("Mustanzir" vs "Mustansir"), which a person can settle at
+     a glance but a script should not decide on its own. */
+  function editDistance(a, b) {
+    const m = [];
+    for (let i = 0; i <= b.length; i++) m[i] = [i];
+    for (let j = 0; j <= a.length; j++) m[0][j] = j;
+    for (let i = 1; i <= b.length; i++)
+      for (let j = 1; j <= a.length; j++)
+        m[i][j] =
+          b[i - 1] === a[j - 1]
+            ? m[i - 1][j - 1]
+            : Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1);
+    return m[b.length][a.length];
+  }
+  const normName = (s) =>
+    String(s || "").toLowerCase().replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+
+  function poolSuggestions() {
+    const freePool = pRows.filter((p) => String(p.name || "").trim() && !p.player_key);
+    const freeRegs = rows.filter((r) => !r.player_key && String(r.full_name || "").trim());
+    const out = [];
+    for (const p of freePool) {
+      const pk = normName(p.name);
+      if (!pk) continue;
+      let best = null;
+      for (const r of freeRegs) {
+        const rk = normName(r.full_name);
+        if (!rk) continue;
+        const sim = 1 - editDistance(pk, rk) / Math.max(pk.length, rk.length);
+        if (sim > 0.72 && (!best || sim > best.sim)) best = { reg: r, sim };
+      }
+      if (best) out.push({ pool: p, reg: best.reg, sim: best.sim });
+    }
+    return out.sort((a, b) => b.sim - a.sim);
+  }
+
+  function renderSuggestions() {
+    const box = $("#poolSuggest");
+    if (!box) return;
+    const list = poolSuggestions();
+    box.hidden = list.length === 0;
+    $("#poolSuggestCount").textContent = list.length;
+    $("#poolSuggestList").innerHTML = list
+      .map(
+        (s) => `<div class="suggest-row" data-sg-pool="${esc(s.pool.id)}" data-sg-reg="${esc(s.reg.id)}">
+          ${
+            s.reg.profile_pic_url
+              ? `<img src="${esc(s.reg.profile_pic_url)}" alt="" loading="lazy" />`
+              : `<span class="noimg">🥒</span>`
+          }
+          <div class="suggest-main">
+            <div class="suggest-names">
+              <b>${esc(s.pool.name)}</b>
+              <span class="cat-chip c-${esc(s.pool.category)}">${esc(s.pool.category)}</span>
+              <span class="suggest-arrow">↔</span>
+              <span>${esc(s.reg.full_name)}</span>
+            </div>
+            <div class="suggest-meta">
+              ${Math.round(s.sim * 100)}% match ·
+              ${s.reg.dupr != null ? "DUPR " + Number(s.reg.dupr).toFixed(3) : "no DUPR"} ·
+              ${s.reg.profile_pic_url ? "has photo" : "no photo"}
+            </div>
+          </div>
+          <button class="btn-mini" data-sg-link="1">Link</button>
+        </div>`
+      )
+      .join("");
+  }
+
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-sg-link]");
+    if (!btn) return;
+    const row = btn.closest("[data-sg-pool]");
+    const pool = pRows.find((p) => p.id === row.dataset.sgPool);
+    const reg = rows.find((r) => r.id === row.dataset.sgReg);
+    if (!pool || !reg) return;
+
+    const key = `MPL-${pool.category}-${String(pool.sl_no || 0).padStart(3, "0")}`;
+    btn.disabled = true;
+    const a = await sb.from("auction_pool").update({ player_key: key }).eq("id", pool.id);
+    if (a.error) {
+      btn.disabled = false;
+      return toast("Couldn't link: " + a.error.message, "err");
+    }
+    const b = await sb.from("registrations").update({ player_key: key }).eq("id", reg.id);
+    if (b.error) {
+      // don't leave a half-link behind
+      await sb.from("auction_pool").update({ player_key: null }).eq("id", pool.id);
+      btn.disabled = false;
+      return toast("Couldn't link: " + b.error.message, "err");
+    }
+    pool.player_key = key;
+    reg.player_key = key;
+    await loadPool();
+    toast(`${pool.name} linked to ${reg.full_name} as ${key}`, "ok");
+  });
 
   /* ---- inline editing ---- */
   async function commitPoolCell(el) {
@@ -1636,7 +1851,8 @@
         if (error) return toast("Couldn't remove: " + error.message, "err");
         await loadPool();
         toast("Removed from the pool", "ok");
-      }
+      },
+      "Remove"
     );
   });
 
@@ -1658,7 +1874,9 @@
             data ? `Linked ${data} player${data === 1 ? "" : "s"} to their registration` : "No new matches to link",
             data ? "ok" : "info"
           );
-        }
+        },
+        "Link them",
+        false
       );
     });
 
@@ -1882,7 +2100,9 @@
         } finally {
           btn.disabled = false;
         }
-      }
+      },
+      "Create logins",
+      false
     );
   });
 
@@ -1925,7 +2145,9 @@
         } finally {
           btn.disabled = false;
         }
-      }
+      },
+      "Generate & apply",
+      false
     );
   });
 

@@ -171,8 +171,7 @@
     const failed = [t, l, s, b].find((r) => r.error);
     if (failed) {
       $("#bidMsg").textContent =
-        "Lost contact with the auction server — reconnecting. Bidding is paused.";
-      $("#btnBid").disabled = true;
+        "Lost contact with the auction server — reconnecting.";
       $("#liveDot").classList.remove("on");
       $("#liveLabel").textContent = "offline";
       return false;
@@ -384,25 +383,29 @@
       : "No bids yet — open at the base price";
     holder.classList.toggle("mine", leadingMe);
 
-    // next bid the captain would place
+    // Bidding is called in the room, so this panel tells the captain where
+    // they stand rather than offering a button: their ceiling for THIS
+    // player, and why it is what it is.
     const t = myTeam();
-    const next = state.leading_team_id
-      ? price + Number(state.bid_increment)
-      : price;
-    const squadFull = t && squadOf(myTeamId).length >= t.max_squad;
-    const tooRich = t && next > Number(t.purse_left);
+    const cat = (cards[lot.id] || lot).category;
+    const u = t ? unfilled(t) : null;
+    const msg = $("#bidMsg");
+    msg.classList.remove("ok");
 
-    $("#bidNext").textContent = money(next);
-    const btn = $("#btnBid");
-    btn.disabled = leadingMe || squadFull || tooRich;
-    $("#bidMsg").textContent = squadFull
-      ? "Your squad is full — you can't bid on more players."
-      : tooRich
-      ? `Not enough purse left for ${money(next)}.`
-      : leadingMe
-      ? ""
-      : "";
-    $("#bidMsg").classList.remove("ok");
+    if (!t) {
+      msg.textContent = "";
+    } else if (squadOf(myTeamId).length >= t.max_squad) {
+      msg.textContent = "Your squad is full — you can no longer buy players.";
+    } else if (u && u[cat] === 0) {
+      msg.textContent = `Your ${cat} quota is full — you cannot take this player.`;
+    } else {
+      const cap = maxBidFor(t, cat);
+      msg.textContent =
+        price > cap
+          ? `Above your limit of ${money(cap)} for a category ${cat} player.`
+          : `You can go up to ${money(cap)} for this player.`;
+      if (price <= cap) msg.classList.add("ok");
+    }
   }
 
   /* ---------------- player card ----------------
@@ -583,30 +586,6 @@
       )
       .join("");
   }
-
-  /* ---------------- bidding ---------------- */
-  $("#btnBid").addEventListener("click", async () => {
-    const btn = $("#btnBid");
-    busy(btn, true);
-    const { data, error } = await sb.rpc("auction_bid", { p_team_id: null, p_amount: null });
-    busy(btn, false);
-    const msg = $("#bidMsg");
-    if (error) {
-      msg.classList.remove("ok");
-      msg.textContent = error.message.replace(/^.*?:\s*/, "");
-      renderStage();
-      return;
-    }
-    // Reflect our own bid immediately — don't wait for the realtime echo, and
-    // re-lock the button so a double-tap can't bid against ourselves.
-    if (state) {
-      state.current_price = Number(data);
-      state.leading_team_id = myTeamId;
-    }
-    renderStage();
-    msg.classList.add("ok");
-    msg.textContent = `Bid placed at ${money(data)}`;
-  });
 
   window.addEventListener("DOMContentLoaded", boot);
 })();

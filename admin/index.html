@@ -159,6 +159,9 @@
         </table>
         <p class="empty" id="gridEmpty" hidden>No registrations yet.</p>
       </section>
+
+      <!-- used by the per-row photo upload buttons in the sheet -->
+      <input type="file" id="gridPhotoInput" accept="image/*" hidden />
     </section>
 
     <!-- ---------- TAB: AUCTION POOL ---------- -->
@@ -180,6 +183,18 @@
       </section>
 
       <section class="stats" id="poolStats" aria-label="Pool statistics"></section>
+
+      <!-- near-miss name matches the organiser can accept one by one -->
+      <section class="suggest" id="poolSuggest" hidden>
+        <div class="suggest-head">
+          <h2 class="panel-title">Suggested links <span class="count" id="poolSuggestCount">0</span></h2>
+          <p class="panel-sub">
+            These pool players almost match a registration — usually a spelling difference.
+            Linking one gives that player their photo, sex and DUPR. Check each before accepting.
+          </p>
+        </div>
+        <div class="suggest-list" id="poolSuggestList"></div>
+      </section>
 
       <section class="grid-wrap">
         <table class="grid">
@@ -291,10 +306,18 @@
                 <option value="pool">In pool</option>
                 <option value="unsold">Unsold</option>
                 <option value="sold">Sold</option>
-                <option value="">All</option>
+                <option value="live">On the block</option>
+                <option value="">All statuses</option>
+              </select>
+              <select id="aucPoolCat">
+                <option value="">All categories</option>
+                <option value="A">A · Advance</option>
+                <option value="B">B · Intermediate</option>
+                <option value="C">C · Beginner</option>
               </select>
               <input type="number" id="aucBase" min="0" step="100" placeholder="Base ₹" title="Base price used when putting a player on the block" />
             </div>
+            <div class="auc-pool-tally" id="aucPoolTally"></div>
             <div class="auc-pool" id="aucPool"></div>
           </div>
 

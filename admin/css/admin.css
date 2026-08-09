@@ -1383,3 +1383,37 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
 .auc-inc { margin-top: 12px; }
 .auc-inc-row { display: flex; gap: 8px; align-items: center; }
 .auc-inc-row input { flex: 1; min-width: 0; }
+
+/* ---- photo controls inside the sheet ---- */
+.g-imgbtns { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.g-imgbtns .btn-mini { padding: 1px 7px; line-height: 1.4; }
+.g-imgbtns .btn-mini.danger:hover { border-color: var(--red); color: var(--red); }
+
+/* ---- pool tally under the auction pool filters ---- */
+.auc-pool-tally {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: 8px 0 4px; font-size: 11.5px; color: var(--text-faint);
+}
+.auc-pool-tally span { border: 1px solid var(--line); border-radius: 999px; padding: 1px 9px; }
+
+/* ---- suggested pool ↔ registration links ---- */
+.suggest {
+  border: 1px solid rgba(232, 195, 90, 0.35);
+  border-radius: var(--radius);
+  background: rgba(232, 195, 90, 0.04);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+.suggest-head { margin-bottom: 10px; }
+.suggest-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+.suggest-row {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--panel); padding: 8px 12px;
+}
+.suggest-row img { width: 38px; height: 38px; border-radius: 8px; object-fit: cover; flex: none; }
+.suggest-row .noimg { width: 38px; height: 38px; display: grid; place-items: center; flex: none; opacity: 0.5; }
+.suggest-main { flex: 1; min-width: 0; }
+.suggest-names { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; }
+.suggest-arrow { color: var(--warn); }
+.suggest-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }

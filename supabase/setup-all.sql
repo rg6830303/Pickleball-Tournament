@@ -1297,6 +1297,46 @@ end $$;
 
 notify pgrst, 'reload schema';
 
+-- Reversing a sale can now send the player to 'unsold' as well as back to
+-- 'pool'. In a hybrid room the auctioneer often needs to void a call and
+-- record the player as unsold rather than re-open them immediately.
+create or replace function public.auction_undo_sale(
+  p_lot_id uuid,
+  p_to_status text default 'pool'
+)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+declare v_team int; v_price numeric;
+begin
+  if not public.is_auction_staff() then
+    raise exception 'Only tournament staff can undo a sale';
+  end if;
+  if p_to_status not in ('pool', 'unsold') then
+    raise exception 'A reversed sale can only go back to the pool or to unsold';
+  end if;
+
+  select sold_to_team_id, sold_price into v_team, v_price
+    from public.auction_pool where id = p_lot_id and status = 'sold' for update;
+  if v_team is null then raise exception 'That player is not sold'; end if;
+  if v_price is null then raise exception 'That sale has no recorded price — fix it on the Auction Pool tab first'; end if;
+
+  update public.auction_teams
+     set purse_spent = greatest(purse_spent - v_price, 0) where id = v_team;
+
+  update public.auction_pool
+     set status = p_to_status, sold_to_team_id = null, sold_price = null, sold_at = null
+   where id = p_lot_id;
+end $$;
+
+revoke all on function public.auction_undo_sale(uuid, text) from public, anon;
+grant execute on function public.auction_undo_sale(uuid, text) to authenticated;
+
+-- The old single-argument signature would otherwise linger and shadow this.
+drop function if exists public.auction_undo_sale(uuid);
+
+notify pgrst, 'reload schema';
+
 
 -- ############################################################
 -- ### create-admin.sql
