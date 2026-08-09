@@ -957,6 +957,7 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "auction_teams" }, (p) => {
           const i = aTeams.findIndex((x) => x.id === p.new.id);
           if (i > -1) aTeams[i] = p.new;
+          renderAucList();
           renderAucTeams();
           renderAucStage();
         })
@@ -985,12 +986,15 @@
 
   function renderAuction() {
     renderAucStage();
+    renderAucList();
     renderAucTeams();
+    // Team name only. The purse was the same 10,00,000 on every line until a
+    // team actually spends, so it read as noise beside sixteen identical rows.
     const sel = $("#aucSellTeam");
     const keep = sel.value;
     sel.innerHTML =
-      `<option value="">— highest bidder —</option>` +
-      aTeams.map((t) => `<option value="${t.id}">${esc(t.name)} · ${aucMoney(t.purse_left)}</option>`).join("");
+      `<option value="">— choose a team —</option>` +
+      aTeams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("");
     if (keep) sel.value = keep;
   }
 
@@ -1118,9 +1122,12 @@
         : "not registered yet";
     }
     $("#aucCardName").textContent = c.name || "—";
-    $("#aucCardCat").textContent = c.category
-      ? `${c.category} · ${c.category_label || catLabel(c.category)}`
-      : "—";
+    // Category is split into a big letter and a small word: "B · Intermediate"
+    // as one string overflowed its box at projector sizes.
+    $("#aucCardCatCode").textContent = c.category || "—";
+    $("#aucCardCatName").textContent = c.category
+      ? c.category_label || catLabel(c.category)
+      : "";
     $("#aucCardAge").textContent = c.age != null ? c.age : "NA";
     $("#aucCardSex").textContent = c.sex || "NA";
     $("#aucCardDupr").textContent = c.dupr != null ? Number(c.dupr).toFixed(3) : "NA";
@@ -1130,6 +1137,107 @@
   const catLabel = (code) =>
     aCats.find((x) => x.code === code)?.label ||
     ({ A: "Advance", B: "Intermediate", C: "Beginner" }[code] || "");
+
+  /* ---- one table for the whole field ----
+     Who is left, who went where, and for how much — the three questions the
+     desk asks all evening, in a single list rather than three panels. */
+  function renderAucList() {
+    const body = $("#aucListBody");
+    if (!body) return;
+
+    const q = ($("#aucListQ")?.value || "").trim().toLowerCase();
+    const st = $("#aucListStatus")?.value || "";
+    const cat = $("#aucListCat")?.value || "";
+    const team = $("#aucListTeam")?.value || "";
+
+    const named = aLots.filter((l) => String(l.name || "").trim());
+    const n = (s) => named.filter((l) => l.status === s).length;
+
+    const list = named
+      .filter((l) => {
+        // "pool" in the filter means "not auctioned yet", which includes the
+        // player currently on screen.
+        if (st === "pool" && !(l.status === "pool" || l.status === "live")) return false;
+        if (st && st !== "pool" && l.status !== st) return false;
+        if (cat && l.category !== cat) return false;
+        if (team && String(l.sold_to_team_id) !== team) return false;
+        if (!q) return true;
+        const t = aTeams.find((x) => x.id === l.sold_to_team_id);
+        return `${l.name} ${l.player_key || ""} ${t ? t.name : ""}`.toLowerCase().includes(q);
+      })
+      .sort((a, b) => (a.sl_no || 0) - (b.sl_no || 0));
+
+    $("#aucListCount").textContent = list.length;
+
+    const spend = named.reduce((s, l) => s + Number(l.sold_price || 0), 0);
+    const tally = $("#aucListTally");
+    if (tally) {
+      tally.innerHTML =
+        `<span>${named.length} players</span>` +
+        `<span class="t-pool">${n("pool") + n("live")} left</span>` +
+        `<span class="t-sold">${n("sold")} sold</span>` +
+        `<span class="t-unsold">${n("unsold")} unsold</span>` +
+        ["A", "B", "C"]
+          .map(
+            (c) =>
+              `<span>${named.filter((l) => l.category === c && l.status === "sold").length}/${named.filter(
+                (l) => l.category === c
+              ).length} ${c}</span>`
+          )
+          .join("") +
+        `<span>${aucMoney(spend)} spent</span>`;
+    }
+
+    const tsel = $("#aucListTeam");
+    if (tsel) {
+      const keep = tsel.value;
+      tsel.innerHTML =
+        `<option value="">All teams</option>` +
+        aTeams
+          .map((t) => {
+            const c = named.filter((l) => l.sold_to_team_id === t.id).length;
+            return `<option value="${t.id}">${esc(t.name)}${c ? ` · ${c}` : ""}</option>`;
+          })
+          .join("");
+      tsel.value = keep;
+    }
+
+    $("#aucListEmpty").hidden = list.length > 0;
+
+    body.innerHTML = list
+      .map((l) => {
+        const t = aTeams.find((x) => x.id === l.sold_to_team_id);
+        const isLive = aState && aState.current_lot_id === l.id;
+        const status = isLive
+          ? `<span class="pool-badge s-live">on screen</span>`
+          : `<span class="pool-badge s-${esc(l.status)}">${esc(
+              l.status === "pool" ? "available" : l.status
+            )}</span>`;
+        const actions =
+          l.status === "sold"
+            ? `<button class="icon-btn" data-auc-undo="${esc(l.id)}" title="Undo the sale and return this player to the pool">↺</button>
+               <button class="icon-btn" data-auc-tounsold="${esc(l.id)}" title="Reverse the sale and mark this player unsold">⊘</button>`
+            : "";
+        return `<tr class="${l.status === "sold" ? "is-sold" : ""} ${isLive ? "is-live" : ""}">
+          <td><span class="g-code">${esc(l.player_key || "—")}</span></td>
+          <td class="al-name">${esc(l.name)}</td>
+          <td><span class="cat-chip c-${esc(l.category)}">${esc(l.category)}</span></td>
+          <td class="num">${aucMoney(l.base_price)}</td>
+          <td>${status}</td>
+          <td>${t ? `<span class="team-no">T${l.sold_to_team_id}</span> ${esc(t.name)}` : `<span class="g-ro">—</span>`}</td>
+          <td class="num">${l.sold_price != null ? aucMoney(l.sold_price) : `<span class="g-ro">—</span>`}</td>
+          <td class="g-actions">${actions}</td>
+        </tr>`;
+      })
+      .join("");
+  }
+
+  ["aucListQ", "aucListStatus", "aucListCat", "aucListTeam"].forEach((id) => {
+    const el = $("#" + id);
+    if (!el) return;
+    el.addEventListener("input", () => aucReady && renderAucList());
+    el.addEventListener("change", () => aucReady && renderAucList());
+  });
 
   const aucOpenTeams = new Set();
 

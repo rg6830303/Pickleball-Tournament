@@ -1438,67 +1438,191 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
 
 /* ============================================================
    PROJECTOR AUCTION SCREEN
-   The Auction tab is shown on a big screen to the whole room, so the
-   card is the page and everything else stays out of its way.
+   Shown on a big screen to the whole room: the card is the page,
+   the controls sit quietly beside it.
    ============================================================ */
-.auc-callbar {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: var(--panel);
-  padding: 14px 18px;
-  margin-bottom: 16px;
+#tab-auction .auc-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 22px;
+  align-items: start;
 }
-.auc-callbar-field { flex: 1 1 260px; min-width: 200px; }
-.auc-callbar-field label {
-  display: block;
-  font-size: 10px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin-bottom: 5px;
-}
-.auc-callbar-field input {
-  width: 100%;
-  background: var(--bg-2);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  color: var(--text);
+#tab-auction .auc-stage-main { min-width: 0; }
+
+.auc-key-row { display: flex; gap: 8px; }
+.auc-key-row input {
+  flex: 1;
+  min-width: 0;
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  text-align: center;
   text-transform: uppercase;
-  padding: 8px 14px;
 }
-.auc-callbar-field input:focus {
-  outline: none;
-  border-color: var(--red);
-  box-shadow: 0 0 0 3px var(--red-glow);
-}
-.auc-callhint { flex-basis: 100%; font-size: 12.5px; color: var(--text-faint); min-height: 17px; }
+.auc-key-row .btn-mini { flex: none; }
+.auc-callhint { font-size: 12px; color: var(--text-faint); margin-top: 6px; min-height: 16px; line-height: 1.4; }
 .auc-callhint.ok  { color: var(--ok); }
 .auc-callhint.bad { color: var(--red); }
+.auc-emptystage { color: var(--text-faint); font-size: 16px; padding: 70px 0; text-align: center; }
 
-.auc-emptystage {
-  color: var(--text-faint);
-  font-size: 15px;
-  padding: 48px 0 40px;
-  text-align: center;
+/* ---------- the card ---------- */
+#tab-auction .pcard {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 30px;
+  align-items: stretch;
+  border: 1px solid rgba(229, 38, 45, 0.5);
+  border-radius: 20px;
+  background:
+    radial-gradient(130% 110% at 0% 0%, rgba(229, 38, 45, 0.16), transparent 58%),
+    linear-gradient(160deg, #17171a 0%, var(--panel) 55%, #0b0b0c 100%);
+  box-shadow:
+    0 0 0 1px rgba(229, 38, 45, 0.14),
+    0 0 60px rgba(229, 38, 45, 0.10),
+    0 26px 70px rgba(0, 0, 0, 0.65);
+  padding: 26px;
+  margin: 14px 0 0;
+  overflow: hidden;
+}
+#tab-auction .pcard-photo {
+  min-height: 420px;
+  border-radius: 16px;
+  border: 1px solid rgba(229, 38, 45, 0.35);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+  background: #08080a;
+}
+#tab-auction .pcard-photo img { width: 100%; height: 100%; object-fit: cover; }
+#tab-auction .pcard-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  gap: 4px;
+}
+#tab-auction .pcard-kicker { font-size: 12px; letter-spacing: 0.3em; }
+#tab-auction .pcard-name {
+  font-size: clamp(40px, 5.2vw, 82px);
+  /* below ~1.15 the glyphs overflow their own line box and clip */
+  line-height: 1.15;
+  padding-bottom: 4px;
+  margin: 6px 0 18px;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  text-shadow: 0 3px 22px rgba(0, 0, 0, 0.6);
 }
 
-/* the card carries the room: bigger photo, bigger name, bigger numbers */
-#tab-auction .pcard { grid-template-columns: 300px 1fr; gap: 26px; padding: 22px; }
-#tab-auction .pcard-photo { min-height: 340px; }
-#tab-auction .pcard-name { font-size: clamp(38px, 5.5vw, 76px); }
-#tab-auction .pcard-stat dd { font-size: 30px; }
-#tab-auction .pcard-stat.wide dd { font-size: 38px; }
-#tab-auction .pcard-kicker { font-size: 12px; }
+/* stat tiles: fixed rhythm, nothing allowed to spill */
+#tab-auction .pcard-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+#tab-auction .pcard-stat {
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.42);
+  padding: 10px 14px 12px;
+  min-width: 0;
+  /* no overflow:hidden — Oswald's ascenders/descenders sit outside a tight
+     line box and were being sliced off inside these tiles */
+}
+#tab-auction .pcard-stat dt {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+#tab-auction .pcard-stat dd {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2vw, 34px);
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* category reads as a big letter with the word beneath, so
+   "Intermediate" can never push out of its tile */
+#tab-auction .pcard-stat dd .cat-code {
+  display: block;
+  font-size: clamp(24px, 2.1vw, 36px);
+  line-height: 1.25;
+  color: var(--red);
+}
+#tab-auction .pcard-stat dd .cat-name {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
 
-@media (max-width: 860px) {
-  #tab-auction .pcard { grid-template-columns: 1fr; }
-  #tab-auction .pcard-photo { min-height: 260px; }
+/* base price gets its own full-width bar */
+#tab-auction .pcard-base {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(229, 38, 45, 0.4);
+  background: linear-gradient(90deg, rgba(229, 38, 45, 0.16), transparent 70%);
+}
+#tab-auction .pcard-base-label {
+  font-size: 10.5px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+#tab-auction .pcard-base-value {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3vw, 52px);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--red);
+}
+
+/* ---------- players table ---------- */
+.auc-list-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.auc-list-bar input[type="search"] { flex: 1 1 220px; min-width: 160px; }
+.auc-list-tally {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 10px; font-size: 11.5px; color: var(--text-faint);
+}
+.auc-list-tally span { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.auc-list-tally .t-sold   { color: var(--ok);   border-color: rgba(47,191,113,0.45); }
+.auc-list-tally .t-unsold { color: var(--warn); border-color: rgba(232,195,90,0.45); }
+.auc-list-tally .t-pool   { color: var(--info); border-color: rgba(156,192,255,0.45); }
+.auc-list-wrap { max-height: 460px; overflow-y: auto; }
+.auc-list th { position: sticky; top: 0; background: var(--panel-2); z-index: 1; }
+.auc-list td { vertical-align: middle; }
+.auc-list .al-name { font-weight: 600; }
+.auc-list tr.is-sold { opacity: 0.78; }
+.auc-list tr.is-live td { background: rgba(229, 38, 45, 0.10); }
+
+@media (max-width: 1080px) {
+  #tab-auction .auc-stage { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  #tab-auction .pcard { grid-template-columns: 1fr; gap: 18px; padding: 18px; }
+  #tab-auction .pcard-photo { min-height: 300px; }
+}
+
+/* The auction tab is projected, so let it use the whole screen instead of
+   the 1240px reading width the rest of the console is set in. */
+.dash:has(#tab-auction:not([hidden])) { max-width: min(1800px, 96vw); }
+
+@media (min-width: 1500px) {
+  #tab-auction .auc-stage { grid-template-columns: minmax(0, 1fr) 320px; }
+  #tab-auction .pcard { grid-template-columns: minmax(0, 440px) minmax(0, 1fr); }
+  #tab-auction .pcard-photo { min-height: 520px; }
+  #tab-auction .pcard-name { font-size: clamp(56px, 4.6vw, 96px); }
+  #tab-auction .pcard-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

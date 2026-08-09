@@ -230,21 +230,7 @@
 
       <div id="aucBody" hidden>
 
-        <!-- ===== projector bar: call a player by key, or clear the block ===== -->
-        <section class="auc-callbar">
-          <div class="auc-callbar-field">
-            <label for="aucKey">Player Key</label>
-            <input type="search" id="aucKey" placeholder="MPL-A-001" autocomplete="off"
-                   spellcheck="false" autocapitalize="characters" />
-          </div>
-          <button class="btn-primary" id="btnAucCall" type="button">
-            <span class="spin" aria-hidden="true"></span><span class="btn-label">Show player</span>
-          </button>
-          <button class="btn-mini ghost" id="btnAucClear" type="button">Clear</button>
-          <p class="auc-callhint" id="aucKeyHint" role="status"></p>
-        </section>
-
-        <!-- ===== the screen everyone watches ===== -->
+        <!-- ===== the screen the room watches ===== -->
         <section class="auc-stage">
           <div class="auc-stage-main">
             <p class="auc-tag" id="aucTag">Waiting for the next player</p>
@@ -261,21 +247,37 @@
                 <p class="pcard-kicker">Auction Player Card · Season 1</p>
                 <h2 class="pcard-name" id="aucCardName">—</h2>
                 <dl class="pcard-stats">
-                  <div class="pcard-stat"><dt>Category</dt><dd id="aucCardCat">—</dd></div>
+                  <div class="pcard-stat">
+                    <dt>Category</dt>
+                    <dd><b class="cat-code" id="aucCardCatCode">—</b><span class="cat-name" id="aucCardCatName"></span></dd>
+                  </div>
                   <div class="pcard-stat"><dt>Age</dt><dd id="aucCardAge">—</dd></div>
                   <div class="pcard-stat"><dt>Sex</dt><dd id="aucCardSex">—</dd></div>
                   <div class="pcard-stat"><dt>DUPR</dt><dd id="aucCardDupr">—</dd></div>
-                  <div class="pcard-stat wide"><dt>Base Price</dt><dd id="aucCardBase">—</dd></div>
                 </dl>
+                <div class="pcard-base">
+                  <span class="pcard-base-label">Base Price</span>
+                  <span class="pcard-base-value" id="aucCardBase">—</span>
+                </div>
               </div>
             </div>
 
             <p class="auc-emptystage" id="aucEmptyStage">
-              Type a Player Key above to put that player on screen.
+              Enter a Player Key on the right to put that player on screen.
             </p>
           </div>
 
           <div class="auc-stage-side">
+            <div class="field">
+              <label for="aucKey">Player Key</label>
+              <div class="auc-key-row">
+                <input type="search" id="aucKey" placeholder="e.g. 16" autocomplete="off"
+                       spellcheck="false" autocapitalize="characters" />
+                <button class="btn-mini" id="btnAucCall" type="button">Show</button>
+              </div>
+              <p class="auc-callhint" id="aucKeyHint" role="status"></p>
+            </div>
+
             <div class="field">
               <label for="aucSellTeam">Sell to</label>
               <select id="aucSellTeam"></select>
@@ -289,9 +291,44 @@
             </button>
             <div class="auc-side-actions">
               <button class="btn-mini" id="btnAucUnsold" type="button">Mark unsold</button>
+              <button class="btn-mini ghost" id="btnAucClear" type="button">Clear</button>
             </div>
           </div>
         </section>
+
+        <!-- ===== one table: the whole pool, sold and unsold ===== -->
+        <div class="panel">
+          <h2 class="panel-title">Players <span class="count" id="aucListCount">0</span></h2>
+          <div class="auc-list-bar">
+            <input type="search" id="aucListQ" placeholder="Search by Player Key or name…" />
+            <select id="aucListStatus">
+              <option value="">All players</option>
+              <option value="pool">Not yet auctioned</option>
+              <option value="sold">Sold</option>
+              <option value="unsold">Unsold</option>
+            </select>
+            <select id="aucListCat">
+              <option value="">All categories</option>
+              <option value="A">A · Advance</option>
+              <option value="B">B · Intermediate</option>
+              <option value="C">C · Beginner</option>
+            </select>
+            <select id="aucListTeam"><option value="">All teams</option></select>
+          </div>
+          <div class="auc-list-tally" id="aucListTally"></div>
+          <div class="table-wrap auc-list-wrap">
+            <table class="grid auc-list">
+              <thead>
+                <tr>
+                  <th>Key</th><th>Player</th><th>Cat</th><th class="num">Base</th>
+                  <th>Status</th><th>Team</th><th class="num">Price</th><th class="th-actions">·</th>
+                </tr>
+              </thead>
+              <tbody id="aucListBody"></tbody>
+            </table>
+            <p class="empty" id="aucListEmpty" hidden>No players match.</p>
+          </div>
+        </div>
 
         <!-- teams · wallets · squads -->
         <div class="panel">
