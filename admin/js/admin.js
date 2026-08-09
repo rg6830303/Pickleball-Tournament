@@ -1150,10 +1150,13 @@
     const cat = $("#aucListCat")?.value || "";
     const team = $("#aucListTeam")?.value || "";
 
-    const named = aLots.filter((l) => String(l.name || "").trim());
-    const n = (s) => named.filter((l) => l.status === s).length;
+    // Every slot counts, including the four the sheet left blank — hiding them
+    // made the total read 140 against a pool of 144 and there was no way to
+    // see which slots still need a name.
+    const all = aLots;
+    const n = (s) => all.filter((l) => l.status === s).length;
 
-    const list = named
+    const list = all
       .filter((l) => {
         // "pool" in the filter means "not auctioned yet", which includes the
         // player currently on screen.
@@ -1163,29 +1166,34 @@
         if (team && String(l.sold_to_team_id) !== team) return false;
         if (!q) return true;
         const t = aTeams.find((x) => x.id === l.sold_to_team_id);
-        return `${l.name} ${l.player_key || ""} ${t ? t.name : ""}`.toLowerCase().includes(q);
+        return `${l.name} ${l.player_key || ""} ${l.sl_no || ""} ${t ? t.name : ""}`
+          .toLowerCase()
+          .includes(q);
       })
       .sort((a, b) => (a.sl_no || 0) - (b.sl_no || 0));
 
-    $("#aucListCount").textContent = list.length;
+    const filtered = list.length !== all.length;
+    $("#aucListCount").textContent = filtered ? `${list.length} / ${all.length}` : all.length;
 
-    const spend = named.reduce((s, l) => s + Number(l.sold_price || 0), 0);
+    const spend = all.reduce((s, l) => s + Number(l.sold_price || 0), 0);
+    const blank = all.filter((l) => !String(l.name || "").trim()).length;
     const tally = $("#aucListTally");
     if (tally) {
       tally.innerHTML =
-        `<span>${named.length} players</span>` +
-        `<span class="t-pool">${n("pool") + n("live")} left</span>` +
+        `<span>${all.length} in pool</span>` +
+        `<span class="t-pool">${n("pool") + n("live")} available</span>` +
         `<span class="t-sold">${n("sold")} sold</span>` +
         `<span class="t-unsold">${n("unsold")} unsold</span>` +
         ["A", "B", "C"]
           .map(
             (c) =>
-              `<span>${named.filter((l) => l.category === c && l.status === "sold").length}/${named.filter(
+              `<span>${all.filter((l) => l.category === c && l.status === "sold").length}/${all.filter(
                 (l) => l.category === c
               ).length} ${c}</span>`
           )
           .join("") +
-        `<span>${aucMoney(spend)} spent</span>`;
+        `<span>${aucMoney(spend)} spent</span>` +
+        (blank ? `<span class="t-unsold">${blank} slot${blank === 1 ? "" : "s"} unnamed</span>` : "");
     }
 
     const tsel = $("#aucListTeam");
@@ -1195,14 +1203,25 @@
         `<option value="">All teams</option>` +
         aTeams
           .map((t) => {
-            const c = named.filter((l) => l.sold_to_team_id === t.id).length;
+            const c = all.filter((l) => l.sold_to_team_id === t.id).length;
             return `<option value="${t.id}">${esc(t.name)}${c ? ` · ${c}` : ""}</option>`;
           })
           .join("");
       tsel.value = keep;
     }
 
-    $("#aucListEmpty").hidden = list.length > 0;
+    const emptyEl = $("#aucListEmpty");
+    emptyEl.hidden = list.length > 0;
+    if (!list.length) {
+      const bits = [];
+      if (st) bits.push(st === "pool" ? "not yet auctioned" : st);
+      if (cat) bits.push("category " + cat);
+      if (team) bits.push(aTeams.find((x) => String(x.id) === team)?.name || "that team");
+      if (q) bits.push(`matching “${q}”`);
+      emptyEl.textContent = bits.length
+        ? `No players ${bits.join(" · ")}.`
+        : "No players in the pool yet.";
+    }
 
     body.innerHTML = list
       .map((l) => {
@@ -1220,7 +1239,11 @@
             : "";
         return `<tr class="${l.status === "sold" ? "is-sold" : ""} ${isLive ? "is-live" : ""}">
           <td><span class="g-code">${esc(l.player_key || "—")}</span></td>
-          <td class="al-name">${esc(l.name)}</td>
+          <td class="al-name">${
+            String(l.name || "").trim()
+              ? esc(l.name)
+              : `<i class="al-tbd">slot ${l.sl_no} · name not filled in</i>`
+          }</td>
           <td><span class="cat-chip c-${esc(l.category)}">${esc(l.category)}</span></td>
           <td class="num">${aucMoney(l.base_price)}</td>
           <td>${status}</td>
