@@ -1417,3 +1417,21 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
 .suggest-names { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; }
 .suggest-arrow { color: var(--warn); }
 .suggest-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+/* ---- sold list: the team that bought each player ---- */
+.team-no {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #ff3b42 0%, var(--red) 60%, var(--red-deep) 100%);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  flex: none;
+}
+.auc-lot.is-sold .right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }

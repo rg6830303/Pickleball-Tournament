@@ -321,6 +321,24 @@
             <div class="auc-pool" id="aucPool"></div>
           </div>
 
+          <!-- everything sold so far, with the team that bought them -->
+          <div class="panel">
+            <h2 class="panel-title">Sold Players <span class="count" id="aucSoldCount">0</span></h2>
+            <p class="panel-sub">Every player bought so far and the team that bought them. Updates live as the room calls each lot.</p>
+            <div class="auc-pool-bar">
+              <input type="search" id="aucSoldQ" placeholder="Search by Player ID, name or team…" />
+              <select id="aucSoldCat">
+                <option value="">All categories</option>
+                <option value="A">A · Advance</option>
+                <option value="B">B · Intermediate</option>
+                <option value="C">C · Beginner</option>
+              </select>
+              <select id="aucSoldTeam"><option value="">All teams</option></select>
+            </div>
+            <div class="auc-pool-tally" id="aucSoldTally"></div>
+            <div class="auc-pool" id="aucSold"></div>
+          </div>
+
         </div>
 
         </div>
