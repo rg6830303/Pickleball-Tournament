@@ -16,6 +16,8 @@
   let state = null;
   let bids = [];
   let lastPrice = null;
+  let cards = {};          // pool id -> card resolved against the registration
+  let openTeam = null;     // team id whose squad is expanded in League Purses
 
   /* ---------------- helpers ---------------- */
   const esc = (s) =>
@@ -143,12 +145,18 @@
   }
 
   async function refreshAll() {
-    const [t, l, s, b] = await Promise.all([
+    const [t, l, s, b, cd] = await Promise.all([
       sb.from("auction_teams").select("*").order("id"),
       sb.from("auction_pool").select("*"),
       sb.from("auction_state").select("*").eq("id", 1).maybeSingle(),
       sb.from("auction_bids").select("*").order("id", { ascending: false }).limit(12),
+      // resolved cards (pool joined to registrations) for photos everywhere
+      sb.rpc("auction_cards"),
     ]);
+    if (!cd.error && cd.data) {
+      cards = {};
+      cd.data.forEach((c) => (cards[c.id] = c));
+    }
 
     // Never fall back to an empty wallet: renderStage() reads purse_left to
     // decide whether the bid button is affordable, so silently keeping the
@@ -196,10 +204,25 @@
         .on("postgres_changes", { event: "*", schema: "public", table: "auction_pool" }, (p) => {
           if (p.eventType === "DELETE") {
             lots = lots.filter((x) => x.id !== p.old.id);
+            delete cards[p.old.id];
           } else {
             const i = lots.findIndex((x) => x.id === p.new.id);
             if (i > -1) lots[i] = p.new;
             else lots.push(p.new);
+            // Keep the cached card in step. Realtime only carries the pool row,
+            // so merge it over the card and keep the resolved photo/sex/DUPR.
+            if (cards[p.new.id]) {
+              Object.assign(cards[p.new.id], {
+                name: p.new.name,
+                category: p.new.category,
+                base_price: p.new.base_price,
+                status: p.new.status,
+                sold_to_team_id: p.new.sold_to_team_id,
+                sold_price: p.new.sold_price,
+              });
+            } else {
+              refreshCards();
+            }
             if (p.eventType === "UPDATE" && p.new.status === "sold") announceSale(p.new);
           }
           renderSquad();
@@ -355,8 +378,22 @@
   function renderCard(lot) {
     if (cardFor === lot.id) return;
     cardFor = lot.id;
-    paintCard(lot);          // show what we already have, immediately
-    fetchCard(lot);          // then upgrade with the registration join
+    paintCard(cards[lot.id] || lot);   // resolved card if we have it, else the raw row
+    if (!cards[lot.id]) fetchCard(lot); // only round-trip when we don't
+  }
+
+  // A player the cache has never seen (added to the pool mid-auction) needs
+  // the registration join, which realtime cannot give us.
+  let refreshingCards = false;
+  async function refreshCards() {
+    if (refreshingCards) return;
+    refreshingCards = true;
+    const { data, error } = await sb.rpc("auction_cards");
+    refreshingCards = false;
+    if (error || !data) return;
+    cards = {};
+    data.forEach((c) => (cards[c.id] = c));
+    renderAll();
   }
 
   async function fetchCard(lot) {
@@ -366,40 +403,112 @@
     if (c) paintCard(c);
   }
 
+  /* A squad row: photo, name, category, and the stats a captain compares on. */
+  function squadRow(l) {
+    const c = cards[l.id] || l;
+    const bits = [
+      c.dupr != null ? "DUPR " + Number(c.dupr).toFixed(3) : "Unrated",
+      c.age != null ? c.age + "y" : null,
+      c.sex || null,
+    ].filter(Boolean);
+    return `<div class="sq">
+      ${
+        c.photo_url
+          ? `<img src="${esc(c.photo_url)}" alt="" loading="lazy" />`
+          : `<span class="noimg">🥒</span>`
+      }
+      <div class="sq-main">
+        <div class="nm">${esc(c.name || "—")} <span class="cat-chip c-${esc(c.category)}">${esc(
+      c.category
+    )}</span></div>
+        <div class="meta">${esc(bits.join(" · "))}</div>
+      </div>
+      <span class="price">${money(l.sold_price)}</span>
+    </div>`;
+  }
+
   function renderSquad() {
     const squad = squadOf(myTeamId).sort((a, b) => (a.sold_at || "").localeCompare(b.sold_at || ""));
+    const t = myTeam();
     $("#squadCount").textContent = squad.length;
+
+    // category progress, so a captain can see at a glance what they still owe
+    const need = t ? { A: t.max_a, B: t.max_b, C: t.max_c } : { A: 1, B: 4, C: 4 };
+    const have = { A: 0, B: 0, C: 0 };
+    squad.forEach((l) => {
+      const cat = (cards[l.id] || l).category;
+      if (have[cat] != null) have[cat]++;
+    });
+    const quota = $("#squadQuota");
+    if (quota) {
+      quota.innerHTML = ["A", "B", "C"]
+        .map(
+          (k) =>
+            `<span class="qchip ${have[k] >= need[k] ? "full" : ""}"><b class="cat-chip c-${k}">${k}</b> ${
+              have[k]
+            }/${need[k]}</span>`
+        )
+        .join("");
+    }
+
     $("#squad").innerHTML = squad.length
-      ? squad
-          .map(
-            (l) => `<div class="sq">
-        ${l.photo_url ? `<img src="${esc(l.photo_url)}" alt="" loading="lazy" />` : `<span class="noimg">🥒</span>`}
-        <div>
-          <div class="nm">${esc(l.name)}</div>
-          <div class="meta">${l.dupr != null ? "DUPR " + Number(l.dupr).toFixed(3) : "Unrated"}${
-              l.jersey_size ? " · " + esc(l.jersey_size) : ""
-            }</div>
-        </div>
-        <span class="price">${money(l.sold_price)}</span>
-      </div>`
-          )
-          .join("")
+      ? squad.map(squadRow).join("")
       : `<p class="empty">No players yet — your squad will appear here the moment you win a bid.</p>`;
   }
 
   function renderTeams() {
     $("#teamsBody").innerHTML = teams
       .map((t) => {
-        const n = squadOf(t.id).length;
+        const roster = squadOf(t.id).sort((a, b) =>
+          (a.sold_at || "").localeCompare(b.sold_at || "")
+        );
         const leading = state && state.leading_team_id === t.id;
-        return `<tr class="${t.id === myTeamId ? "me" : ""} ${leading ? "lead" : ""}">
-          <td>${esc(t.name)}${leading ? " ●" : ""}</td>
-          <td>${n}/${t.max_squad}</td>
+        const isMe = t.id === myTeamId;
+        const open = openTeam === t.id;
+
+        const head = `<tr class="tm-row ${isMe ? "me" : ""} ${leading ? "lead" : ""} ${
+          open ? "open" : ""
+        }" data-team="${t.id}" tabindex="0" role="button" aria-expanded="${open}">
+          <td><span class="tm-caret">${open ? "▾" : "▸"}</span> ${esc(t.name)}${
+          leading ? " ●" : ""
+        }${isMe ? ` <span class="tm-you">you</span>` : ""}</td>
+          <td>${roster.length}/${t.max_squad}</td>
           <td class="num">${money(t.purse_left)}</td>
         </tr>`;
+
+        if (!open) return head;
+
+        const body = roster.length
+          ? roster.map(squadRow).join("")
+          : `<p class="empty">No players bought yet.</p>`;
+        return (
+          head +
+          `<tr class="tm-detail"><td colspan="3">
+             <div class="tm-squad">${body}</div>
+             <div class="tm-foot">Spent ${money(t.purse_spent)} of ${money(t.purse_total)}</div>
+           </td></tr>`
+        );
       })
       .join("");
   }
+
+  /* Tap any team to see who they have bought and what it cost. */
+  function toggleTeam(id) {
+    openTeam = openTeam === id ? null : id;
+    renderTeams();
+  }
+  document.addEventListener("click", (e) => {
+    const r = e.target.closest(".tm-row");
+    if (r) toggleTeam(Number(r.dataset.team));
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const r = e.target.closest && e.target.closest(".tm-row");
+    if (r) {
+      e.preventDefault();
+      toggleTeam(Number(r.dataset.team));
+    }
+  });
 
   function renderTicker() {
     const lotId = state && state.current_lot_id;

@@ -267,14 +267,13 @@ notify pgrst, 'reload schema';
 begin;
 
 -- ------------------------------------------------------------
--- 0) Clear the console's test sale so nothing carries into the new pool.
+-- 0) NOTHING is cleared here on purpose.
+--    This file is re-run by the console's install button and by CI, and
+--    an auction may be half-finished when that happens. Zeroing purses or
+--    deleting bids here would refund every team while leaving the players
+--    they already bought assigned to them. Use the console's Reset button
+--    (auction_reset()) when you actually want to start over.
 -- ------------------------------------------------------------
-update public.auction_state
-   set status = 'idle', current_lot_id = null, current_price = 0,
-       leading_team_id = null, updated_at = now()
- where id = 1;
-delete from public.auction_bids where id is not null;
-update public.auction_teams set purse_spent = 0 where purse_spent <> 0;
 
 -- ------------------------------------------------------------
 -- 1) Player Key on registrations (manual, typed by the organiser).
@@ -740,5 +739,43 @@ begin
     end;
   end loop;
 end $$;
+
+notify pgrst, 'reload schema';
+-- Resolved cards for the WHOLE pool in one call.
+--
+-- The per-player auction_player_card() is fine for the block, but the captain
+-- app also needs photos for its own squad and for every other team's squad;
+-- one round trip per player would be 144 of them. SECURITY DEFINER for the
+-- same reason as auction_player_card: it reads the staff-only registrations
+-- table but returns ONLY the three display fields a card needs — never a
+-- phone number, email address or payment screenshot.
+create or replace function public.auction_cards()
+returns table (
+  id uuid, sl_no int, player_key text, name text,
+  category text, category_label text, base_price numeric,
+  photo_url text, sex text, age int, dupr numeric,
+  has_registration boolean, status text,
+  sold_to_team_id int, sold_price numeric
+)
+language sql stable security definer set search_path = public
+as $$
+  select p.id, p.sl_no, p.player_key, p.name,
+         p.category, c.label, p.base_price,
+         coalesce(nullif(p.photo_url, ''), r.profile_pic_url),
+         coalesce(nullif(p.sex, ''), r.gender),
+         p.age,
+         coalesce(p.dupr, r.dupr),
+         (r.id is not null),
+         p.status, p.sold_to_team_id, p.sold_price
+    from public.auction_pool p
+    join public.auction_categories c on c.code = p.category
+    left join public.registrations r
+           on p.player_key is not null and p.player_key <> ''
+          and r.player_key = p.player_key
+   order by p.sl_no;
+$$;
+
+revoke all on function public.auction_cards() from public, anon;
+grant execute on function public.auction_cards() to authenticated;
 
 notify pgrst, 'reload schema';

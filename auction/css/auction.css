@@ -459,3 +459,46 @@ table.teams { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   .lot.pcard { grid-template-columns: 1fr; }
   .pcard .lot-photo, .pcard-photo { min-height: 260px; }
 }
+
+/* ---- squad quota chips ---- */
+.squad-quota { display: flex; gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; }
+.qchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  padding: 3px 10px; font-size: 12px; color: var(--text-dim);
+}
+.qchip.full { border-color: rgba(47,191,113,0.5); color: var(--ok); }
+
+/* ---- category chips ---- */
+.cat-chip {
+  display: inline-block; min-width: 17px; text-align: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 11px;
+  line-height: 1.5; padding: 0 5px; border-radius: 4px;
+  border: 1px solid var(--line-strong); color: var(--text-dim);
+}
+.cat-chip.c-A { color: var(--gold);  border-color: rgba(232,195,90,0.5); }
+.cat-chip.c-B { color: #9cc0ff;      border-color: rgba(156,192,255,0.5); }
+.cat-chip.c-C { color: var(--ok);    border-color: rgba(47,191,113,0.5); }
+
+.sq .sq-main { min-width: 0; }
+.sq .nm { display: flex; align-items: center; gap: 7px; }
+
+/* ---- expandable league purses ---- */
+.teams-scroll { max-height: 420px; overflow-y: auto; }
+.tm-row { cursor: pointer; }
+.tm-row:hover td { background: rgba(255,255,255,0.03); }
+.tm-row.open td { background: rgba(229,38,45,0.07); }
+.tm-caret { display: inline-block; width: 12px; color: var(--text-faint); }
+.tm-row.open .tm-caret { color: var(--red); }
+.tm-you {
+  font-size: 9.5px; letter-spacing: 0.16em; text-transform: uppercase;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  padding: 1px 6px; color: var(--text-faint); margin-left: 4px;
+}
+.tm-detail td { padding: 0 0 12px; background: rgba(0,0,0,0.25); }
+.tm-squad { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 4px; }
+.tm-squad .sq { background: rgba(255,255,255,0.02); }
+.tm-foot {
+  padding: 4px 14px 8px; font-size: 11.5px; color: var(--text-faint);
+  letter-spacing: 0.04em;
+}
