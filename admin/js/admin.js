@@ -915,11 +915,6 @@
     if (!aucReady) {
       aucReady = true;
       $("#aucIncrement").value = aState?.bid_increment ?? 500;
-      $("#aucPurseAll").value = aTeams[0]?.purse_total ?? 1000000;
-      $("#aucSquadAll").value = aTeams[0]?.max_squad ?? 9;
-      $("#aucMaxA").value = aTeams[0]?.max_a ?? 1;
-      $("#aucMaxB").value = aTeams[0]?.max_b ?? 4;
-      $("#aucMaxC").value = aTeams[0]?.max_c ?? 4;
       startAuctionRealtime();
     }
     renderAuction();
@@ -1063,7 +1058,9 @@
     const f = $("#aucPoolFilter").value;
     const list = aLots.filter((l) => {
       if (f && l.status !== f) return false;
-      if (q && !`${l.name} ${l.player_key || ""} ${l.category}`.toLowerCase().includes(q)) return false;
+      // Player ID and name only — searching the category matched 64 people at
+      // once and buried whoever the auctioneer was actually looking for.
+      if (q && !`${l.name} ${l.player_key || ""}`.toLowerCase().includes(q)) return false;
       return true;
     });
     $("#aucPoolCount").textContent = aLots.filter((l) => l.status === "pool").length;
@@ -1104,7 +1101,7 @@
   function renderAucTeams() {
     const q = ($("#aucTeamQ")?.value || "").trim().toLowerCase();
     const list = aTeams.filter(
-      (t) => !q || t.name.toLowerCase().includes(q) || (t.captain_name || "").toLowerCase().includes(q)
+      (t) => !q || t.name.toLowerCase().includes(q)
     );
     $("#aucTeamCount").textContent = aTeams.length;
 
@@ -1160,10 +1157,6 @@
           <div class="tc-bar"><i style="width:${pct}%"></i></div>
 
           <div class="tc-controls">
-            <label class="tc-ctl">
-              <span>Captain</span>
-              <input data-tf="captain_name" value="${esc(t.captain_name || "")}" placeholder="name" />
-            </label>
             <label class="tc-ctl">
               <span>Purse</span>
               <input type="number" data-tf="purse_total" value="${Number(t.purse_total)}" step="1000" />
@@ -1326,81 +1319,13 @@
     loadAuction();
   });
 
-  /* ---- call a player up by their Player Key ---- */
-  async function callByKey() {
-    const raw = ($("#aucKeyLookup").value || "").trim().toUpperCase();
-    const hint = $("#aucKeyHint");
-    hint.className = "auc-keyhint";
-    if (!raw) {
-      hint.textContent = "Type the Player Key printed on the player's card.";
-      return;
-    }
-    const hit = aLots.find((l) => (l.player_key || "").toUpperCase() === raw);
-    if (!hit) {
-      hint.classList.add("bad");
-      hint.textContent = `No pool player has the key “${raw}”. Set it on the Auction Pool tab.`;
-      return;
-    }
-    if (hit.status === "sold") {
-      hint.classList.add("bad");
-      const t = aTeams.find((x) => x.id === hit.sold_to_team_id);
-      hint.textContent = `${hit.name} is already sold to ${t ? t.name : "a team"}.`;
-      return;
-    }
-    const base = Number($("#aucBase").value) || null;
-    const { error } = await sb.rpc("auction_start_lot", { p_lot_id: hit.id, p_base: base });
-    if (error) {
-      hint.classList.add("bad");
-      hint.textContent = error.message;
-      return;
-    }
-    hint.classList.add("ok");
-    hint.textContent = `${hit.name} is on the block.`;
-    $("#aucKeyLookup").value = "";
-    loadAuction();
-  }
-  $("#btnAucKeyGo").addEventListener("click", callByKey);
-  $("#aucKeyLookup").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      callByKey();
-    }
-  });
-
-  $("#btnAucApply").addEventListener("click", async () => {
-    const btn = $("#btnAucApply");
-    const purse = Number($("#aucPurseAll").value);
-    const squad = Number($("#aucSquadAll").value);
+  /* ---- bid increment (the one auction-wide setting used mid-auction) ---- */
+  $("#btnAucIncSave").addEventListener("click", async () => {
     const inc = Number($("#aucIncrement").value);
-    const maxA = Number($("#aucMaxA").value);
-    const maxB = Number($("#aucMaxB").value);
-    const maxC = Number($("#aucMaxC").value);
-
-    // The per-category quotas are what the server actually enforces, so a
-    // squad size that disagrees with them would silently cap every team early.
-    if (maxA + maxB + maxC !== squad) {
-      return toast(
-        `Squad size ${squad} doesn't match the category quotas (${maxA}+${maxB}+${maxC}=${maxA + maxB + maxC}).`,
-        "err"
-      );
-    }
-    const overspent = aTeams.filter((t) => Number(t.purse_spent) > purse);
-    if (overspent.length) {
-      return toast(
-        `${overspent.length} team(s) have already spent more than ${aucMoney(purse)} — undo those sales first.`,
-        "err"
-      );
-    }
-
-    busy(btn, true);
-    const e1 = await sb
-      .from("auction_teams")
-      .update({ purse_total: purse, max_squad: squad, max_a: maxA, max_b: maxB, max_c: maxC })
-      .gte("id", 1);
-    const e2 = await sb.from("auction_state").update({ bid_increment: inc }).eq("id", 1);
-    busy(btn, false);
-    if (e1.error || e2.error) return toast((e1.error || e2.error).message, "err");
-    toast("Applied to all 16 teams", "ok");
+    if (!(inc > 0)) return toast("Bid increment must be greater than zero", "err");
+    const { error } = await sb.from("auction_state").update({ bid_increment: inc }).eq("id", 1);
+    if (error) return toast(error.message, "err");
+    toast(`Bid increment set to ${aucMoney(inc)}`, "ok");
     loadAuction();
   });
 
@@ -1416,32 +1341,13 @@
     )
   );
 
-  $("#btnAucCsv").addEventListener("click", () => {
-    const cols = ["sl_no", "player_key", "name", "category", "base_price", "status", "sold_price", "team"];
-    const cell = (v) => {
-      const s = String(v ?? "");
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const body = aLots.map((l) => {
-      const t = aTeams.find((x) => x.id === l.sold_to_team_id);
-      return cols
-        .map((c) => cell(c === "team" ? (t ? t.name : "") : l[c]))
-        .join(",");
-    });
-    const csv = [cols.join(","), ...body].join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = `mpl-auction-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-
   /* ============================================================
      AUCTION POOL — the curated player list the auction runs on.
      This is NOT the registration table: registrations stay open and
      are joined to a pool entry by the Player Key typed in by hand.
      ============================================================ */
   let pRows = [];
+  let pCards = {};           // pool id -> row resolved against its registration
   let pPhotoTarget = null;   // pool row id awaiting a file from #poolPhotoInput
 
   const POOL_COLS = [
@@ -1459,11 +1365,16 @@
   ];
 
   async function loadPool() {
-    const [p, c, t] = await Promise.all([
+    const [p, c, t, cd] = await Promise.all([
       sb.from("auction_pool").select("*").order("sl_no", { nullsFirst: false }),
       sb.from("auction_categories").select("*").order("sort_order"),
       sb.from("auction_teams").select("id,name").order("id"),
+      // the same rows resolved against registrations, so the grid can show
+      // what each player will actually get on their card
+      sb.rpc("auction_cards"),
     ]);
+    pCards = {};
+    if (!cd.error && cd.data) cd.data.forEach((x) => (pCards[x.id] = x));
     if (p.error) {
       $("#poolEmpty").hidden = false;
       $("#poolEmpty").textContent = /does not exist|schema cache/i.test(p.error.message || "")
@@ -1490,22 +1401,44 @@
 
   function poolCell(r, col) {
     const v = r[col.key];
+    const card = pCards[r.id];
+    // What the player card will show when this cell is left blank. The
+    // spreadsheet carries no sex/age/DUPR at all, so for most players these
+    // come from the registration the Player Key points at.
+    const inherited = card ? card[col.key] : null;
     const idf = `data-pid="${esc(r.id)}" data-pfield="${col.key}"`;
     switch (col.type) {
       case "ro":
         return `<span class="g-ro">${esc(v ?? "—")}</span>`;
-      case "number":
-        return `<input class="g-in g-num" type="number" step="${col.step}" min="0" value="${v ?? ""}" ${idf} />`;
-      case "select":
-        return `<select class="g-sel" ${idf}>${col.opts
-          .map((o) => `<option value="${esc(o)}" ${o === (v ?? "") ? "selected" : ""}>${esc(o || "—")}</option>`)
+      case "number": {
+        const ph = v == null && inherited != null ? ` placeholder="${esc(inherited)}" title="from the registration form"` : "";
+        const cls = v == null && inherited != null ? " g-inherit" : "";
+        return `<input class="g-in g-num${cls}" type="number" step="${col.step}" min="0" value="${v ?? ""}"${ph} ${idf} />`;
+      }
+      case "select": {
+        const cls = !v && inherited ? " g-inherit" : "";
+        return `<select class="g-sel${cls}" ${idf} ${
+          !v && inherited ? `title="${esc(inherited)} — from the registration form"` : ""
+        }>${col.opts
+          .map(
+            (o) =>
+              `<option value="${esc(o)}" ${o === (v ?? "") ? "selected" : ""}>${esc(
+                o || (inherited ? inherited + " ·" : "—")
+              )}</option>`
+          )
           .join("")}</select>`;
-      case "photo":
+      }
+      case "photo": {
+        const shown = v || inherited;
+        const own = !!v;
         return `${
-          v
-            ? `<img class="g-thumb" src="${esc(v)}" alt="" data-zoom="${esc(v)}" loading="lazy" />`
+          shown
+            ? `<img class="g-thumb${own ? "" : " g-inherit"}" src="${esc(shown)}" alt="" data-zoom="${esc(
+                shown
+              )}" loading="lazy" title="${own ? "uploaded here" : "from the registration form"}" />`
             : `<span class="g-ro">—</span>`
         }<button type="button" class="btn-mini pool-up" data-pphoto="${esc(r.id)}" title="Upload a photo for this player">⤒</button>`;
+      }
       case "badge":
         return `<span class="pool-badge s-${esc(v)}">${esc(v)}</span>`;
       case "sold": {
@@ -1557,10 +1490,20 @@
       const all = pRows.filter((r) => r.category === c);
       return stat(`${c} · ${catLabel(c)}`, `${all.filter((r) => String(r.name || "").trim()).length}/${all.length}`);
     });
+    // How many will actually have a full card. The spreadsheet has no photo,
+    // sex, age or DUPR — those only arrive via the Player Key link.
+    const res = Object.values(pCards);
+    const withPhoto = res.filter((c) => c.photo_url).length;
+    const withDupr = res.filter((c) => c.dupr != null).length;
+    const withAge = res.filter((c) => c.age != null).length;
+
     el.innerHTML =
       stat("Pool slots", pRows.length) +
       byCat.join("") +
       stat("Player Keys set", `${linked}/${pRows.length}`, linked < pRows.length ? "warn" : "") +
+      stat("With photo", `${withPhoto}/${pRows.length}`, withPhoto < pRows.length ? "warn" : "ok") +
+      stat("With DUPR", `${withDupr}/${pRows.length}`, withDupr < pRows.length ? "warn" : "ok") +
+      stat("With age", `${withAge}/${pRows.length}`, withAge < pRows.length ? "warn" : "ok") +
       stat("Slots needing a name", blank, blank ? "warn" : "");
   }
 
@@ -1696,6 +1639,28 @@
       }
     );
   });
+
+  /* ---- give every unambiguous name match a Player Key ---- */
+  $("#btnPoolAutolink") &&
+    $("#btnPoolAutolink").addEventListener("click", () => {
+      confirmDialog(
+        "Give a Player Key to every pool player whose name matches a registration exactly? " +
+          "Only unambiguous one-to-one matches are linked, and no existing key is changed. " +
+          "Linked players pick up their photo, sex and DUPR from the registration form.",
+        async () => {
+          const btn = $("#btnPoolAutolink");
+          btn.disabled = true;
+          const { data, error } = await sb.rpc("auction_pool_autolink");
+          btn.disabled = false;
+          if (error) return toast(error.message, "err");
+          await loadPool();
+          toast(
+            data ? `Linked ${data} player${data === 1 ? "" : "s"} to their registration` : "No new matches to link",
+            data ? "ok" : "info"
+          );
+        }
+      );
+    });
 
   $("#btnPoolCsv") &&
     $("#btnPoolCsv").addEventListener("click", () => {
@@ -1996,13 +1961,6 @@
     a.download = `mpl-team-logins-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
-  });
-
-  /* ---- legacy quick-create button (kept in Auction Setup) ---- */
-  $("#btnAucCreds").addEventListener("click", () => {
-    $("#aucLoginKey").scrollIntoView({ behavior: "smooth", block: "center" });
-    $("#aucLoginKey").focus();
-    toast("Manage every captain login in the Team Logins panel below", "info");
   });
 
   window.addEventListener("DOMContentLoaded", boot);

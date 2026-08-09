@@ -1373,3 +1373,13 @@ table.login-table { min-width: 620px; }
 .pool-badge.s-unsold { color: var(--warn); border-color: rgba(232, 195, 90, 0.5); }
 .grid tr.is-sold { opacity: 0.72; }
 .btn-mini.pool-up { margin-left: 6px; padding: 2px 8px; line-height: 1.4; }
+
+/* Values inherited from the linked registration rather than typed into the
+   pool: shown greyed so it is obvious they are not overrides. */
+.g-in.g-inherit::placeholder { color: var(--info); opacity: 0.75; font-style: italic; }
+select.g-sel.g-inherit { color: var(--text-faint); font-style: italic; }
+img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-offset: 1px; }
+
+.auc-inc { margin-top: 12px; }
+.auc-inc-row { display: flex; gap: 8px; align-items: center; }
+.auc-inc-row input { flex: 1; min-width: 0; }

@@ -1106,6 +1106,197 @@ grant execute on function public.auction_cards() to authenticated;
 
 notify pgrst, 'reload schema';
 
+-- ============================================================
+-- MAX BID (reserve formula) + auto-linking the pool to registrations
+-- ============================================================
+begin;
+
+-- ------------------------------------------------------------
+-- Max bid a team may commit to one player of a given category.
+--
+--   R = purse remaining
+--   a,b,c = slots still unfilled per category, INCLUDING the one being
+--           bid for
+--   F = a*baseA + b*baseB + c*baseC   (reserve for every unfilled slot)
+--   max on category X = R - F + base(X)
+--
+-- i.e. keep back enough to buy every other missing player at their base
+-- price, and spend the rest on this one. Base prices come from
+-- auction_categories, so changing a base price re-prices the reserve too.
+-- ------------------------------------------------------------
+create or replace function public.auction_max_bid(p_team int, p_cat text)
+returns numeric
+language sql stable security definer set search_path = public
+as $$
+  with t as (
+    select id, purse_left, max_a, max_b, max_c
+      from public.auction_teams where id = p_team
+  ),
+  slots as (
+    select c.code,
+           c.base_price,
+           greatest(
+             case c.code when 'A' then t.max_a when 'B' then t.max_b else t.max_c end
+             - (select count(*) from public.auction_pool p
+                 where p.sold_to_team_id = t.id and p.status = 'sold'
+                   and p.category = c.code), 0) as unfilled
+      from public.auction_categories c cross join t
+  )
+  select greatest(
+           (select purse_left from t)
+           - (select coalesce(sum(unfilled * base_price), 0) from slots)
+           + coalesce((select base_price from public.auction_categories where code = p_cat), 0),
+         0)
+   where exists (select 1 from t);
+$$;
+
+-- ------------------------------------------------------------
+-- Bidding honours the reserve, so a team can never spend itself out of a
+-- legal squad. Staff keep a manual override on auction_sell.
+-- ------------------------------------------------------------
+create or replace function public.auction_bid(p_team_id int default null, p_amount numeric default null)
+returns numeric
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_team int; v_state public.auction_state%rowtype;
+  v_amount numeric; v_min numeric; v_lotbase numeric; v_cat text; v_catlabel text;
+  v_left numeric; v_squad int; v_max int; v_ccount int; v_cmax int; v_maxbid numeric;
+begin
+  v_team := coalesce(public.my_auction_team(), case when public.is_auction_staff() then p_team_id end);
+  if v_team is null then raise exception 'No team is linked to this login'; end if;
+  if public.my_auction_team() is not null
+     and p_team_id is not null and p_team_id <> v_team then
+    raise exception 'You can only bid for your own team';
+  end if;
+
+  select * into v_state from public.auction_state where id = 1 for update;
+  if v_state.status <> 'live' or v_state.current_lot_id is null then
+    raise exception 'No player is on the block right now';
+  end if;
+  if v_state.leading_team_id = v_team then
+    raise exception 'Your team is already the highest bidder';
+  end if;
+
+  select p.base_price, p.category, c.label into v_lotbase, v_cat, v_catlabel
+    from public.auction_pool p
+    join public.auction_categories c on c.code = p.category
+   where p.id = v_state.current_lot_id;
+
+  v_min := case when v_state.leading_team_id is null
+                then greatest(v_state.current_price, coalesce(v_lotbase, 0))
+                else v_state.current_price + v_state.bid_increment end;
+  v_amount := coalesce(p_amount, v_min);
+  if v_amount < v_min then
+    raise exception 'Bid must be at least %', v_min;
+  end if;
+
+  select purse_left, max_squad into v_left, v_max
+    from public.auction_teams where id = v_team for update;
+  if v_left is null then raise exception 'Team not found'; end if;
+  if v_amount > v_left then
+    raise exception 'Not enough purse left (wallet %, bid %)', v_left, v_amount;
+  end if;
+
+  select count(*) into v_squad from public.auction_pool
+   where sold_to_team_id = v_team and status = 'sold';
+  if v_squad >= v_max then
+    raise exception 'Squad is already full (% players)', v_max;
+  end if;
+
+  v_ccount := public.auction_team_cat_count(v_team, v_cat);
+  v_cmax   := public.auction_team_cat_max(v_team, v_cat);
+  if v_ccount >= v_cmax then
+    raise exception 'Your % quota is full (% of % players in category %)',
+      v_catlabel, v_ccount, v_cmax, v_cat;
+  end if;
+
+  v_maxbid := public.auction_max_bid(v_team, v_cat);
+  if v_amount > v_maxbid then
+    raise exception 'Your maximum bid is % — the rest of your purse is reserved to fill your remaining squad slots at their base price', v_maxbid;
+  end if;
+
+  insert into public.auction_bids (lot_id, team_id, amount)
+  values (v_state.current_lot_id, v_team, v_amount);
+
+  update public.auction_state
+     set current_price = v_amount, leading_team_id = v_team, updated_at = now()
+   where id = 1;
+
+  return v_amount;
+end $$;
+
+-- ------------------------------------------------------------
+-- Bootstrap the Player Keys.
+--
+-- The spreadsheet has no photo, sex, age or DUPR — every one of those
+-- cells reads "Fetch From Registration" — so a pool entry only gets those
+-- details once it is joined to a registration. Typing 144 keys by hand is
+-- the slow way; this links the ones whose names match exactly.
+--
+-- Deliberately conservative: only where exactly ONE registration matches
+-- exactly ONE pool entry. Ambiguous names are left alone for the organiser
+-- to resolve by hand, and an existing key is never overwritten.
+-- ------------------------------------------------------------
+create or replace function public.auction_pool_autolink()
+returns int
+language plpgsql security definer set search_path = public
+as $$
+declare v_linked int;
+begin
+  if not public.is_auction_staff() then
+    raise exception 'Only tournament staff can link the pool';
+  end if;
+
+  with pn as (
+    select id, sl_no, category,
+           lower(regexp_replace(trim(name), '\s+', ' ', 'g')) as k
+      from public.auction_pool
+     where trim(name) <> '' and (player_key is null or player_key = '')
+  ),
+  rn as (
+    select id, lower(regexp_replace(trim(full_name), '\s+', ' ', 'g')) as k
+      from public.registrations
+     where player_key is null or player_key = ''
+  ),
+  uniq as (
+    select p.id as pool_id, r.id as reg_id,
+           'MPL-' || p.category || '-' || lpad(p.sl_no::text, 3, '0') as key
+      from pn p join rn r on r.k = p.k
+     where (select count(*) from rn r2 where r2.k = p.k) = 1
+       and (select count(*) from pn p2 where p2.k = p.k) = 1
+  ),
+  up_pool as (
+    update public.auction_pool p set player_key = u.key
+      from uniq u where p.id = u.pool_id
+    returning 1
+  ),
+  up_reg as (
+    update public.registrations r set player_key = u.key
+      from uniq u where r.id = u.reg_id
+    returning 1
+  )
+  select count(*) into v_linked from up_pool;
+
+  return v_linked;
+end $$;
+
+commit;
+
+do $$
+declare fn text;
+begin
+  foreach fn in array array[
+    'public.auction_max_bid(int, text)',
+    'public.auction_pool_autolink()'
+  ] loop
+    execute format('revoke all on function %s from public, anon', fn);
+    execute format('grant execute on function %s to authenticated', fn);
+  end loop;
+end $$;
+
+notify pgrst, 'reload schema';
+
 
 -- ############################################################
 -- ### create-admin.sql

@@ -164,7 +164,7 @@
     <!-- ---------- TAB: AUCTION POOL ---------- -->
     <section class="tabpane" id="tab-pool" hidden>
       <section class="toolbar">
-        <input type="search" id="poolQ" class="search" placeholder="Filter the pool — name, key, category…" />
+        <input type="search" id="poolQ" class="search" placeholder="Search by Player ID or name…" />
         <div class="toolbar-right">
           <span class="hint" id="poolHint">Click any cell to edit · saves instantly</span>
           <select id="poolCatFilter" class="mini-select">
@@ -173,6 +173,7 @@
             <option value="B">B · Intermediate</option>
             <option value="C">C · Beginner</option>
           </select>
+          <button class="btn-ghost" id="btnPoolAutolink" type="button" title="Give a Player Key to every pool player whose name matches a registration exactly">🔗 Auto-link by name</button>
           <button class="btn-ghost" id="btnPoolCsv" type="button">⬇ Download CSV</button>
           <button class="btn-primary" id="btnPoolAdd" type="button">+ Add player</button>
         </div>
@@ -269,6 +270,13 @@
               <button class="btn-mini" id="btnAucUnsold" type="button">Mark unsold</button>
               <button class="btn-mini ghost" id="btnAucClear" type="button">Clear block</button>
             </div>
+            <div class="field auc-inc">
+              <label for="aucIncrement">Bid increment</label>
+              <div class="auc-inc-row">
+                <input type="number" id="aucIncrement" min="1" step="100" />
+                <button class="btn-mini" id="btnAucIncSave" type="button">Set</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -278,7 +286,7 @@
             <h2 class="panel-title">Player Pool <span class="count" id="aucPoolCount">0</span></h2>
             <p class="panel-sub">Put players on the block one by one. Sold players move to their team automatically.</p>
             <div class="auc-pool-bar">
-              <input type="search" id="aucPoolQ" placeholder="Search players…" />
+              <input type="search" id="aucPoolQ" placeholder="Search by Player ID or name…" />
               <select id="aucPoolFilter">
                 <option value="pool">In pool</option>
                 <option value="unsold">Unsold</option>
@@ -290,59 +298,7 @@
             <div class="auc-pool" id="aucPool"></div>
           </div>
 
-          <!-- auction setup -->
-          <div class="panel">
-            <h2 class="panel-title">Auction Setup</h2>
-            <p class="panel-sub">
-              Call a player up by their Player Key, set the bid step and purse, and create the 16 captain logins.
-              The pool itself is edited on the <b>Auction Pool</b> tab.
-            </p>
-            <div class="auc-setup-row">
-              <div class="field" style="margin:0;flex:1">
-                <label for="aucKeyLookup">Call player by Player Key</label>
-                <input type="search" id="aucKeyLookup" placeholder="e.g. MPL-014" autocomplete="off" />
-              </div>
-              <button class="btn-mini" id="btnAucKeyGo" type="button">→ On the block</button>
-            </div>
-            <p class="auc-keyhint" id="aucKeyHint"></p>
-            <div class="auc-setup-row" style="margin-top:14px">
-              <div class="field" style="margin:0">
-                <label for="aucIncrement">Bid increment</label>
-                <input type="number" id="aucIncrement" min="1" step="100" />
-              </div>
-              <div class="field" style="margin:0">
-                <label for="aucPurseAll">Purse for every team</label>
-                <input type="number" id="aucPurseAll" min="0" step="1000" />
-              </div>
-              <div class="field" style="margin:0">
-                <label for="aucSquadAll">Max squad size</label>
-                <input type="number" id="aucSquadAll" min="1" step="1" />
-              </div>
-            </div>
-            <div class="auc-setup-row" style="margin-top:12px">
-              <div class="field" style="margin:0">
-                <label for="aucMaxA">A · Advance per team</label>
-                <input type="number" id="aucMaxA" min="0" step="1" />
-              </div>
-              <div class="field" style="margin:0">
-                <label for="aucMaxB">B · Intermediate per team</label>
-                <input type="number" id="aucMaxB" min="0" step="1" />
-              </div>
-              <div class="field" style="margin:0">
-                <label for="aucMaxC">C · Beginner per team</label>
-                <input type="number" id="aucMaxC" min="0" step="1" />
-              </div>
-            </div>
-            <div class="auc-setup-row" style="margin-top:12px">
-              <button class="btn-primary sm" id="btnAucApply" type="button">
-                <span class="spin" aria-hidden="true"></span><span class="btn-label">Apply to all teams</span>
-              </button>
-              <button class="btn-mini" id="btnAucCreds" type="button">🔑 Create 16 team logins</button>
-              <button class="btn-mini" id="btnAucCsv" type="button">⬇ Auction CSV</button>
-            </div>
-
-            <!-- captain logins are managed in the Team Logins panel below -->
-          </div>
+        </div>
 
         </div>
 

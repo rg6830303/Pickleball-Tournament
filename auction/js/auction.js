@@ -17,6 +17,9 @@
   let bids = [];
   let lastPrice = null;
   let cards = {};          // pool id -> card resolved against the registration
+  // Base price per category, refreshed from auction_categories. The reserve
+  // in the max-bid formula is priced off these.
+  let BASE = { A: 50000, B: 30000, C: 20000 };
   let openTeam = null;     // team id whose squad is expanded in League Purses
 
   /* ---------------- helpers ---------------- */
@@ -145,17 +148,21 @@
   }
 
   async function refreshAll() {
-    const [t, l, s, b, cd] = await Promise.all([
+    const [t, l, s, b, cd, cat] = await Promise.all([
       sb.from("auction_teams").select("*").order("id"),
       sb.from("auction_pool").select("*"),
       sb.from("auction_state").select("*").eq("id", 1).maybeSingle(),
       sb.from("auction_bids").select("*").order("id", { ascending: false }).limit(12),
       // resolved cards (pool joined to registrations) for photos everywhere
       sb.rpc("auction_cards"),
+      sb.from("auction_categories").select("code,base_price"),
     ]);
     if (!cd.error && cd.data) {
       cards = {};
       cd.data.forEach((c) => (cards[c.id] = c));
+    }
+    if (!cat.error && cat.data) {
+      cat.data.forEach((c) => (BASE[c.code] = Number(c.base_price)));
     }
 
     // Never fall back to an empty wallet: renderStage() reads purse_left to
@@ -274,6 +281,32 @@
     return lots.filter((l) => l.sold_to_team_id === id && l.status === "sold");
   }
 
+  /* Slots this team still has to fill, per category. */
+  function unfilled(t) {
+    const have = { A: 0, B: 0, C: 0 };
+    squadOf(t.id).forEach((l) => {
+      const cat = (cards[l.id] || l).category;
+      if (have[cat] != null) have[cat]++;
+    });
+    return {
+      A: Math.max((t.max_a ?? 1) - have.A, 0),
+      B: Math.max((t.max_b ?? 4) - have.B, 0),
+      C: Math.max((t.max_c ?? 4) - have.C, 0),
+    };
+  }
+
+  /* The most this team may commit to one player of category `cat`.
+       R = purse remaining
+       F = reserve for EVERY unfilled slot at its base price
+       max = R − F + base(cat)
+     i.e. hold back enough to still buy the rest of the squad at base. */
+  function maxBidFor(t, cat) {
+    if (!t) return 0;
+    const u = unfilled(t);
+    const F = u.A * BASE.A + u.B * BASE.B + u.C * BASE.C;
+    return Math.max(Number(t.purse_left) - F + (BASE[cat] || 0), 0);
+  }
+
   function renderWallet() {
     const t = myTeam();
     if (!t) return;
@@ -287,8 +320,38 @@
     $("#wSquad").textContent = `${squad.length} / ${t.max_squad}`;
     $("#wBar").style.width = Math.max(0, Math.min(100, (left / total) * 100)) + "%";
 
-    // keep enough purse to fill remaining slots at the minimum base price
-    $("#wMaxBid").textContent = slotsLeft > 0 ? money(left) : "Squad full";
+    // Max bid is per category, so show it for whoever is on the block; with
+    // nobody up, show the best case across the categories still open.
+    const lot = state && state.current_lot_id ? lots.find((l) => l.id === state.current_lot_id) : null;
+    const cat = lot ? (cards[lot.id] || lot).category : null;
+    const u = unfilled(t);
+    const label = $("#wMaxBidLabel");
+
+    const note = $("#wMaxBidNote");
+    const reserve = u.A * BASE.A + u.B * BASE.B + u.C * BASE.C;
+
+    if (!slotsLeft) {
+      $("#wMaxBid").textContent = "Squad full";
+      if (label) label.textContent = "Max bid possible";
+      if (note) note.textContent = "";
+    } else if (cat) {
+      $("#wMaxBid").textContent = u[cat] > 0 ? money(maxBidFor(t, cat)) : `No ${cat} slot left`;
+      if (label) label.textContent = `Max bid · category ${cat}`;
+      if (note) {
+        note.textContent =
+          u[cat] > 0
+            ? `keeps ${money(reserve - BASE[cat])} for your other ${u.A + u.B + u.C - 1} slot${
+                u.A + u.B + u.C - 1 === 1 ? "" : "s"
+              }`
+            : `your ${cat} quota is already full`;
+      }
+    } else {
+      const open = ["A", "B", "C"].filter((k) => u[k] > 0);
+      const best = open.length ? Math.max(...open.map((k) => maxBidFor(t, k))) : 0;
+      $("#wMaxBid").textContent = money(best);
+      if (label) label.textContent = "Max bid possible";
+      if (note) note.textContent = `${u.A}A · ${u.B}B · ${u.C}C still to buy`;
+    }
   }
 
   function renderStage() {
