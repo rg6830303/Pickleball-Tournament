@@ -1933,112 +1933,196 @@ body > *:not(.mn-page-rain) { position: relative; z-index: 1; }
 
 
 /* ============================================================
-   STORM — cloud bank, lightning, thunder rumble
-   Restrained on purpose: this runs for hours behind a live auction on a
-   projector, so the flash peaks low and fires irregularly rather than on a
-   metronome. Everything sits behind the content, lighting the room rather
-   than washing out the card.
+   STORM — high definition
+   Clouds are fractal-noise texture masked into banks, not soft blobs.
+   Lightning draws an actual forked bolt and lights the cloud base from
+   behind. Rain has three depth planes plus spray and splash.
+   Everything sits behind the content and pauses when the tab is hidden.
    ============================================================ */
 
 /* ---------- cloud bank ---------- */
 .mn-clouds {
-  position: absolute; left: -12%; right: -12%; top: -8%;
-  height: 62%;
+  position: absolute; left: -14%; right: -14%; top: -10%;
+  height: 66%;
   pointer-events: none;
   overflow: hidden;
 }
 .mn-clouds i {
   position: absolute;
   display: block;
-  border-radius: 50%;
-  filter: blur(42px);
-  opacity: .55;
   will-change: transform;
+  /* fractal noise gives real billow and wisp; a blurred radial cannot */
+  background-image:
+    url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='900' height='500'>\
+<filter id='n' x='0' y='0' width='100%25' height='100%25'>\
+<feTurbulence type='fractalNoise' baseFrequency='0.0055 0.014' numOctaves='5' seed='11' stitchTiles='stitch'/>\
+<feColorMatrix type='matrix' values='0 0 0 0 0.62 0 0 0 0 0.67 0 0 0 0 0.82 0 0 0 -1.6 1.05'/>\
+</filter>\
+<rect width='900' height='500' filter='url(%23n)'/></svg>");
+  background-size: cover;
+  background-repeat: repeat-x;
+  /* fade the noise into nothing at the edges so it reads as a bank, not a box */
+  -webkit-mask-image: radial-gradient(72% 76% at 50% 34%, #000 30%, rgba(0,0,0,.55) 62%, transparent 88%);
+  mask-image: radial-gradient(72% 76% at 50% 34%, #000 30%, rgba(0,0,0,.55) 62%, transparent 88%);
 }
-/* three overlapping banks at different depths and speeds */
 .mn-clouds i:nth-child(1) {
-  left: -18%; top: -22%; width: 78%; height: 128%;
-  background: radial-gradient(58% 54% at 50% 52%,
-    rgba(86, 96, 128, .58), rgba(38, 42, 60, .34) 58%, rgba(10, 10, 16, 0) 78%);
-  animation: mnCloudA 96s ease-in-out infinite alternate;
+  left: -16%; top: -26%; width: 86%; height: 132%;
+  opacity: .5;
+  filter: blur(14px) contrast(1.25);
+  animation: mnCloudA 112s ease-in-out infinite alternate;
 }
 .mn-clouds i:nth-child(2) {
-  left: 26%; top: -34%; width: 92%; height: 142%;
-  background: radial-gradient(56% 52% at 50% 50%,
-    rgba(64, 72, 100, .52), rgba(28, 30, 46, .3) 60%, rgba(10, 10, 16, 0) 80%);
-  animation: mnCloudB 132s ease-in-out infinite alternate;
-  opacity: .46;
+  left: 24%; top: -36%; width: 96%; height: 146%;
+  opacity: .38;
+  filter: blur(22px) contrast(1.1);
+  animation: mnCloudB 158s ease-in-out infinite alternate;
 }
 .mn-clouds i:nth-child(3) {
-  left: -6%; top: -12%; width: 120%; height: 108%;
-  background: radial-gradient(60% 48% at 42% 46%,
-    rgba(112, 96, 116, .3), rgba(44, 32, 44, .2) 56%, rgba(10, 10, 16, 0) 80%);
-  animation: mnCloudC 168s linear infinite;
-  opacity: .34;
-  filter: blur(58px);
+  left: -8%; top: -14%; width: 124%; height: 112%;
+  opacity: .26;
+  filter: blur(34px);
+  animation: mnCloudC 196s linear infinite;
 }
 @keyframes mnCloudA {
   from { transform: translate3d(-4%, 0, 0) scale(1) }
-  to   { transform: translate3d(9%, 2%, 0) scale(1.09) }
+  to   { transform: translate3d(9%, 2%, 0) scale(1.08) }
 }
 @keyframes mnCloudB {
-  from { transform: translate3d(6%, 1%, 0) scale(1.05) }
-  to   { transform: translate3d(-8%, -2%, 0) scale(1) }
+  from { transform: translate3d(6%, 1%, 0) scale(1.06) }
+  to   { transform: translate3d(-9%, -2%, 0) scale(1) }
 }
 @keyframes mnCloudC {
-  from { transform: translate3d(-14%, 0, 0) }
-  to   { transform: translate3d(14%, 0, 0) }
+  from { transform: translate3d(-15%, 0, 0) }
+  to   { transform: translate3d(15%, 0, 0) }
 }
+
+/* the base of the cloud lights up from behind when a bolt fires */
+.mn-cloudlight {
+  position: absolute; left: 0; right: 0; top: -6%;
+  height: 58%;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(46% 62% at var(--fx, 40%) 8%,
+    rgba(206, 226, 255, .85), rgba(150, 178, 230, .35) 44%, rgba(120, 145, 200, 0) 74%);
+  mix-blend-mode: screen;
+  filter: blur(18px);
+}
+.mn-page-rain.is-strike .mn-cloudlight,
+.mn-weather.is-strike .mn-cloudlight { animation: mnStrike 1.25s ease-out; }
+.mn-page-rain.is-sheet .mn-cloudlight,
+.mn-weather.is-sheet .mn-cloudlight { animation: mnSheet 2.1s ease-in-out; }
 
 /* the bank shudders when thunder rolls */
 .mn-page-rain.is-thunder .mn-clouds,
-.mn-weather.is-thunder .mn-clouds { animation: mnRumble 1.5s ease-out; }
+.mn-weather.is-thunder .mn-clouds { animation: mnRumble 1.6s ease-out; }
 @keyframes mnRumble {
   0%   { transform: translate3d(0, 0, 0) }
-  14%  { transform: translate3d(0, 3px, 0) }
-  28%  { transform: translate3d(0, -2px, 0) }
-  46%  { transform: translate3d(0, 2px, 0) }
-  70%  { transform: translate3d(0, -1px, 0) }
+  12%  { transform: translate3d(1px, 3px, 0) }
+  26%  { transform: translate3d(-1px, -2px, 0) }
+  44%  { transform: translate3d(1px, 2px, 0) }
+  68%  { transform: translate3d(0, -1px, 0) }
   100% { transform: translate3d(0, 0, 0) }
 }
 
-/* ---------- lightning ---------- */
+/* ---------- the bolt ---------- */
+.mn-bolt {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  opacity: 0;
+}
+.mn-bolt path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.mn-bolt .core  { stroke: #FFFFFF; stroke-width: 2.1; }
+.mn-bolt .halo  { stroke: rgba(198, 220, 255, .75); stroke-width: 7; filter: blur(4px); }
+.mn-bolt .glow  { stroke: rgba(150, 185, 255, .45); stroke-width: 18; filter: blur(13px); }
+.mn-bolt .fork  { stroke: #EAF2FF; stroke-width: 1.2; opacity: .85; }
+.mn-bolt.is-live { animation: mnBolt 900ms cubic-bezier(.2,.7,.25,1) forwards; }
+@keyframes mnBolt {
+  0%   { opacity: 0 }
+  4%   { opacity: 1 }
+  10%  { opacity: .15 }
+  15%  { opacity: .95 }
+  24%  { opacity: .1 }
+  32%  { opacity: .6 }
+  48%  { opacity: .05 }
+  60%  { opacity: .28 }
+  100% { opacity: 0 }
+}
+
+/* ---------- the sky flash ---------- */
 .mn-flash {
   position: absolute; inset: 0;
   pointer-events: none;
   opacity: 0;
   background:
-    radial-gradient(58% 42% at var(--fx, 40%) -8%,
-      rgba(214, 230, 255, .95), rgba(150, 176, 226, .42) 42%, rgba(120, 145, 200, 0) 72%),
-    linear-gradient(to bottom, rgba(190, 212, 255, .5), rgba(120, 140, 190, 0) 58%);
+    radial-gradient(56% 40% at var(--fx, 40%) -6%,
+      rgba(216, 232, 255, .95), rgba(150, 176, 226, .4) 44%, rgba(120, 145, 200, 0) 74%),
+    linear-gradient(to bottom, rgba(190, 212, 255, .45), rgba(120, 140, 190, 0) 56%);
   mix-blend-mode: screen;
 }
-/* Real lightning stutters — a strike, a gap, then a weaker return stroke.
-   Peaks are deliberately low: this is lighting a room, not blinding it. */
 .mn-page-rain.is-strike .mn-flash,
 .mn-weather.is-strike .mn-flash { animation: mnStrike 1.25s ease-out; }
-@keyframes mnStrike {
-  0%   { opacity: 0 }
-  3%   { opacity: .34 }
-  6%   { opacity: .06 }
-  10%  { opacity: .30 }
-  16%  { opacity: .04 }
-  22%  { opacity: .17 }
-  34%  { opacity: .02 }
-  46%  { opacity: .12 }
-  100% { opacity: 0 }
-}
-
-/* a far-off sheet flash: no stutter, softer, no rumble */
 .mn-page-rain.is-sheet .mn-flash,
 .mn-weather.is-sheet .mn-flash { animation: mnSheet 2.1s ease-in-out; }
+
+/* Real lightning stutters. Peaks stay low: this lights a room for hours
+   behind a live auction, it does not blind it. */
+@keyframes mnStrike {
+  0%   { opacity: 0 }
+  3%   { opacity: .36 }
+  6%   { opacity: .06 }
+  10%  { opacity: .32 }
+  16%  { opacity: .04 }
+  22%  { opacity: .18 }
+  34%  { opacity: .02 }
+  46%  { opacity: .13 }
+  100% { opacity: 0 }
+}
 @keyframes mnSheet {
   0%   { opacity: 0 }
-  22%  { opacity: .10 }
+  22%  { opacity: .11 }
   55%  { opacity: .05 }
   100% { opacity: 0 }
 }
 
+/* ---------- spray and splash ---------- */
+.mn-spray {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 26%;
+  pointer-events: none;
+  opacity: .5;
+  background: linear-gradient(to top, rgba(178, 198, 232, .16), rgba(178, 198, 232, 0) 72%);
+  filter: blur(7px);
+  animation: mnSpray 7s ease-in-out infinite alternate;
+}
+@keyframes mnSpray {
+  from { opacity: .34; transform: translate3d(0, 3px, 0) }
+  to   { opacity: .6;  transform: translate3d(0, -2px, 0) }
+}
+.mn-splash { position: absolute; left: 0; right: 0; bottom: 0; height: 16%; pointer-events: none; overflow: hidden; }
+.mn-splash i {
+  position: absolute;
+  bottom: var(--b, 20%);
+  left: var(--x, 50%);
+  width: 12px; height: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(196, 214, 248, .5);
+  border-top-color: transparent;
+  opacity: 0;
+  animation: mnSplash var(--dur, 2.4s) linear var(--delay, 0s) infinite;
+}
+@keyframes mnSplash {
+  0%   { opacity: 0; transform: scale(.25) }
+  8%   { opacity: .7 }
+  100% { opacity: 0; transform: scale(1.9) }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .mn-clouds, .mn-flash { display: none; }
+  .mn-clouds, .mn-flash, .mn-bolt, .mn-cloudlight, .mn-spray, .mn-splash { display: none; }
 }

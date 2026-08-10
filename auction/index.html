@@ -10,14 +10,18 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/auction.css?v=202608100215" />
+  <link rel="stylesheet" href="css/auction.css?v=202608100430" />
 </head>
 <body>
 
   <!-- monsoon: page-wide rainfall, behind every screen -->
   <div class="mn-page-rain" aria-hidden="true">
     <div class="mn-clouds"><i></i><i></i><i></i></div>
-    <div class="mn-drops" data-drops="130"></div>
+    <div class="mn-cloudlight"></div>
+    <svg class="mn-bolt" viewBox="0 0 1000 700" preserveAspectRatio="none"></svg>
+    <div class="mn-drops" data-drops="150"></div>
+    <div class="mn-spray"></div>
+    <div class="mn-splash" data-splash="26"></div>
     <div class="mn-flash"></div>
   </div>
 
@@ -97,7 +101,11 @@
       <div class="mn-weather" aria-hidden="true">
         <div class="mn-mist"></div>
         <div class="mn-clouds"><i></i><i></i></div>
-        <div class="mn-drops" data-drops="90"></div>
+        <div class="mn-cloudlight"></div>
+        <svg class="mn-bolt" viewBox="0 0 1000 700" preserveAspectRatio="none"></svg>
+        <div class="mn-drops" data-drops="100"></div>
+        <div class="mn-spray"></div>
+        <div class="mn-splash" data-splash="18"></div>
         <div class="mn-flash"></div>
         <div class="mn-floor"></div>
       </div>
@@ -196,7 +204,7 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
   <script src="js/vendor/supabase.js" defer></script>
-  <script src="js/config.js?v=202608100215"></script>
-  <script src="js/auction.js?v=202608100215" defer></script>
+  <script src="js/config.js?v=202608100430"></script>
+  <script src="js/auction.js?v=202608100430" defer></script>
 </body>
 </html>

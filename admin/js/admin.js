@@ -2416,7 +2416,7 @@
       box.innerHTML = html;
     });
   }
-  window.addEventListener('DOMContentLoaded', () => seedRain());
+  window.addEventListener('DOMContentLoaded', () => { seedRain(); seedSplash(); });
 
   /* ---- storm ----
      Lightning on a fixed interval reads as a broken monitor, so strikes fire
@@ -2429,25 +2429,103 @@
     return [].slice.call(document.querySelectorAll('.mn-page-rain, .mn-weather'));
   }
 
+  /* ---- splashes on the floor ---- */
+  function seedSplash(root) {
+    (root || document).querySelectorAll('[data-splash]').forEach(function (box) {
+      if (box.dataset.seeded) return;
+      box.dataset.seeded = '1';
+      var n = Number(box.dataset.splash) || 20;
+      var html = '';
+      for (var i = 0; i < n; i++) {
+        html += '<i style="--x:' + (Math.random() * 100).toFixed(1) + '%;' +
+                '--b:' + (Math.random() * 70).toFixed(0) + '%;' +
+                '--dur:' + (1.6 + Math.random() * 1.8).toFixed(2) + 's;' +
+                '--delay:' + (Math.random() * -3).toFixed(2) + 's"></i>';
+      }
+      box.innerHTML = html;
+    });
+  }
+
+  /* ---- bolt geometry ----
+     A real bolt is a jagged descent that loses energy as it goes, throwing
+     off a few short forks. Drawn as one path per stroke weight so the core,
+     halo and glow all follow exactly the same line. */
+  function boltPath(startX) {
+    var x = startX, y = 0;
+    var d = 'M' + x.toFixed(1) + ' 0';
+    var forks = [];
+    var i = 0;
+    // Descend until it lands, rather than for a fixed number of segments — a
+    // fixed count left almost 40% of bolts hanging in mid-air, some stopping
+    // 100px short of the ground, which reads as broken rather than dramatic.
+    while (y < 700 && i < 22) {
+      var t = y / 700;                            // progress down the sky
+      var spread = 62 * (1 - t) + 14;             // wanders less as it descends
+      x += (Math.random() - 0.5) * spread * 2;
+      y += 46 + Math.random() * 44;
+      if (y > 700) y = 700;
+      d += ' L' + x.toFixed(1) + ' ' + y.toFixed(1);
+      // short branches off the main channel, never right at the ground
+      if (i > 1 && y < 610 && Math.random() < 0.34) {
+        var fx = x, fy = y, fd = 'M' + fx.toFixed(1) + ' ' + fy.toFixed(1);
+        var dir = Math.random() < 0.5 ? -1 : 1;
+        var fn = 2 + Math.floor(Math.random() * 3);
+        for (var j = 0; j < fn; j++) {
+          fx += dir * (18 + Math.random() * 46);
+          fy += 26 + Math.random() * 54;
+          fd += ' L' + fx.toFixed(1) + ' ' + fy.toFixed(1);
+        }
+        forks.push(fd);
+      }
+      i++;
+    }
+    if (y < 700) d += ' L' + x.toFixed(1) + ' 700';   // always lands
+    return { main: d, forks: forks };
+  }
+
+  function drawBolt(svg, originPct) {
+    var g = boltPath(originPct * 10);            // 0-100% -> 0-1000 viewBox
+    var forks = g.forks.map(function (f) {
+      return '<path class="fork" d="' + f + '"/>';
+    }).join('');
+    svg.innerHTML =
+      '<path class="glow" d="' + g.main + '"/>' +
+      '<path class="halo" d="' + g.main + '"/>' +
+      forks +
+      '<path class="core" d="' + g.main + '"/>';
+    svg.classList.remove('is-live');
+    void svg.getBoundingClientRect();            // restart the animation
+    svg.classList.add('is-live');
+    setTimeout(function () { svg.classList.remove('is-live'); svg.innerHTML = ''; }, 1000);
+  }
+
   function strike() {
     var layers = stormLayers();
     if (!layers.length) return;
-    var close = Math.random() < 0.25;          // 1 in 4 lands near
+    var close = Math.random() < 0.3;           // roughly 1 in 3 lands near
     var cls = close ? 'is-strike' : 'is-sheet';
-    var originX = (14 + Math.random() * 72).toFixed(0) + '%';
+    var origin = 14 + Math.random() * 72;      // percent across the sky
+    var originX = origin.toFixed(0) + '%';
 
     layers.forEach(function (el) {
       var f = el.querySelector('.mn-flash');
+      var cl = el.querySelector('.mn-cloudlight');
       if (f) f.style.setProperty('--fx', originX);
+      if (cl) cl.style.setProperty('--fx', originX);
       el.classList.remove('is-strike', 'is-sheet', 'is-thunder');
       void el.offsetWidth;                     // restart the animation
       el.classList.add(cls);
+
+      // only a near strike shows its channel; distant ones are sheet glow
+      var svg = el.querySelector('.mn-bolt');
+      if (close && svg) drawBolt(svg, origin);
+
       if (close) {
-        // thunder lags the flash, the way it does outdoors
+        // thunder lags the flash, the way sound lags light outdoors
         setTimeout(function () {
           el.classList.add('is-thunder');
-          setTimeout(function () { el.classList.remove('is-thunder'); }, 1600);
-        }, 380 + Math.random() * 520);
+          setTimeout(function () { el.classList.remove('is-thunder'); }, 1700);
+        }, 380 + Math.random() * 620);
       }
       setTimeout(function () { el.classList.remove(cls); }, 2300);
     });
