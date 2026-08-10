@@ -2382,5 +2382,33 @@
     URL.revokeObjectURL(a.href);
   });
 
+
+  /* ---- rainfall ----
+     Fill any [data-drops] container with individual drops. Each gets its own
+     column, length, speed, delay and depth so the field never looks like a
+     repeating pattern. Built once; the animation runs on the compositor. */
+  function seedRain(root) {
+    (root || document).querySelectorAll('[data-drops]').forEach((box) => {
+      if (box.dataset.seeded) return;
+      box.dataset.seeded = '1';
+      const n = Number(box.dataset.drops) || 80;
+      let html = '';
+      for (let i = 0; i < n; i++) {
+        const far = i % 3 === 0;                       // a third sit further back
+        const x = (Math.random() * 118 - 9).toFixed(2); // overshoot: drops drift left
+        const len = far ? 34 + Math.random() * 40 : 52 + Math.random() * 76;
+        const dur = far ? 1.5 + Math.random() * 1.1 : 0.85 + Math.random() * 0.65;
+        const delay = (Math.random() * -2.6).toFixed(2);
+        const op = far ? 0.3 + Math.random() * 0.25 : 0.5 + Math.random() * 0.5;
+        html +=
+          '<i class="' + (far ? 'far' : '') + '" style="' +
+          '--x:' + x + '%;--len:' + len.toFixed(0) + 'px;--dur:' + dur.toFixed(2) + 's;' +
+          '--delay:' + delay + 's;opacity:' + op.toFixed(2) + '"></i>';
+      }
+      box.innerHTML = html;
+    });
+  }
+  window.addEventListener('DOMContentLoaded', () => seedRain());
+
   window.addEventListener("DOMContentLoaded", boot);
 })();

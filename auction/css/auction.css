@@ -774,7 +774,9 @@ body > * { position: relative; z-index: 1; }
   overflow-wrap: break-word;
 }
 .pcard-stats {
-  display: grid; grid-template-columns: 1.25fr 1fr 1fr 1.05fr; gap: 1px;
+  /* the Category tile holds a whole word ("INTERMEDIATE") next to three short
+     values, so it gets noticeably more of the row */
+  display: grid; grid-template-columns: 1.75fr 1fr 1fr 1.1fr; gap: 1px;
   background: var(--mn-line); border: 1px solid var(--mn-line);
   border-radius: 9px; overflow: hidden;
   margin-top: clamp(10px, 1.4vh, 16px);
@@ -796,16 +798,21 @@ body > * { position: relative; z-index: 1; }
   color: var(--mn-text); margin: 1px 0 0; min-width: 0;
   overflow-wrap: break-word; font-variant-numeric: tabular-nums;
 }
+.pcard-stat--cat { padding-left: 11px; padding-right: 11px; }
 .pcard-stat--cat dd .cat-code {
   display: block;
   font-size: clamp(1.8rem, 2.4vw, 2.5rem); line-height: 1.2;
   color: #FFF; letter-spacing: .02em;
 }
 .pcard-stat--cat dd .cat-name {
-  display: block; margin-top: 1px;
+  display: block; margin-top: 2px;
   font-family: var(--font-body); font-weight: 600;
-  font-size: 13px; line-height: 1.5; letter-spacing: .1em; text-transform: uppercase;
+  /* "INTERMEDIATE" was splitting as "INTERMEDIAT E" — shrink to fit rather
+     than break a word that is also a label */
+  font-size: clamp(9.5px, .64vw, 11.5px); line-height: 1.45;
+  letter-spacing: .01em; text-transform: uppercase;
   color: var(--mn-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pcard-base {
   margin-top: clamp(10px, 1.4vh, 18px);
@@ -829,37 +836,48 @@ body > * { position: relative; z-index: 1; }
   text-shadow: 0 0 22px rgba(240, 67, 56, .3);
 }
 
-/* ---------- max bid, one cell per category ---------- */
-.w-maxes .maxrow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+/* ---------- max bid ----------
+   Three ~₹7,80,000 figures will not fit side by side in a quarter of the
+   wallet strip — they were breaking mid-number ("₹8,0 0,00 0"). One row per
+   category instead: letter left, figure right, never wrapping. */
+.w-card.w-maxes { min-width: 0; }
+.w-maxes .maxrow { display: flex; flex-direction: column; gap: 4px; margin-top: 5px; }
 .maxcell {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
   border: 1px solid var(--mn-line);
-  border-radius: 8px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, .03);
-  padding: 6px 8px 7px;
+  padding: 4px 10px 5px;
   min-width: 0;
-  text-align: center;
 }
 .maxcell b {
-  display: block;
+  flex: 0 0 auto;
   font-family: "Barlow Condensed", sans-serif; font-weight: 700;
-  font-size: 13px; line-height: 1.3; letter-spacing: .18em;
+  font-size: 13px; line-height: 1.5; letter-spacing: .18em;
   color: var(--mn-muted);
 }
 .maxcell span {
-  display: block;
+  flex: 1 1 auto;
+  text-align: right;
   font-family: "Barlow Condensed", sans-serif; font-weight: 700;
-  font-size: clamp(15px, 1.25vw, 19px); line-height: 1.3;
-  color: var(--mn-text); font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  font-size: clamp(16px, 1.35vw, 21px); line-height: 1.35;
+  color: var(--mn-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;              /* a price must never break across lines */
+  overflow: hidden; text-overflow: ellipsis;
 }
-.maxcell.is-full span { color: var(--mn-muted); font-weight: 500; }
+.maxcell.is-full span { color: var(--mn-muted); font-weight: 500; font-size: 14px; letter-spacing: .1em; }
 .maxcell.is-live {
   border-color: rgba(240, 67, 56, .55);
-  background: linear-gradient(180deg, rgba(220, 38, 38, .18), rgba(220, 38, 38, .04));
+  background: linear-gradient(90deg, rgba(220, 38, 38, .2), rgba(220, 38, 38, .05));
 }
 .maxcell.is-live b { color: #F3B7B3; }
 .maxcell.is-live span { color: #FFFFFF; }
-.w-note { font-size: 11.5px; color: var(--mn-muted); margin-top: 5px; line-height: 1.4; }
+.w-note { font-size: 11.5px; color: var(--mn-muted); margin-top: 6px; line-height: 1.4; }
+
+/* the wallet strip gives the max-bid tile more room than the rest */
+.wallet { align-items: stretch; }
+.wallet .w-card.w-maxes { flex: 1 1 260px; }
 
 /* ---------- projector mode ---------- */
 .stage:fullscreen,
@@ -900,4 +918,53 @@ body.mn-blownup { overflow: hidden; }
 body.mn-blownup .app {
   animation: none !important;
   transform: none !important;
+}
+
+/* ============================================================
+   RAINFALL — actual falling drops
+   A repeating-linear-gradient draws infinite parallel lines, which reads as
+   diagonal hatching, not weather. These are discrete drops, each with its own
+   length, speed, delay and opacity, falling and fading.
+   ============================================================ */
+.mn-drops { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.mn-drops i {
+  position: absolute;
+  top: -14%;
+  left: var(--x, 50%);
+  width: 1.4px;
+  height: var(--len, 74px);
+  border-radius: 0 0 2px 2px;
+  background: linear-gradient(to bottom,
+    rgba(203, 217, 242, 0) 0%,
+    rgba(203, 217, 242, .28) 32%,
+    rgba(223, 234, 255, .85) 100%);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: mnFall var(--dur, 1.05s) linear var(--delay, 0s) infinite;
+}
+/* a slower, blurrier layer behind for depth */
+.mn-drops i.far {
+  width: 1px;
+  filter: blur(.7px);
+  background: linear-gradient(to bottom,
+    rgba(190, 205, 232, 0) 0%,
+    rgba(190, 205, 232, .22) 40%,
+    rgba(205, 220, 248, .5) 100%);
+}
+@keyframes mnFall {
+  0%   { transform: translate3d(0, -14vh, 0) rotate(11deg); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translate3d(-9vh, 116vh, 0) rotate(11deg); opacity: 0; }
+}
+
+/* the splash-lit floor keeps the drops from stopping dead at the edge */
+.mn-floor {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92), transparent);
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mn-drops { display: none; }
 }
