@@ -674,5 +674,51 @@
   }
   window.addEventListener('DOMContentLoaded', () => seedRain());
 
+  /* ---- storm ----
+     Lightning on a fixed interval reads as a broken monitor, so strikes fire
+     at irregular gaps. Most are distant sheet flashes; a close strike is
+     rarer and is the only one that pulls a rumble behind it. Thunder here is
+     visual only — a delayed shudder through the cloud bank. No audio:
+     browsers block autoplay, and a thunderclap over a live auctioneer would
+     be worse than no thunder at all. */
+  function stormLayers() {
+    return [].slice.call(document.querySelectorAll('.mn-page-rain, .mn-weather'));
+  }
+
+  function strike() {
+    var layers = stormLayers();
+    if (!layers.length) return;
+    var close = Math.random() < 0.25;          // 1 in 4 lands near
+    var cls = close ? 'is-strike' : 'is-sheet';
+    var originX = (14 + Math.random() * 72).toFixed(0) + '%';
+
+    layers.forEach(function (el) {
+      var f = el.querySelector('.mn-flash');
+      if (f) f.style.setProperty('--fx', originX);
+      el.classList.remove('is-strike', 'is-sheet', 'is-thunder');
+      void el.offsetWidth;                     // restart the animation
+      el.classList.add(cls);
+      if (close) {
+        // thunder lags the flash, the way it does outdoors
+        setTimeout(function () {
+          el.classList.add('is-thunder');
+          setTimeout(function () { el.classList.remove('is-thunder'); }, 1600);
+        }, 380 + Math.random() * 520);
+      }
+      setTimeout(function () { el.classList.remove(cls); }, 2300);
+    });
+  }
+
+  function scheduleStorm() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var gap = 7000 + Math.random() * 17000;    // 7s to 24s apart
+    setTimeout(function () {
+      if (!document.hidden) strike();
+      scheduleStorm();
+    }, gap);
+  }
+  window.addEventListener('DOMContentLoaded', scheduleStorm);
+
+
   window.addEventListener("DOMContentLoaded", boot);
 })();

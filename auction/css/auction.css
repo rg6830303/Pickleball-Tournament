@@ -972,3 +972,114 @@ body.mn-blownup .app {
   .mn-drops, .mn-page-rain { display: none; }
 }
 
+
+/* ============================================================
+   STORM — cloud bank, lightning, thunder rumble
+   Restrained on purpose: this runs for hours behind a live auction on a
+   projector, so the flash peaks low and fires irregularly rather than on a
+   metronome. Everything sits behind the content, lighting the room rather
+   than washing out the card.
+   ============================================================ */
+
+/* ---------- cloud bank ---------- */
+.mn-clouds {
+  position: absolute; left: -12%; right: -12%; top: -8%;
+  height: 62%;
+  pointer-events: none;
+  overflow: hidden;
+}
+.mn-clouds i {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(42px);
+  opacity: .55;
+  will-change: transform;
+}
+/* three overlapping banks at different depths and speeds */
+.mn-clouds i:nth-child(1) {
+  left: -18%; top: -22%; width: 78%; height: 128%;
+  background: radial-gradient(58% 54% at 50% 52%,
+    rgba(86, 96, 128, .58), rgba(38, 42, 60, .34) 58%, rgba(10, 10, 16, 0) 78%);
+  animation: mnCloudA 96s ease-in-out infinite alternate;
+}
+.mn-clouds i:nth-child(2) {
+  left: 26%; top: -34%; width: 92%; height: 142%;
+  background: radial-gradient(56% 52% at 50% 50%,
+    rgba(64, 72, 100, .52), rgba(28, 30, 46, .3) 60%, rgba(10, 10, 16, 0) 80%);
+  animation: mnCloudB 132s ease-in-out infinite alternate;
+  opacity: .46;
+}
+.mn-clouds i:nth-child(3) {
+  left: -6%; top: -12%; width: 120%; height: 108%;
+  background: radial-gradient(60% 48% at 42% 46%,
+    rgba(112, 96, 116, .3), rgba(44, 32, 44, .2) 56%, rgba(10, 10, 16, 0) 80%);
+  animation: mnCloudC 168s linear infinite;
+  opacity: .34;
+  filter: blur(58px);
+}
+@keyframes mnCloudA {
+  from { transform: translate3d(-4%, 0, 0) scale(1) }
+  to   { transform: translate3d(9%, 2%, 0) scale(1.09) }
+}
+@keyframes mnCloudB {
+  from { transform: translate3d(6%, 1%, 0) scale(1.05) }
+  to   { transform: translate3d(-8%, -2%, 0) scale(1) }
+}
+@keyframes mnCloudC {
+  from { transform: translate3d(-14%, 0, 0) }
+  to   { transform: translate3d(14%, 0, 0) }
+}
+
+/* the bank shudders when thunder rolls */
+.mn-page-rain.is-thunder .mn-clouds,
+.mn-weather.is-thunder .mn-clouds { animation: mnRumble 1.5s ease-out; }
+@keyframes mnRumble {
+  0%   { transform: translate3d(0, 0, 0) }
+  14%  { transform: translate3d(0, 3px, 0) }
+  28%  { transform: translate3d(0, -2px, 0) }
+  46%  { transform: translate3d(0, 2px, 0) }
+  70%  { transform: translate3d(0, -1px, 0) }
+  100% { transform: translate3d(0, 0, 0) }
+}
+
+/* ---------- lightning ---------- */
+.mn-flash {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(58% 42% at var(--fx, 40%) -8%,
+      rgba(214, 230, 255, .95), rgba(150, 176, 226, .42) 42%, rgba(120, 145, 200, 0) 72%),
+    linear-gradient(to bottom, rgba(190, 212, 255, .5), rgba(120, 140, 190, 0) 58%);
+  mix-blend-mode: screen;
+}
+/* Real lightning stutters — a strike, a gap, then a weaker return stroke.
+   Peaks are deliberately low: this is lighting a room, not blinding it. */
+.mn-page-rain.is-strike .mn-flash,
+.mn-weather.is-strike .mn-flash { animation: mnStrike 1.25s ease-out; }
+@keyframes mnStrike {
+  0%   { opacity: 0 }
+  3%   { opacity: .34 }
+  6%   { opacity: .06 }
+  10%  { opacity: .30 }
+  16%  { opacity: .04 }
+  22%  { opacity: .17 }
+  34%  { opacity: .02 }
+  46%  { opacity: .12 }
+  100% { opacity: 0 }
+}
+
+/* a far-off sheet flash: no stutter, softer, no rumble */
+.mn-page-rain.is-sheet .mn-flash,
+.mn-weather.is-sheet .mn-flash { animation: mnSheet 2.1s ease-in-out; }
+@keyframes mnSheet {
+  0%   { opacity: 0 }
+  22%  { opacity: .10 }
+  55%  { opacity: .05 }
+  100% { opacity: 0 }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mn-clouds, .mn-flash { display: none; }
+}
