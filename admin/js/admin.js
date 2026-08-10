@@ -1031,6 +1031,13 @@
       return;
     }
 
+    // Opening the tab and typing straight away used to answer "no player has
+    // that key", which is a lie — the pool simply had not arrived yet.
+    if (!aLots.length) {
+      hint.textContent = "Still loading the pool — try that key again in a second.";
+      return;
+    }
+
     const hit = aLots.find((l) => (l.player_key || "").toUpperCase() === raw);
     if (!hit) {
       hint.classList.add("bad");
@@ -2396,10 +2403,11 @@
       for (let i = 0; i < n; i++) {
         const far = i % 3 === 0;                       // a third sit further back
         const x = (Math.random() * 118 - 9).toFixed(2); // overshoot: drops drift left
-        const len = far ? 34 + Math.random() * 40 : 52 + Math.random() * 76;
-        const dur = far ? 1.5 + Math.random() * 1.1 : 0.85 + Math.random() * 0.65;
-        const delay = (Math.random() * -2.6).toFixed(2);
-        const op = far ? 0.3 + Math.random() * 0.25 : 0.5 + Math.random() * 0.5;
+        const len = far ? 46 + Math.random() * 46 : 74 + Math.random() * 96;
+        // slow enough for the eye to follow a single drop down the screen
+        const dur = far ? 5.2 + Math.random() * 3.4 : 3 + Math.random() * 2.2;
+        const delay = (Math.random() * -9).toFixed(2);
+        const op = far ? 0.34 + Math.random() * 0.24 : 0.6 + Math.random() * 0.4;
         html +=
           '<i class="' + (far ? 'far' : '') + '" style="' +
           '--x:' + x + '%;--len:' + len.toFixed(0) + 'px;--dur:' + dur.toFixed(2) + 's;' +

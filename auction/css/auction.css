@@ -587,17 +587,8 @@ table.teams { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   to   { opacity: 1;   transform: translateY(-4px) scale(1.03) }
 }
 
-/* rain across the whole page, behind everything */
-body::after {
-  content: "";
-  position: fixed; inset: -25% -15%; z-index: 0; pointer-events: none;
-  background-image: repeating-linear-gradient(101deg,
-    transparent 0 4px, rgba(206, 216, 236, 0.5) 4px 5px, transparent 5px 26px);
-  background-size: 100% 190px;
-  opacity: 0.07;
-  animation: mnRain 1.15s linear infinite;
-}
-body > * { position: relative; z-index: 1; }
+/* every screen sits above the page-wide rain */
+body > *:not(.mn-page-rain) { position: relative; z-index: 1; }
 
 /* ---------- stage ---------- */
 .stage {
@@ -921,44 +912,56 @@ body.mn-blownup .app {
 }
 
 /* ============================================================
-   RAINFALL — actual falling drops
+   RAINFALL — discrete drops, page-wide
    A repeating-linear-gradient draws infinite parallel lines, which reads as
-   diagonal hatching, not weather. These are discrete drops, each with its own
-   length, speed, delay and opacity, falling and fading.
+   diagonal hatching rather than weather. These are individual drops: slow
+   enough to follow, bright enough to see, each with its own column, length,
+   speed and depth.
    ============================================================ */
+.mn-page-rain {
+  position: fixed; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.mn-drops, .mn-page-rain { contain: layout paint; }
 .mn-drops { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.mn-drops i {
+
+.mn-drops i, .mn-page-rain i {
   position: absolute;
-  top: -14%;
+  top: -16%;
   left: var(--x, 50%);
-  width: 1.4px;
-  height: var(--len, 74px);
+  width: 2px;
+  height: var(--len, 96px);
   border-radius: 0 0 2px 2px;
+  /* a long faint trail with a bright, sharp head — that is what makes a drop
+     read as a drop instead of a scratch */
   background: linear-gradient(to bottom,
-    rgba(203, 217, 242, 0) 0%,
-    rgba(203, 217, 242, .28) 32%,
-    rgba(223, 234, 255, .85) 100%);
+    rgba(214, 228, 255, 0) 0%,
+    rgba(214, 228, 255, .22) 45%,
+    rgba(232, 242, 255, .95) 100%);
+  box-shadow: 0 0 4px rgba(188, 214, 255, .45);
   opacity: 0;
   will-change: transform, opacity;
-  animation: mnFall var(--dur, 1.05s) linear var(--delay, 0s) infinite;
+  animation: mnFall var(--dur, 3s) linear var(--delay, 0s) infinite;
 }
-/* a slower, blurrier layer behind for depth */
-.mn-drops i.far {
-  width: 1px;
-  filter: blur(.7px);
+/* a slower, softer layer further back so the field has depth */
+.mn-drops i.far, .mn-page-rain i.far {
+  width: 1.3px;
+  filter: blur(.9px);
+  box-shadow: none;
   background: linear-gradient(to bottom,
-    rgba(190, 205, 232, 0) 0%,
-    rgba(190, 205, 232, .22) 40%,
-    rgba(205, 220, 248, .5) 100%);
+    rgba(190, 208, 240, 0) 0%,
+    rgba(190, 208, 240, .16) 50%,
+    rgba(210, 226, 255, .6) 100%);
 }
 @keyframes mnFall {
-  0%   { transform: translate3d(0, -14vh, 0) rotate(11deg); opacity: 0; }
-  8%   { opacity: 1; }
-  92%  { opacity: 1; }
-  100% { transform: translate3d(-9vh, 116vh, 0) rotate(11deg); opacity: 0; }
+  0%   { transform: translate3d(0, -16vh, 0) rotate(8deg); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translate3d(-7vh, 118vh, 0) rotate(8deg); opacity: 0; }
 }
 
-/* the splash-lit floor keeps the drops from stopping dead at the edge */
 .mn-floor {
   position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.92), transparent);
@@ -966,5 +969,6 @@ body.mn-blownup .app {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mn-drops { display: none; }
+  .mn-drops, .mn-page-rain { display: none; }
 }
+
