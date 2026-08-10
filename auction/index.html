@@ -9,8 +9,8 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='8' y='8' width='84' height='84' rx='18' fill='%23e5262d'/%3E%3Cpath d='M28 62h44M34 62V40M50 62V32M66 62V46' stroke='%23070707' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/auction.css?v=202608051639" />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/auction.css?v=202608092100" />
 </head>
 <body>
 
@@ -74,15 +74,36 @@
         <p class="w-label">Squad</p>
         <p class="w-value sm" id="wSquad">—</p>
       </div>
-      <div class="w-card">
-        <p class="w-label" id="wMaxBidLabel">Max Bid Possible</p>
-        <p class="w-value sm" id="wMaxBid">—</p>
+      <div class="w-card w-maxes">
+        <p class="w-label" id="wMaxBidLabel">Max Bid</p>
+        <div class="maxrow">
+          <div class="maxcell" id="wMaxA"><b>A</b><span>—</span></div>
+          <div class="maxcell" id="wMaxB"><b>B</b><span>—</span></div>
+          <div class="maxcell" id="wMaxC"><b>C</b><span>—</span></div>
+        </div>
         <p class="w-note" id="wMaxBidNote"></p>
       </div>
     </section>
 
     <!-- live block -->
     <section class="stage" id="stage">
+      <div class="mn-weather" aria-hidden="true">
+        <div class="mn-mist"></div>
+        <div class="mn-rain"></div>
+        <div class="mn-rain2"></div>
+        <div class="mn-floor"></div>
+      </div>
+      <div class="mn-glow" aria-hidden="true"></div>
+
+      <button class="mn-fs" id="btnFull" type="button" title="Full screen (F)" aria-label="Toggle full screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path class="mn-fs-in" d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/>
+          <path class="mn-fs-out" d="M3 8h3a2 2 0 0 0 2-2V3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M21 16h-3a2 2 0 0 0-2 2v3"/>
+        </svg>
+        <span class="mn-fs-label">Full screen</span>
+      </button>
+
       <div class="stage-idle" id="stageIdle">
         <span class="pulse-ring" aria-hidden="true"></span>
         <p class="idle-title">Waiting for the next player</p>
@@ -91,25 +112,37 @@
 
       <div class="stage-live" id="stageLive" hidden>
         <p class="stage-tag">On the block</p>
-        <div class="lot pcard">
-          <div class="lot-photo pcard-photo">
-            <img id="lotPhoto" alt="" />
-            <span class="lot-noimg pcard-noimg" id="lotNoImg">
-              <b>NO PHOTO</b>
-              <small id="lotNoImgWhy">not registered yet</small>
-            </span>
-          </div>
-          <div class="lot-info pcard-body">
-            <p class="pcard-kicker">Auction Player Card · Season 1</p>
-            <h2 class="lot-name pcard-name" id="lotName">—</h2>
-            <dl class="pcard-stats">
-              <div class="pcard-stat"><dt>Category</dt><dd id="lotCat">—</dd></div>
-              <div class="pcard-stat"><dt>Age</dt><dd id="lotAge">—</dd></div>
-              <div class="pcard-stat"><dt>Sex</dt><dd id="lotSex">—</dd></div>
-              <div class="pcard-stat"><dt>DUPR</dt><dd id="lotDupr">—</dd></div>
-              <div class="pcard-stat wide"><dt>Base Price</dt><dd id="lotBase">—</dd></div>
-            </dl>
-            <div class="lot-tags" id="lotTags" hidden></div>
+
+        <div class="pcard" id="lotCard">
+          <div class="pcard-frame">
+            <div class="pcard-photo">
+              <img id="lotPhoto" alt="" hidden />
+              <div class="pcard-noimg" id="lotNoImg">
+                <span class="pcard-noimg-mark" aria-hidden="true"></span>
+                <span>No photo</span>
+                <small id="lotNoImgWhy">not registered yet</small>
+              </div>
+              <span class="pcard-lot" id="lotKey">Key —</span>
+            </div>
+            <div class="pcard-rule" aria-hidden="true"></div>
+            <div class="pcard-body">
+              <p class="pcard-league">Monsoon Premier League</p>
+              <p class="pcard-kicker"><i class="spark" aria-hidden="true"></i>Auction Player Card · Season 1</p>
+              <h2 class="pcard-name" id="lotName">—</h2>
+              <dl class="pcard-stats">
+                <div class="pcard-stat pcard-stat--cat">
+                  <dt>Category</dt>
+                  <dd><b class="cat-code" id="lotCatCode">—</b><span class="cat-name" id="lotCatName"></span></dd>
+                </div>
+                <div class="pcard-stat"><dt>Age</dt><dd id="lotAge">—</dd></div>
+                <div class="pcard-stat"><dt>Sex</dt><dd id="lotSex">—</dd></div>
+                <div class="pcard-stat"><dt>DUPR</dt><dd id="lotDupr">—</dd></div>
+              </dl>
+              <div class="pcard-base">
+                <span class="pcard-base-label">Base Price</span>
+                <span class="pcard-base-value" id="lotBase">—</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -119,8 +152,6 @@
             <p class="bid-value" id="bidValue">—</p>
             <p class="bid-holder" id="bidHolder">No bids yet</p>
           </div>
-          <!-- Bidding happens in the room. This screen mirrors the auctioneer
-               so captains can see the card, the price and their own limit. -->
           <div class="bid-live" id="bidLive">
             <p class="bid-live-label">Bid in the room</p>
             <p class="bid-live-sub">The auctioneer records every bid — this page follows along live.</p>
@@ -157,7 +188,7 @@
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
   <script src="js/vendor/supabase.js" defer></script>
-  <script src="js/config.js?v=202608051639"></script>
-  <script src="js/auction.js?v=202608051639" defer></script>
+  <script src="js/config.js?v=202608092100"></script>
+  <script src="js/auction.js?v=202608092100" defer></script>
 </body>
 </html>

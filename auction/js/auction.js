@@ -319,39 +319,38 @@
     $("#wSquad").textContent = `${squad.length} / ${t.max_squad}`;
     $("#wBar").style.width = Math.max(0, Math.min(100, (left / total) * 100)) + "%";
 
-    // Max bid is per category, so show it for whoever is on the block; with
-    // nobody up, show the best case across the categories still open.
-    const lot = state && state.current_lot_id ? lots.find((l) => l.id === state.current_lot_id) : null;
-    const cat = lot ? (cards[lot.id] || lot).category : null;
+    // All three maxima, always. A single figure meant the number changed
+    // meaning depending on who was on screen, which read as simply wrong when
+    // a captain was thinking about a different category.
     const u = unfilled(t);
-    const label = $("#wMaxBidLabel");
+    const lot = state && state.current_lot_id ? lots.find((l) => l.id === state.current_lot_id) : null;
+    const liveCat = lot ? (cards[lot.id] || lot).category : null;
+
+    ["A", "B", "C"].forEach((k) => {
+      const cell = $("#wMax" + k);
+      if (!cell) return;
+      const val = cell.querySelector("span");
+      if (u[k] > 0) {
+        val.textContent = money(maxBidFor(t, k));
+        cell.classList.remove("is-full");
+      } else {
+        val.textContent = "full";
+        cell.classList.add("is-full");
+      }
+      cell.classList.toggle("is-live", k === liveCat);
+    });
 
     const note = $("#wMaxBidNote");
     const reserve = u.A * BASE.A + u.B * BASE.B + u.C * BASE.C;
-
-    if (!slotsLeft) {
-      $("#wMaxBid").textContent = "Squad full";
-      if (label) label.textContent = "Max bid possible";
-      if (note) note.textContent = "";
-    } else if (cat) {
-      $("#wMaxBid").textContent = u[cat] > 0 ? money(maxBidFor(t, cat)) : `No ${cat} slot left`;
-      if (label) label.textContent = `Max bid · category ${cat}`;
-      if (note) {
-        note.textContent =
-          u[cat] > 0
-            ? `keeps ${money(reserve - BASE[cat])} for your other ${u.A + u.B + u.C - 1} slot${
-                u.A + u.B + u.C - 1 === 1 ? "" : "s"
-              }`
-            : `your ${cat} quota is already full`;
-      }
-    } else {
-      const open = ["A", "B", "C"].filter((k) => u[k] > 0);
-      const best = open.length ? Math.max(...open.map((k) => maxBidFor(t, k))) : 0;
-      $("#wMaxBid").textContent = money(best);
-      if (label) label.textContent = "Max bid possible";
-      if (note) note.textContent = `${u.A}A · ${u.B}B · ${u.C}C still to buy`;
+    if (note) {
+      note.textContent = !slotsLeft
+        ? "Squad full"
+        : `${u.A}A · ${u.B}B · ${u.C}C to buy · ${money(reserve)} reserved`;
     }
+    const label = $("#wMaxBidLabel");
+    if (label) label.textContent = liveCat ? `Max bid · ${liveCat} on the block` : "Max bid";
   }
+
 
   function renderStage() {
     const live = state && state.status === "live" && state.current_lot_id;
@@ -428,24 +427,83 @@
       const why = $("#lotNoImgWhy");
       if (why) why.textContent = c.has_registration ? "registered, no photo" : "not registered yet";
     }
+    const key = $("#lotKey");
+    if (key) key.textContent = c.player_key ? `Key ${c.player_key}` : "Unkeyed";
     $("#lotName").textContent = c.name || "—";
-    $("#lotCat").textContent = c.category
-      ? `${c.category} · ${c.category_label || CAT_LABEL[c.category] || ""}`
-      : "—";
+    // Category is a big letter with the word beneath: one long string
+    // overflowed its tile at card sizes.
+    $("#lotCatCode").textContent = c.category || "—";
+    $("#lotCatName").textContent = c.category ? c.category_label || CAT_LABEL[c.category] || "" : "";
     $("#lotAge").textContent = c.age != null ? c.age : "NA";
     $("#lotSex").textContent = c.sex || "NA";
     $("#lotDupr").textContent = c.dupr != null ? Number(c.dupr).toFixed(3) : "NA";
     $("#lotBase").textContent = money(c.base_price);
   }
 
+  /* ---------------- projector mode ----------------
+     Captains watch on a phone or a second screen, so the card gets the same
+     full-screen treatment as the auctioneer's console. */
+  function stageEl() { return document.getElementById("stage"); }
+
+  function syncFullBtn(on) {
+    const b = $("#btnFull");
+    if (!b) return;
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    const l = b.querySelector(".mn-fs-label");
+    if (l) l.textContent = on ? "Exit" : "Full screen";
+  }
+
+  function setBlownUp(on) {
+    const el = stageEl();
+    if (!el) return;
+    el.classList.toggle("is-blownup", on);
+    document.body.classList.toggle("mn-blownup", on);
+    syncFullBtn(on);
+  }
+
+  async function toggleFullscreen() {
+    const el = stageEl();
+    if (!el) return;
+    if (el.classList.contains("is-blownup")) return setBlownUp(false);
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch { /* already out */ }
+      return;
+    }
+    try {
+      if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: "hide" });
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else setBlownUp(true);
+    } catch {
+      // refused by policy or missing a user gesture — fill the window instead
+      setBlownUp(true);
+    }
+  }
+
+  $("#btnFull") && $("#btnFull").addEventListener("click", toggleFullscreen);
+  document.addEventListener("fullscreenchange", () => syncFullBtn(document.fullscreenElement === stageEl()));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const el = stageEl();
+      if (el && el.classList.contains("is-blownup")) setBlownUp(false);
+      return;
+    }
+    if (e.key !== "f" && e.key !== "F") return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if ($("#app").hidden) return;
+    e.preventDefault();
+    toggleFullscreen();
+  });
+
   // renderStage() runs on every price tick and every realtime event. Only
-  // repaint the card when the player actually changes, otherwise the pool-row
-  // fallback (which has no photo) would overwrite the resolved card each time.
+  // repaint when the player actually changes, otherwise the pool-row fallback
+  // (which has no photo) would overwrite the resolved card each time.
   function renderCard(lot) {
     if (cardFor === lot.id) return;
     cardFor = lot.id;
-    paintCard(cards[lot.id] || lot);   // resolved card if we have it, else the raw row
-    if (!cards[lot.id]) fetchCard(lot); // only round-trip when we don't
+    paintCard(cards[lot.id] || lot);    // resolved card if we have it
+    if (!cards[lot.id]) fetchCard(lot); // otherwise go and get it
   }
 
   // A player the cache has never seen (added to the pool mid-auction) needs

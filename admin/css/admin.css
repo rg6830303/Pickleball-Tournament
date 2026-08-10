@@ -1631,9 +1631,13 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
   font-family: "Barlow Condensed", sans-serif; font-weight: 600;
   font-size: 21px; line-height: 1.4; letter-spacing: .22em; text-transform: uppercase;
   color: var(--mn-text-2);
+  /* falling rain, not a static diagonal hatch — the monsoon should move
+     everywhere it appears */
   background:
-    repeating-linear-gradient(135deg, rgba(255,255,255,.021) 0 9px, rgba(255,255,255,0) 9px 18px),
+    repeating-linear-gradient(101deg, transparent 0 4px, rgba(206,216,236,.5) 4px 5px, transparent 5px 26px),
     linear-gradient(165deg, #16141c, #08080c);
+  background-size: 100% 190px, auto;
+  animation: mnRain 1.15s linear infinite;
 }
 #tab-auction .pcard-noimg small {
   font-family: var(--font-body); font-weight: 500;
