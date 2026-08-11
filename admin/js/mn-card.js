@@ -27,7 +27,7 @@
     stand: { x: 4.4922, y: 7.8125, w: 35.026, h: 85.2539 },
 
     /* the name sits in the clear space above the four boxes */
-    name: { x: 41.9271, y: 39.0625, w: 52.1484, h: 11.7188 },
+    name: { x: 41.9271, y: 36.5234, w: 52.1484, h: 11.8164 },
 
     /* the four boxes. The first one is genuinely 11px wider than the other
        three in the artwork, so these are the measured widths, not four

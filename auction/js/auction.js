@@ -284,6 +284,8 @@
 
   /* ---------------- render ---------------- */
   function renderAll() {
+    $("#brandTeam").textContent = teamName(myTeamId);
+    renderWelcome();
     renderWallet();
     renderStage();
     renderSquad();
