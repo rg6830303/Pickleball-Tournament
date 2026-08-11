@@ -10,7 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/auction.css?v=202608110230" />
+  <link rel="stylesheet" href="css/mn-card.css?v=202608110515" />
+  <link rel="stylesheet" href="css/auction.css?v=202608110515" />
 </head>
 <body>
 
@@ -107,38 +108,7 @@
       <div class="stage-live" id="stageLive" hidden>
         <p class="stage-tag">On the block</p>
 
-        <div class="pcard" id="lotCard">
-          <div class="pcard-frame">
-            <div class="pcard-photo">
-              <img id="lotPhoto" alt="" hidden />
-              <div class="pcard-noimg" id="lotNoImg">
-                <span class="pcard-noimg-mark" aria-hidden="true"></span>
-                <span>No photo</span>
-                <small id="lotNoImgWhy">not registered yet</small>
-              </div>
-              <span class="pcard-lot" id="lotKey">Key —</span>
-            </div>
-            <div class="pcard-rule" aria-hidden="true"></div>
-            <div class="pcard-body">
-              <p class="pcard-league">Monsoon Premier League</p>
-              <p class="pcard-kicker"><i class="spark" aria-hidden="true"></i>Auction Player Card · Season 1</p>
-              <h2 class="pcard-name" id="lotName">—</h2>
-              <dl class="pcard-stats">
-                <div class="pcard-stat pcard-stat--cat">
-                  <dt>Category</dt>
-                  <dd><b class="cat-code" id="lotCatCode">—</b><span class="cat-name" id="lotCatName"></span></dd>
-                </div>
-                <div class="pcard-stat"><dt>Age</dt><dd id="lotAge">—</dd></div>
-                <div class="pcard-stat"><dt>Sex</dt><dd id="lotSex">—</dd></div>
-                <div class="pcard-stat"><dt>DUPR</dt><dd id="lotDupr">—</dd></div>
-              </dl>
-              <div class="pcard-base">
-                <span class="pcard-base-label">Base Price</span>
-                <span class="pcard-base-value" id="lotBase">—</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="mplc-wrap" id="lotCard"></div>
 
         <div class="bid-panel">
           <div class="bid-now">
@@ -181,9 +151,10 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/mn-sky.js?v=202608110230"></script>
+  <script src="js/mn-sky.js?v=202608110515"></script>
+  <script src="js/mn-card.js?v=202608110515"></script>
   <script src="js/vendor/supabase.js" defer></script>
-  <script src="js/config.js?v=202608110230"></script>
-  <script src="js/auction.js?v=202608110230" defer></script>
+  <script src="js/config.js?v=202608110515"></script>
+  <script src="js/auction.js?v=202608110515" defer></script>
 </body>
 </html>

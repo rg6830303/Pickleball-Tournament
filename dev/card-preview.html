@@ -99,7 +99,9 @@
       var rows = await load();
       var row = rows.filter(function (x) { return String(x.player_key) === key; })[0];
       if (!row) { st.textContent = 'no player with key ' + key + ' (' + rows.length + ' in pool)'; return; }
-      ['p1', 'p2', 'p3'].forEach(function (id) { MNCard.render(document.getElementById(id), row); });
+      ['p1', 'p2', 'p3'].forEach(function (id) {
+        MNCard.render(document.getElementById(id), row, { base: '../auction/' });
+      });
       st.textContent = row.name + ' · cat ' + row.category + ' · ' +
         (row.photo_url ? 'photo ok' : 'no photo') + ' · ' + rows.length + ' in pool';
     } catch (e) {

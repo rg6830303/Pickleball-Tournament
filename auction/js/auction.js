@@ -414,30 +414,12 @@
   const CAT_LABEL = { A: "Advance", B: "Intermediate", C: "Beginner" };
   let cardFor = null;
 
+  /* The card is the supplied artwork with the player laid onto it; the
+     renderer lives in mn-card.js so the console and every captain's app
+     draw an identical card. */
   function paintCard(c) {
-    const img = $("#lotPhoto");
-    const no = $("#lotNoImg");
-    if (c.photo_url) {
-      img.src = c.photo_url;
-      img.hidden = false;
-      no.hidden = true;
-    } else {
-      img.hidden = true;
-      no.hidden = false;
-      const why = $("#lotNoImgWhy");
-      if (why) why.textContent = c.has_registration ? "registered, no photo" : "not registered yet";
-    }
-    const key = $("#lotKey");
-    if (key) key.textContent = c.player_key ? `Key ${c.player_key}` : "Unkeyed";
-    $("#lotName").textContent = c.name || "—";
-    // Category is a big letter with the word beneath: one long string
-    // overflowed its tile at card sizes.
-    $("#lotCatCode").textContent = c.category || "—";
-    $("#lotCatName").textContent = c.category ? c.category_label || CAT_LABEL[c.category] || "" : "";
-    $("#lotAge").textContent = c.age != null ? c.age : "NA";
-    $("#lotSex").textContent = c.sex || "NA";
-    $("#lotDupr").textContent = c.dupr != null ? Number(c.dupr).toFixed(3) : "NA";
-    $("#lotBase").textContent = money(c.base_price);
+    const el = $("#lotCard");
+    if (el) MNCard.render(el, c);
   }
 
   /* ---------------- projector mode ----------------

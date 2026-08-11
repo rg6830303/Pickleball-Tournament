@@ -20,26 +20,28 @@
   /* Where things sit on the artwork, measured off the file itself.
      Percentages of the card's width and height. */
   var T = {
-    src: 'assets/card-template.png',
-    ratio: 1536 / 1024,
+    src: 'assets/card.jpeg',
+    ratio: 1.5,
 
     /* the red-bordered panel on the left: the photo goes inside it */
-    stand: { x: 4.30, y: 8.59, w: 35.68, h: 85.35 },
+    stand: { x: 4.4922, y: 7.8125, w: 35.026, h: 85.2539 },
 
-    /* the name sits above the four boxes, in the artwork's right column */
-    name: { x: 42.32, y: 40.30, w: 52.15, h: 10.00 },
+    /* the name sits in the clear space above the four boxes */
+    name: { x: 41.9271, y: 39.0625, w: 52.1484, h: 11.7188 },
 
-    /* the four boxes, and the red rule the artwork draws across each one */
+    /* the four boxes. The first one is genuinely 11px wider than the other
+       three in the artwork, so these are the measured widths, not four
+       equal columns. */
     tiles: [
-      { x: 42.32, y: 52.05, w: 12.56, h: 21.00 },
-      { x: 55.86, y: 52.05, w: 12.56, h: 21.00 },
-      { x: 69.40, y: 52.05, w: 12.56, h: 21.00 },
-      { x: 82.94, y: 52.05, w: 12.56, h: 21.00 }
+      { x: 41.9271, y: 52.0508, w: 13.0859, h: 20.6055 },
+      { x: 55.7292, y: 52.0508, w: 12.3698, h: 20.6055 },
+      { x: 68.8151, y: 52.0508, w: 12.3047, h: 20.6055 },
+      { x: 81.8359, y: 52.0508, w: 12.2396, h: 20.6055 }
     ],
-    tileRule: 30.0,          /* % down the tile where the artwork's red line is */
+    tileRule: 29.86,          /* % down a box where the artwork's red line sits */
 
     /* the wide box underneath */
-    price: { x: 42.32, y: 74.22, w: 53.18, h: 17.09 }
+    price: { x: 41.9271, y: 74.2188, w: 52.1484, h: 16.6016 }
   };
 
   var CAT_LABEL = { A: 'Advance', B: 'Intermediate', C: 'Beginner' };

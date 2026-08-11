@@ -1193,35 +1193,12 @@
     if (c) paintCard(c);
   }
 
+  /* The card is the supplied artwork with the player laid onto it; the
+     renderer lives in mn-card.js so the console and every captain's app
+     draw an identical card. */
   function paintCard(c) {
-    const img = $("#aucCardImg");
-    const no = $("#aucCardNoImg");
-    if (c.photo_url) {
-      img.src = c.photo_url;
-      img.hidden = false;
-      no.hidden = true;
-    } else {
-      img.hidden = true;
-      no.hidden = false;
-      $("#aucCardNoImgWhy").textContent = !c.player_key
-        ? "no Player Key set"
-        : c.has_registration
-        ? "registered, no photo"
-        : "not registered yet";
-    }
-    const lot = $("#aucCardLot");
-    if (lot) lot.textContent = c.player_key ? `Key ${c.player_key}` : "Unkeyed";
-    $("#aucCardName").textContent = c.name || "—";
-    // Category is split into a big letter and a small word: "B · Intermediate"
-    // as one string overflowed its box at projector sizes.
-    $("#aucCardCatCode").textContent = c.category || "—";
-    $("#aucCardCatName").textContent = c.category
-      ? c.category_label || catLabel(c.category)
-      : "";
-    $("#aucCardAge").textContent = c.age != null ? c.age : "NA";
-    $("#aucCardSex").textContent = c.sex || "NA";
-    $("#aucCardDupr").textContent = c.dupr != null ? Number(c.dupr).toFixed(3) : "NA";
-    $("#aucCardBase").textContent = aucMoney(c.base_price);
+    const el = $("#aucCard");
+    if (el) MNCard.render(el, c);
   }
 
   const catLabel = (code) =>

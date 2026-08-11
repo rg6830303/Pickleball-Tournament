@@ -79,15 +79,15 @@
   display: flex;
   align-items: flex-end;
   font-weight: 700;
-  font-size: 5.1cqw;
-  line-height: 1.02;
+  font-size: 4.7cqw;
+  line-height: 1;
   letter-spacing: .012em;
   text-transform: uppercase;
   text-shadow: 0 0 2.2cqw rgba(255, 92, 96, .3), 0 .16cqw .4cqw rgba(0, 0, 0, .92);
   overflow-wrap: anywhere;
 }
-.mplc-name[data-step="long"]  { font-size: 4.2cqw; }
-.mplc-name[data-step="xlong"] { font-size: 3.4cqw; line-height: 1.06; }
+.mplc-name[data-step="long"]  { font-size: 3.9cqw; }
+.mplc-name[data-step="xlong"] { font-size: 3.15cqw; line-height: 1.04; }
 
 /* one box on the artwork: label above its red rule, value below */
 .mplc-tile,
@@ -113,13 +113,21 @@
   display: flex;
   align-items: center;
 }
+/* fills the space below the artwork's rule and centres in it, so the figure
+   is optically in the middle of the lower half of the box rather than
+   hanging off the line */
 .mplc-tile-v {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   font-weight: 700;
-  font-size: 2.7cqw;
+  font-size: 3.05cqw;
   line-height: 1.04;
   color: #fff;
   white-space: nowrap;
-  margin-top: .55cqw;
+  min-height: 0;
 }
 .mplc-tile-v.is-empty { color: rgba(255, 255, 255, .3); }
 .mplc-tile-v i {
@@ -134,10 +142,11 @@
 }
 
 .mplc-price { justify-content: center; }
+.mplc-price .mplc-price-v { margin-top: .1cqw; }
 .mplc-price .mplc-tile-k { color: #ffcccd; height: auto; margin-bottom: .35cqw; }
 .mplc-price-v {
   font-weight: 700;
-  font-size: 4.4cqw;
+  font-size: 4.15cqw;
   line-height: 1;
   color: #fff;
   white-space: nowrap;
