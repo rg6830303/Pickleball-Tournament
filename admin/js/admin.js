@@ -1042,6 +1042,11 @@
     if (!hit) {
       hint.classList.add("bad");
       hint.textContent = `No player has the key ${raw}. Check it on the Auction Pool tab.`;
+      // The projector shows the card and nothing else, so a bad key must take
+      // the previous player down. Leaving them up would have the room looking
+      // at someone who is not being auctioned, with the explanation sitting on
+      // a screen they cannot see.
+      renderPlayerCard(null);
       return;
     }
     if (hit.status === "sold") {

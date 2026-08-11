@@ -58,6 +58,9 @@
   /* ---------------- boot ---------------- */
   function boot() {
     const pick = $("#teamPick");
+    // Numbered placeholders first, so the form works even if the roster call
+    // fails; the real names replace them a moment later. The option value stays
+    // the team id either way, because the login is still team<id>@…
     for (let i = 1; i <= CFG.TEAM_COUNT; i++) {
       pick.insertAdjacentHTML("beforeend", `<option value="${i}">Team ${i}</option>`);
     }
@@ -73,6 +76,17 @@
     // tab-scoped session: nothing persists once the tab closes
     sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, {
       auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true },
+    });
+
+    // auction_teams is readable only once signed in, so the login screen asks
+    // for the roster on its own — names and captains, nothing else
+    sb.rpc("auction_team_roster").then(({ data }) => {
+      if (!data || !data.length) return;
+      const chosen = pick.value;
+      pick.innerHTML = data
+        .map((t) => `<option value="${t.id}">${esc(t.name)}</option>`)
+        .join("");
+      pick.value = chosen || data[0].id;
     });
 
     sb.auth.getSession().then(({ data }) => {
@@ -141,6 +155,7 @@
     $("#authWrap").hidden = true;
     $("#app").hidden = false;
     $("#brandTeam").textContent = teamName(myTeamId);
+    renderWelcome();
     $("#brandMark").textContent = String(myTeamId);
 
     await refreshAll();
@@ -420,6 +435,19 @@
   function paintCard(c) {
     const el = $("#lotCard");
     if (el) MNCard.render(el, c);
+  }
+
+  /* The captains walk in and log in on their phones; the first thing the
+     screen should do is know who they are. Sits above the block so it never
+     competes with the player card. */
+  function renderWelcome() {
+    const el = $("#welcome");
+    if (!el) return;
+    const t = myTeam();
+    if (!t) { el.hidden = true; return; }
+    el.hidden = false;
+    $("#welcomeWho").textContent = t.captain_name || teamName(myTeamId);
+    $("#welcomeTeam").textContent = teamName(myTeamId);
   }
 
   /* ---------------- projector mode ----------------

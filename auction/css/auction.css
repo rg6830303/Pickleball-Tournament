@@ -361,105 +361,6 @@ table.teams { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
 }
 
-/* ============================================================
-   DIGITAL PLAYER CARD — the player on the block
-   Overrides the older flat .lot layout above.
-   ============================================================ */
-.lot.pcard {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 18px;
-  align-items: stretch;
-  border: 1px solid rgba(229, 38, 45, 0.45);
-  border-radius: var(--radius);
-  background:
-    radial-gradient(120% 100% at 0% 0%, rgba(229, 38, 45, 0.14), transparent 60%),
-    linear-gradient(180deg, var(--panel-2), var(--panel));
-  box-shadow: 0 0 0 1px rgba(229, 38, 45, 0.12), 0 18px 44px rgba(0, 0, 0, 0.55);
-  padding: 16px;
-  margin-bottom: 22px;
-}
-.pcard .lot-photo,
-.pcard-photo {
-  width: 100%;
-  height: auto;
-  min-height: 230px;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: #0a0a0b;
-  border: 1px solid var(--line-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.pcard .lot-photo img { width: 100%; height: 100%; object-fit: cover; }
-.pcard-noimg {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  letter-spacing: 0.18em;
-  font-family: var(--font-display);
-  color: var(--text-faint);
-  text-align: center;
-  padding: 10px;
-}
-.pcard-noimg small {
-  font-family: var(--font-body);
-  letter-spacing: 0.04em;
-  font-size: 11px;
-  opacity: 0.8;
-}
-.pcard-body { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.pcard-kicker {
-  font-size: 10px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--red);
-  font-weight: 700;
-}
-.lot-name.pcard-name {
-  font-family: var(--font-display);
-  font-size: clamp(26px, 7vw, 44px);
-  font-weight: 700;
-  line-height: 1.02;
-  text-transform: uppercase;
-  margin: 4px 0 12px;
-  overflow-wrap: anywhere;
-}
-.pcard-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-  gap: 8px;
-}
-.pcard-stat {
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.35);
-  padding: 8px 12px;
-}
-.pcard-stat.wide { grid-column: 1 / -1; }
-.pcard-stat dt {
-  font-size: 9.5px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-.pcard-stat dd {
-  font-family: var(--font-display);
-  font-size: 21px;
-  font-weight: 700;
-  line-height: 1.15;
-  margin-top: 2px;
-}
-.pcard-stat.wide dd { color: var(--red); }
-
-@media (max-width: 640px) {
-  .lot.pcard { grid-template-columns: 1fr; }
-  .pcard .lot-photo, .pcard-photo { min-height: 260px; }
-}
-
 /* ---- squad quota chips ---- */
 .squad-quota { display: flex; gap: 8px; flex-wrap: wrap; margin: -4px 0 12px; }
 .qchip {
@@ -574,206 +475,9 @@ body > *:not(.mn-sky) { position: relative; z-index: 1; }
 .mn-fs .mn-fs-out { display: none; }
 .stage:fullscreen .mn-fs .mn-fs-in,  .stage.is-blownup .mn-fs .mn-fs-in  { display: none; }
 .stage:fullscreen .mn-fs .mn-fs-out, .stage.is-blownup .mn-fs .mn-fs-out { display: inline; }
-
-/* ---------- the card ---------- */
-.pcard {
-  position: relative; z-index: 2;
-  border-radius: 16px;
-  padding: 13px;
-  margin-bottom: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background:
-    linear-gradient(178deg, rgba(255,255,255,.055), rgba(255,255,255,.012) 26%, rgba(255,255,255,0) 55%),
-    linear-gradient(180deg, #141219 0%, #0c0b10 46%, #08070b 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .06),
-    0 34px 80px -30px rgba(0, 0, 0, .95),
-    0 22px 90px -40px rgba(220, 38, 38, .5);
-  animation: mnCardIn .55s var(--mn-ease) both;
-}
 @keyframes mnCardIn {
   from { opacity: 0; transform: translateY(14px) scale(.99); filter: saturate(.7) brightness(.86) }
   to   { opacity: 1; transform: none; filter: none }
-}
-.pcard-frame {
-  display: grid;
-  grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
-  gap: 0 clamp(16px, 2vw, 32px);
-  border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, .055);
-  background: rgba(0, 0, 0, .35);
-  overflow: hidden;
-}
-.pcard-photo {
-  position: relative;
-  grid-row: 1 / span 2;
-  min-height: clamp(260px, 38vh, 460px);
-  background: linear-gradient(160deg, #15131b, #08070b);
-  overflow: hidden;
-  border-right: 1px solid rgba(255, 255, 255, .05);
-}
-.pcard-photo img {
-  width: 100%; height: 100%; object-fit: cover; object-position: 50% 16%;
-  filter: saturate(.88) contrast(1.05) brightness(.95);
-  display: block;
-}
-.pcard-photo::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background:
-    radial-gradient(78% 74% at 50% 30%, rgba(0,0,0,0) 26%, rgba(0,0,0,.5) 74%, rgba(0,0,0,.85) 100%),
-    linear-gradient(to top, rgba(8,7,11,.9) 0%, rgba(8,7,11,.3) 26%, rgba(8,7,11,0) 58%);
-}
-.pcard-photo::before {
-  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .16;
-  background: repeating-linear-gradient(101deg,
-    transparent 0 4px, rgba(214, 224, 244, .6) 4px 5px, transparent 5px 27px);
-  background-size: 100% 190px;
-  animation: mnRain 1.15s linear infinite;
-}
-.pcard-lot {
-  position: absolute; z-index: 3; top: 13px; left: 13px;
-  font-family: "Barlow Condensed", sans-serif; font-weight: 600;
-  font-size: 14px; line-height: 1.5; letter-spacing: .2em; text-transform: uppercase;
-  color: #EBE6E2;
-  padding: 4px 11px; border-radius: 5px;
-  background: rgba(6, 5, 9, .7); border: 1px solid rgba(255, 255, 255, .18);
-}
-.pcard-noimg {
-  position: absolute; inset: 0;
-  display: grid; align-content: center; justify-items: center; gap: 6px;
-  text-align: center; padding: 24px;
-  font-family: "Barlow Condensed", sans-serif; font-weight: 600;
-  font-size: 20px; line-height: 1.4; letter-spacing: .22em; text-transform: uppercase;
-  color: var(--mn-text-2);
-  /* falling rain, not a static hatch */
-  background:
-    repeating-linear-gradient(101deg, transparent 0 4px, rgba(206,216,236,.5) 4px 5px, transparent 5px 26px),
-    linear-gradient(165deg, #16141c, #08080c);
-  background-size: 100% 190px, auto;
-  animation: mnRain 1.15s linear infinite;
-}
-.pcard-noimg small {
-  font-family: var(--font-body); font-weight: 500;
-  font-size: 13px; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--mn-muted);
-}
-.pcard-noimg-mark {
-  width: 48px; height: 48px; border-radius: 50%;
-  border: 1px dashed rgba(255, 255, 255, .26);
-  position: relative; margin-bottom: 4px;
-}
-.pcard-noimg-mark::after {
-  content: ""; position: absolute; left: 9px; right: 9px; top: 12px; bottom: 12px;
-  border: 1px solid rgba(255, 255, 255, .18); border-radius: 3px;
-  background: linear-gradient(140deg, rgba(255, 255, 255, .05), transparent);
-}
-.pcard-rule {
-  grid-column: 2; align-self: start;
-  height: 2px; margin: 0 clamp(16px, 2vw, 28px);
-  border-radius: 2px;
-  background: linear-gradient(90deg,
-    rgba(127,29,29,0), var(--mn-red) 22%, var(--mn-red-hot) 50%, var(--mn-red) 78%, rgba(127,29,29,0));
-  box-shadow: 0 0 18px rgba(240, 67, 56, .75), 0 0 44px rgba(220, 38, 38, .35);
-}
-.pcard-body {
-  grid-column: 2;
-  display: flex; flex-direction: column; justify-content: center;
-  min-width: 0;
-  padding: clamp(14px, 1.6vw, 24px) clamp(16px, 2vw, 28px) clamp(16px, 1.7vw, 26px);
-}
-.pcard-league {
-  font-family: "Barlow Condensed", sans-serif; font-weight: 700;
-  font-size: clamp(14px, 1.1vw, 19px); line-height: 1.5;
-  letter-spacing: .3em; text-transform: uppercase;
-  color: #FFE9E6;
-  background: linear-gradient(92deg, #FFFFFF 6%, var(--mn-red-hot) 52%, #FFD9D4 96%);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 3px;
-  overflow-wrap: anywhere;
-}
-.pcard-kicker {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  font-family: "Barlow Condensed", sans-serif; font-weight: 500;
-  font-size: 13.5px; line-height: 1.6;
-  letter-spacing: .24em; text-transform: uppercase;
-  color: var(--mn-muted);
-}
-.pcard-kicker .spark {
-  width: 22px; height: 1px; flex: 0 0 auto;
-  background: linear-gradient(90deg, var(--mn-red), transparent);
-}
-.pcard-name {
-  margin: .14em 0 .3em;
-  font-family: "Barlow Condensed", sans-serif; font-weight: 700;
-  font-size: clamp(2.3rem, 4vw, 4.2rem);
-  line-height: 1.16;
-  letter-spacing: .004em;
-  color: #FFFFFF;
-  text-shadow: 0 2px 34px rgba(255, 255, 255, .1), 0 0 70px rgba(220, 38, 38, .14);
-  overflow-wrap: break-word;
-}
-.pcard-stats {
-  /* the Category tile holds a whole word ("INTERMEDIATE") next to three short
-     values, so it gets noticeably more of the row */
-  display: grid; grid-template-columns: 1.75fr 1fr 1fr 1.1fr; gap: 1px;
-  background: var(--mn-line); border: 1px solid var(--mn-line);
-  border-radius: 9px; overflow: hidden;
-  margin-top: clamp(10px, 1.4vh, 16px);
-}
-.pcard-stat {
-  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
-  padding: 10px 12px 12px; min-width: 0;
-}
-.pcard-stat dt {
-  font-family: var(--font-body); font-weight: 600;
-  font-size: 13px; line-height: 1.5;
-  letter-spacing: .14em; text-transform: uppercase;
-  color: var(--mn-muted); white-space: nowrap;
-  margin: 0;
-}
-.pcard-stat dd {
-  font-family: "Barlow Condensed", sans-serif; font-weight: 600;
-  font-size: clamp(1.4rem, 1.9vw, 2rem); line-height: 1.26;
-  color: var(--mn-text); margin: 1px 0 0; min-width: 0;
-  overflow-wrap: break-word; font-variant-numeric: tabular-nums;
-}
-.pcard-stat--cat { padding-left: 11px; padding-right: 11px; }
-.pcard-stat--cat dd .cat-code {
-  display: block;
-  font-size: clamp(1.8rem, 2.4vw, 2.5rem); line-height: 1.2;
-  color: #FFF; letter-spacing: .02em;
-}
-.pcard-stat--cat dd .cat-name {
-  display: block; margin-top: 2px;
-  font-family: var(--font-body); font-weight: 600;
-  /* "INTERMEDIATE" was splitting as "INTERMEDIAT E" — shrink to fit rather
-     than break a word that is also a label */
-  font-size: clamp(9.5px, .64vw, 11.5px); line-height: 1.45;
-  letter-spacing: .01em; text-transform: uppercase;
-  color: var(--mn-muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.pcard-base {
-  margin-top: clamp(10px, 1.4vh, 18px);
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; flex-wrap: wrap;
-  padding: 12px clamp(14px, 1.4vw, 20px);
-  border-radius: 9px;
-  border: 1px solid rgba(220, 38, 38, .26);
-  background: linear-gradient(100deg, rgba(220,38,38,.14), rgba(220,38,38,.03) 52%, rgba(255,255,255,.018));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
-}
-.pcard-base-label {
-  font-family: var(--font-body); font-weight: 600;
-  font-size: 13px; line-height: 1.5; letter-spacing: .2em; text-transform: uppercase;
-  color: #EBC4C1;
-}
-.pcard-base-value {
-  font-family: "Barlow Condensed", sans-serif; font-weight: 700;
-  font-size: clamp(1.9rem, 2.7vw, 2.9rem); line-height: 1.2;
-  color: #FFFFFF; font-variant-numeric: tabular-nums; letter-spacing: .01em;
-  text-shadow: 0 0 22px rgba(240, 67, 56, .3);
 }
 
 /* ---------- max bid ----------
@@ -830,25 +534,12 @@ body > *:not(.mn-sky) { position: relative; z-index: 1; }
   background: radial-gradient(120% 80% at 50% -20%, rgba(26,22,34,.80) 0%, rgba(11,10,16,.80) 46%, rgba(5,5,8,.83) 78%, rgba(0,0,0,.86) 100%);
 }
 body.mn-blownup { overflow: hidden; }
-.stage:fullscreen .pcard-name,   .stage.is-blownup .pcard-name   { font-size: clamp(3rem, 5vw, 6.4rem); }
-.stage:fullscreen .pcard-photo,  .stage.is-blownup .pcard-photo  { min-height: clamp(320px, 52vh, 700px); }
-.stage:fullscreen .pcard-base-value, .stage.is-blownup .pcard-base-value { font-size: clamp(2.4rem, 3.6vw, 4.1rem); }
-.stage:fullscreen .pcard-league, .stage.is-blownup .pcard-league { font-size: clamp(17px, 1.4vw, 26px); }
-.stage:fullscreen .pcard-stat dd, .stage.is-blownup .pcard-stat dd { font-size: clamp(1.7rem, 2.3vw, 2.6rem); }
-.stage:fullscreen .pcard-stat--cat dd .cat-code,
-.stage.is-blownup .pcard-stat--cat dd .cat-code { font-size: clamp(2.2rem, 3vw, 3.4rem); }
 .stage:fullscreen .mn-fs, .stage.is-blownup .mn-fs { top: 22px; right: 26px; }
 
 @media (max-width: 760px) {
-  .pcard-frame { grid-template-columns: 1fr; }
-  .pcard-photo { grid-row: auto; min-height: 280px; border-right: none; }
-  .pcard-rule, .pcard-body { grid-column: 1; }
-  .pcard-rule { margin: 0 16px; }
-  .pcard-stats { grid-template-columns: 1fr 1fr; }
   .w-maxes .maxrow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (prefers-reduced-motion: reduce) { .pcard-photo::before, .pcard-noimg, body::after { animation: none; }
-  .pcard { animation: none; }
+@media (prefers-reduced-motion: reduce) { body::after { animation: none; }
 }
 
 /* .app carries an entrance animation whose fill-mode leaves a transform
@@ -876,3 +567,48 @@ body.mn-blownup .app {
 @media (prefers-reduced-motion: reduce) {
   .mn-sky { opacity: .5; }
 }
+
+/* ============================================================
+   WELCOME
+   The captain's own name, at the top of the block. It is a
+   greeting, not a control, so it stays quiet: it must never pull
+   attention off the player on the card underneath it.
+   ============================================================ */
+.welcome {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0 0 clamp(14px, 1.8vh, 22px);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--mn-line, rgba(255, 255, 255, .09));
+}
+.welcome-hi {
+  margin: 0;
+  font-family: 'Barlow', system-ui, sans-serif;
+  font-size: 15px;
+  color: #9a9da4;
+}
+.welcome-hi b {
+  font-family: 'Barlow Condensed', 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: clamp(19px, 2.4vw, 26px);
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.welcome-team {
+  margin: 0 0 0 auto;
+  font-family: 'Barlow Condensed', 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: clamp(13px, 1.5vw, 16px);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: #e5262d;
+  text-shadow: 0 0 14px rgba(229, 38, 45, .45);
+}
+/* the greeting is for the captain, not the room */
+.stage:fullscreen .welcome,
+.stage.is-blownup .welcome { display: none; }

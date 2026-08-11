@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/mn-card.css?v=202608110515" />
-  <link rel="stylesheet" href="css/auction.css?v=202608110515" />
+  <link rel="stylesheet" href="css/mn-card.css?v=202608110720" />
+  <link rel="stylesheet" href="css/auction.css?v=202608110720" />
 </head>
 <body>
 
@@ -99,6 +99,12 @@
         <span class="mn-fs-label">Full screen</span>
       </button>
 
+      <!-- who is holding this phone -->
+      <div class="welcome" id="welcome" hidden>
+        <p class="welcome-hi">Welcome, <b id="welcomeWho">Captain</b></p>
+        <p class="welcome-team" id="welcomeTeam">Team</p>
+      </div>
+
       <div class="stage-idle" id="stageIdle">
         <span class="pulse-ring" aria-hidden="true"></span>
         <p class="idle-title">Waiting for the next player</p>
@@ -151,10 +157,10 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/mn-sky.js?v=202608110515"></script>
-  <script src="js/mn-card.js?v=202608110515"></script>
+  <script src="js/mn-sky.js?v=202608110720"></script>
+  <script src="js/mn-card.js?v=202608110720"></script>
   <script src="js/vendor/supabase.js" defer></script>
-  <script src="js/config.js?v=202608110515"></script>
-  <script src="js/auction.js?v=202608110515" defer></script>
+  <script src="js/config.js?v=202608110720"></script>
+  <script src="js/auction.js?v=202608110720" defer></script>
 </body>
 </html>

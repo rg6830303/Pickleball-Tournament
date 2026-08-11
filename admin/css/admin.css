@@ -1227,103 +1227,6 @@ table.login-table { min-width: 620px; }
   padding: 10px; resize: vertical;
 }
 
-/* ============================================================
-   DIGITAL PLAYER CARD — shown on the auctioneer stage
-   ============================================================ */
-.pcard {
-  display: grid;
-  grid-template-columns: 190px 1fr;
-  gap: 18px;
-  align-items: stretch;
-  border: 1px solid rgba(229, 38, 45, 0.45);
-  border-radius: var(--radius);
-  background:
-    radial-gradient(120% 100% at 0% 0%, rgba(229, 38, 45, 0.14), transparent 60%),
-    linear-gradient(180deg, var(--panel-2), var(--panel));
-  box-shadow: 0 0 0 1px rgba(229, 38, 45, 0.12), 0 18px 44px rgba(0, 0, 0, 0.55);
-  padding: 16px;
-  margin: 12px 0 16px;
-}
-.pcard-photo {
-  position: relative;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: #0a0a0b;
-  border: 1px solid var(--line-strong);
-  min-height: 210px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.pcard-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.pcard-noimg {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-faint);
-  font-family: var(--font-display);
-  letter-spacing: 0.18em;
-  font-size: 13px;
-  text-align: center;
-  padding: 10px;
-}
-.pcard-noimg small {
-  font-family: var(--font-body);
-  letter-spacing: 0.04em;
-  font-size: 11px;
-  color: var(--text-faint);
-  opacity: 0.8;
-}
-.pcard-body { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.pcard-kicker {
-  font-size: 10.5px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--red);
-  font-weight: 700;
-}
-.pcard-name {
-  font-family: var(--font-display);
-  font-size: clamp(26px, 4.2vw, 46px);
-  font-weight: 700;
-  line-height: 1.02;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
-  margin: 4px 0 12px;
-  overflow-wrap: anywhere;
-}
-.pcard-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 8px;
-}
-.pcard-stat {
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.35);
-  padding: 8px 12px;
-}
-.pcard-stat.wide { grid-column: 1 / -1; }
-.pcard-stat dt {
-  font-size: 9.5px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-.pcard-stat dd {
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.15;
-  margin-top: 2px;
-}
-.pcard-stat.wide dd { color: var(--red); }
-@media (max-width: 720px) {
-  .pcard { grid-template-columns: 1fr; }
-  .pcard-photo { min-height: 240px; }
-}
-
 /* ---- category chips ---- */
 .cat-chip {
   display: inline-block;
@@ -1504,216 +1407,9 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
   color: var(--mn-red-hot);
   margin-bottom: 10px;
 }
-
-/* ---------- the card ---------- */
-#tab-auction .pcard {
-  position: relative; z-index: 2;
-  display: block;
-  border-radius: 16px;
-  padding: 13px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background:
-    linear-gradient(178deg, rgba(255,255,255,.055), rgba(255,255,255,.012) 26%, rgba(255,255,255,0) 55%),
-    linear-gradient(180deg, #141219 0%, #0c0b10 46%, #08070b 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, .06),
-    0 34px 80px -30px rgba(0, 0, 0, .95),
-    0 22px 90px -40px rgba(220, 38, 38, .5);
-  animation: mnCardIn .55s var(--mn-ease) both;
-}
 @keyframes mnCardIn {
   from { opacity: 0; transform: translateY(14px) scale(.99); filter: saturate(.7) brightness(.86) }
   to   { opacity: 1; transform: none; filter: none }
-}
-#tab-auction .pcard-frame {
-  display: grid;
-  grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
-  gap: 0 clamp(18px, 2vw, 34px);
-  border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, .055);
-  background: rgba(0, 0, 0, .35);
-  overflow: hidden;
-}
-
-/* photo plate */
-#tab-auction .pcard-photo {
-  position: relative;
-  grid-row: 1 / span 2;
-  min-height: clamp(280px, 42vh, 520px);
-  background: linear-gradient(160deg, #15131b, #08070b);
-  overflow: hidden;               /* image only — no text lives in here */
-  border-right: 1px solid rgba(255, 255, 255, .05);
-}
-#tab-auction .pcard-photo img {
-  width: 100%; height: 100%; object-fit: cover; object-position: 50% 16%;
-  filter: saturate(.88) contrast(1.05) brightness(.95);
-  display: block;
-}
-#tab-auction .pcard-photo::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background:
-    radial-gradient(78% 74% at 50% 30%, rgba(0,0,0,0) 26%, rgba(0,0,0,.5) 74%, rgba(0,0,0,.85) 100%),
-    linear-gradient(to top, rgba(8,7,11,.9) 0%, rgba(8,7,11,.3) 26%, rgba(8,7,11,0) 58%);
-}
-#tab-auction .pcard-photo::before {
-  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .16;
-  background: repeating-linear-gradient(101deg,
-    transparent 0 4px, rgba(214, 224, 244, .6) 4px 5px, transparent 5px 27px);
-  background-size: 100% 190px;
-  animation: mnRain 1.15s linear infinite;
-}
-.pcard-lot {
-  position: absolute; z-index: 3; top: 13px; left: 13px;
-  font-family: "Barlow Condensed", sans-serif; font-weight: 600;
-  font-size: 14px; line-height: 1.5; letter-spacing: .2em; text-transform: uppercase;
-  color: #EBE6E2;
-  padding: 4px 11px; border-radius: 5px;
-  background: rgba(6, 5, 9, .7); border: 1px solid rgba(255, 255, 255, .18);
-}
-#tab-auction .pcard-noimg {
-  position: absolute; inset: 0;
-  display: grid; align-content: center; justify-items: center; gap: 6px;
-  text-align: center; padding: 24px;
-  font-family: "Barlow Condensed", sans-serif; font-weight: 600;
-  font-size: 21px; line-height: 1.4; letter-spacing: .22em; text-transform: uppercase;
-  color: var(--mn-text-2);
-  /* falling rain, not a static diagonal hatch — the monsoon should move
-     everywhere it appears */
-  background:
-    repeating-linear-gradient(101deg, transparent 0 4px, rgba(206,216,236,.5) 4px 5px, transparent 5px 26px),
-    linear-gradient(165deg, #16141c, #08080c);
-  background-size: 100% 190px, auto;
-  animation: mnRain 1.15s linear infinite;
-}
-#tab-auction .pcard-noimg small {
-  font-family: var(--font-body); font-weight: 500;
-  font-size: 13px; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--mn-muted);
-}
-.pcard-noimg-mark {
-  width: 50px; height: 50px; border-radius: 50%;
-  border: 1px dashed rgba(255, 255, 255, .26);
-  position: relative; margin-bottom: 4px;
-}
-.pcard-noimg-mark::after {
-  content: ""; position: absolute; left: 9px; right: 9px; top: 12px; bottom: 12px;
-  border: 1px solid rgba(255, 255, 255, .18); border-radius: 3px;
-  background: linear-gradient(140deg, rgba(255, 255, 255, .05), transparent);
-}
-
-/* the luminous rule under the plate */
-.pcard-rule {
-  grid-column: 2; align-self: start;
-  height: 2px; margin: 0 clamp(18px, 2vw, 30px);
-  border-radius: 2px;
-  background: linear-gradient(90deg,
-    rgba(127,29,29,0), var(--mn-red) 22%, var(--mn-red-hot) 50%, var(--mn-red) 78%, rgba(127,29,29,0));
-  box-shadow: 0 0 18px rgba(240, 67, 56, .75), 0 0 44px rgba(220, 38, 38, .35);
-}
-
-/* body */
-#tab-auction .pcard-body {
-  grid-column: 2;
-  display: flex; flex-direction: column; justify-content: center;
-  min-width: 0;
-  padding: clamp(16px, 1.7vw, 26px) clamp(18px, 2vw, 30px) clamp(18px, 1.8vw, 28px);
-}
-.pcard-league {
-  font-family: "Barlow Condensed", sans-serif; font-weight: 700;
-  font-size: clamp(15px, 1.15vw, 20px); line-height: 1.5;
-  letter-spacing: .3em; text-transform: uppercase;
-  color: #FFE9E6;
-  background: linear-gradient(92deg, #FFFFFF 6%, var(--mn-red-hot) 52%, #FFD9D4 96%);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 3px;
-  overflow-wrap: anywhere;
-}
-#tab-auction .pcard-kicker {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  font-family: "Barlow Condensed", sans-serif; font-weight: 500;
-  font-size: 14px; line-height: 1.6;
-  letter-spacing: .24em; text-transform: uppercase;
-  color: var(--mn-muted);
-}
-#tab-auction .pcard-kicker .spark {
-  width: 22px; height: 1px; flex: 0 0 auto;
-  background: linear-gradient(90deg, var(--mn-red), transparent);
-}
-#tab-auction .pcard-name {
-  margin: .14em 0 .3em;
-  font-family: "Barlow Condensed", sans-serif; font-weight: 700;
-  font-size: clamp(2.6rem, 4.2vw, 4.6rem);
-  line-height: 1.16;                 /* condensed glyph box needs the room */
-  letter-spacing: .004em;
-  color: #FFFFFF;
-  text-shadow: 0 2px 34px rgba(255, 255, 255, .1), 0 0 70px rgba(220, 38, 38, .14);
-  overflow-wrap: break-word;
-}
-
-/* stats */
-#tab-auction .pcard-stats {
-  /* the Category tile holds a whole word ("INTERMEDIATE") next to three short
-     values, so it gets noticeably more of the row */
-  display: grid; grid-template-columns: 1.75fr 1fr 1fr 1.1fr; gap: 1px;
-  background: var(--mn-line); border: 1px solid var(--mn-line);
-  border-radius: 9px; overflow: hidden;
-  margin-top: clamp(10px, 1.4vh, 18px);
-}
-#tab-auction .pcard-stat {
-  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
-  padding: 10px 13px 12px; min-width: 0;
-}
-#tab-auction .pcard-stat dt {
-  font-family: var(--font-body); font-weight: 600;
-  font-size: 13px; line-height: 1.5;          /* floored for the projector */
-  letter-spacing: .14em; text-transform: uppercase;
-  color: var(--mn-muted); white-space: nowrap;
-}
-#tab-auction .pcard-stat dd {
-  font-family: "Barlow Condensed", sans-serif; font-weight: 600;
-  font-size: clamp(1.5rem, 2vw, 2.15rem); line-height: 1.26;
-  color: var(--mn-text); margin-top: 1px; min-width: 0;
-  overflow-wrap: break-word; font-variant-numeric: tabular-nums;
-}
-#tab-auction .pcard-stat--cat { padding-left: 11px; padding-right: 11px; }
-#tab-auction .pcard-stat--cat dd .cat-code {
-  display: block;
-  font-size: clamp(1.9rem, 2.6vw, 2.7rem); line-height: 1.2;
-  color: #FFF; letter-spacing: .02em;
-}
-#tab-auction .pcard-stat--cat dd .cat-name {
-  display: block; margin-top: 2px;
-  font-family: var(--font-body); font-weight: 600;
-  /* "INTERMEDIATE" was splitting as "INTERMEDIAT E" — shrink to fit rather
-     than break a word that is also a label */
-  font-size: clamp(9.5px, .66vw, 11.5px); line-height: 1.45;
-  letter-spacing: .01em; text-transform: uppercase;
-  color: var(--mn-muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-
-/* base price */
-#tab-auction .pcard-base {
-  margin-top: clamp(12px, 1.5vh, 20px);
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; flex-wrap: wrap;
-  padding: 12px clamp(14px, 1.4vw, 20px);
-  border-radius: 9px;
-  border: 1px solid rgba(220, 38, 38, .26);
-  background: linear-gradient(100deg, rgba(220,38,38,.14), rgba(220,38,38,.03) 52%, rgba(255,255,255,.018));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
-}
-#tab-auction .pcard-base-label {
-  font-family: var(--font-body); font-weight: 600;
-  font-size: 13px; line-height: 1.5; letter-spacing: .2em; text-transform: uppercase;
-  color: #EBC4C1;
-}
-#tab-auction .pcard-base-value {
-  font-family: "Barlow Condensed", sans-serif; font-weight: 700;
-  font-size: clamp(2rem, 2.9vw, 3.1rem); line-height: 1.2;
-  color: #FFFFFF; font-variant-numeric: tabular-nums; letter-spacing: .01em;
-  text-shadow: 0 0 22px rgba(240, 67, 56, .3);
 }
 
 #tab-auction .auc-emptystage {
@@ -1751,30 +1447,13 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
   overflow-y: auto;
 }
 #tab-auction .auc-stage:fullscreen .auc-tag { font-size: 18px; }
-#tab-auction .auc-stage:fullscreen .pcard-name { font-size: clamp(3.4rem, 5.4vw, 7rem); }
-#tab-auction .auc-stage:fullscreen .pcard-photo { min-height: clamp(360px, 56vh, 760px); }
-#tab-auction .auc-stage:fullscreen .pcard-base-value { font-size: clamp(2.6rem, 3.8vw, 4.4rem); }
-#tab-auction .auc-stage:fullscreen .pcard-league { font-size: clamp(18px, 1.5vw, 28px); }
-#tab-auction .auc-stage:fullscreen .pcard-stat dd { font-size: clamp(1.8rem, 2.5vw, 2.8rem); }
-#tab-auction .auc-stage:fullscreen .pcard-stat--cat dd .cat-code { font-size: clamp(2.3rem, 3.2vw, 3.6rem); }
 #tab-auction .auc-stage:fullscreen .mn-fs { top: 22px; right: 26px; }
 
 @media (min-width: 1500px) {
   #tab-auction .auc-stage { grid-template-columns: minmax(0, 1fr) 400px; }
-  #tab-auction .pcard-frame { grid-template-columns: minmax(0, 40%) minmax(0, 1fr); }
 }
 @media (max-width: 1080px) {
   #tab-auction .auc-stage { grid-template-columns: 1fr; }
-}
-@media (max-width: 760px) {
-  #tab-auction .pcard-frame { grid-template-columns: 1fr; }
-  #tab-auction .pcard-photo { grid-row: auto; min-height: 300px; border-right: none; }
-  .pcard-rule, #tab-auction .pcard-body { grid-column: 1; }
-  .pcard-rule { margin: 0 18px; }
-  #tab-auction .pcard-stats { grid-template-columns: 1fr 1fr; }
-}
-@media (prefers-reduced-motion: reduce) { #tab-auction .pcard-photo::before { animation: none; }
-  #tab-auction .pcard { animation: none; }
 }
 
 /* Fallback projector mode for when the Fullscreen API is refused.
@@ -1789,12 +1468,6 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
 }
 body.mn-blownup { overflow: hidden; }
 #tab-auction .auc-stage.is-blownup .auc-tag { font-size: 18px; }
-#tab-auction .auc-stage.is-blownup .pcard-name { font-size: clamp(3.4rem, 5.4vw, 7rem); }
-#tab-auction .auc-stage.is-blownup .pcard-photo { min-height: clamp(360px, 56vh, 760px); }
-#tab-auction .auc-stage.is-blownup .pcard-base-value { font-size: clamp(2.6rem, 3.8vw, 4.4rem); }
-#tab-auction .auc-stage.is-blownup .pcard-league { font-size: clamp(18px, 1.5vw, 28px); }
-#tab-auction .auc-stage.is-blownup .pcard-stat dd { font-size: clamp(1.8rem, 2.5vw, 2.8rem); }
-#tab-auction .auc-stage.is-blownup .pcard-stat--cat dd .cat-code { font-size: clamp(2.3rem, 3.2vw, 3.6rem); }
 #tab-auction .auc-stage.is-blownup .mn-fs { top: 22px; right: 26px; }
 #tab-auction .auc-stage.is-blownup .mn-fs .mn-fs-in { display: none; }
 #tab-auction .auc-stage.is-blownup .mn-fs .mn-fs-out { display: inline; }
@@ -1838,3 +1511,30 @@ body > *:not(.mn-sky) { position: relative; z-index: 1; }
 @media (prefers-reduced-motion: reduce) {
   .mn-sky { opacity: .5; }
 }
+
+/* ============================================================
+   PROJECTOR
+   The console runs on two machines during the auction: this one
+   is thrown on the screen, and a second one — not in full screen
+   — is where the key is typed and the player is sold. So full
+   screen here shows the card and nothing else. The desk controls
+   would only be read by the room, and they are not for the room.
+   ============================================================ */
+#tab-auction .auc-stage:fullscreen,
+#tab-auction .auc-stage.is-blownup {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: clamp(12px, 2vh, 24px);
+}
+#tab-auction .auc-stage:fullscreen .auc-stage-side,
+#tab-auction .auc-stage.is-blownup .auc-stage-side { display: none; }
+
+/* Fit the card to whichever runs out first, the width or the height, so a
+   3:2 card fills a 16:9 projector without ever being cropped. */
+#tab-auction .auc-stage:fullscreen #aucCard,
+#tab-auction .auc-stage.is-blownup #aucCard {
+  width: min(100%, calc(88vh * 1.5));
+  margin: 0 auto;
+}
+#tab-auction .auc-stage:fullscreen .auc-tag,
+#tab-auction .auc-stage.is-blownup .auc-tag { justify-self: start; }
