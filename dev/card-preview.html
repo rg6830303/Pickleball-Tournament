@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Player card — design preview</title>
+<meta name="robots" content="noindex,nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../auction/css/mn-card.css" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 26px 26px 60px;
+    background: #060608;
+    color: #e8e8ea;
+    font-family: 'Barlow', system-ui, sans-serif;
+  }
+  h1 { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; letter-spacing: .18em;
+       text-transform: uppercase; color: #ff5b5e; margin: 0 0 4px; }
+  p.sub { margin: 0 0 20px; color: #8b8e95; font-size: 13px; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  input, select, button {
+    font: inherit; font-size: 14px;
+    background: #111114; color: #fff;
+    border: 1px solid #2a2a30; border-radius: 8px; padding: 8px 12px;
+  }
+  button { cursor: pointer; border-color: #e5262d; background: #1a0d0f; }
+  button:hover { background: #261013; }
+  .sizes { display: grid; gap: 34px; }
+  .slot h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; letter-spacing: .22em;
+             text-transform: uppercase; color: #6f727a; margin: 0 0 10px; font-weight: 600; }
+  .w-projector { max-width: 1240px; }
+  .w-console   { max-width: 760px; }
+  .w-phone     { max-width: 360px; }
+  .note { margin-top: 26px; font-size: 13px; color: #8b8e95; line-height: 1.7; max-width: 900px; }
+  .note b { color: #ffb3b5; font-weight: 600; }
+  code { background: #131317; padding: 1px 6px; border-radius: 4px; color: #ffd6d7; }
+</style>
+</head>
+<body>
+
+<h1>Player card — design preview</h1>
+<p class="sub">Live data from the auction pool, joined to registrations through the player key.</p>
+
+<div class="bar">
+  <!-- the pool is only readable to a signed-in account, so this tool needs
+       one too: any staff or team-captain login works -->
+  <input id="email" type="email" placeholder="staff or captain email" size="26" autocomplete="username" />
+  <input id="pass" type="password" placeholder="password" size="16" autocomplete="current-password" />
+  <button id="signin" type="button">Sign in</button>
+</div>
+
+<div class="bar">
+  <label for="key">Player key</label>
+  <input id="key" value="1" size="6" />
+  <button id="go" type="button">Show card</button>
+  <button id="prev" type="button">◀</button>
+  <button id="next" type="button">▶</button>
+  <span id="status" style="color:#8b8e95;font-size:13px"></span>
+</div>
+
+<div class="sizes">
+  <div class="slot"><h3>Projector / full screen — 1240px</h3><div class="w-projector" id="p1"></div></div>
+  <div class="slot"><h3>Console panel — 760px</h3><div class="w-console" id="p2"></div></div>
+  <div class="slot"><h3>Captain's phone — 360px</h3><div class="w-phone" id="p3"></div></div>
+</div>
+
+<p class="note">
+  <b>Age is blank for every player</b> — there is no age or date-of-birth column anywhere in
+  the database; the registration form never asked for it. The tile is built and will fill the
+  moment <code>auction_pool.age</code> has a value, which is editable in the Auction&nbsp;Pool tab.
+</p>
+
+<script src="../auction/js/vendor/supabase.js"></script>
+<script src="../auction/js/config.js"></script>
+<script src="../auction/js/mn-card.js"></script>
+<script>
+(function () {
+  var C = window.MPL_AUCTION_CONFIG;
+  var sb = window.supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY);
+  var cache = null;
+
+  async function load() {
+    if (cache) return cache;
+    var r = await sb.rpc('auction_cards');
+    if (r.error) throw r.error;
+    cache = r.data || [];
+    return cache;
+  }
+
+  async function show() {
+    var key = String(document.getElementById('key').value || '').trim();
+    var st = document.getElementById('status');
+    st.textContent = 'loading…';
+    try {
+      var rows = await load();
+      var row = rows.filter(function (x) { return String(x.player_key) === key; })[0];
+      if (!row) { st.textContent = 'no player with key ' + key + ' (' + rows.length + ' in pool)'; return; }
+      ['p1', 'p2', 'p3'].forEach(function (id) { MNCard.render(document.getElementById(id), row); });
+      st.textContent = row.name + ' · cat ' + row.category + ' · ' +
+        (row.photo_url ? 'photo ok' : 'no photo') + ' · ' + rows.length + ' in pool';
+    } catch (e) {
+      st.textContent = 'error: ' + (e.message || e);
+    }
+  }
+
+  async function signIn() {
+    var st = document.getElementById('status');
+    st.textContent = 'signing in…';
+    var r = await sb.auth.signInWithPassword({
+      email: document.getElementById('email').value.trim(),
+      password: document.getElementById('pass').value
+    });
+    if (r.error) { st.textContent = 'sign-in failed: ' + r.error.message; return; }
+    cache = null;
+    show();
+  }
+
+  function stepKey(dir) {
+    if (!cache) return;
+    var keys = cache.map(function (r) { return String(r.player_key); });
+    var i = keys.indexOf(String(document.getElementById('key').value).trim());
+    var n = (i < 0 ? 0 : i + dir + keys.length) % keys.length;
+    document.getElementById('key').value = keys[n];
+    show();
+  }
+
+  document.getElementById('signin').addEventListener('click', signIn);
+  document.getElementById('pass').addEventListener('keydown', function (e) { if (e.key === 'Enter') signIn(); });
+  document.getElementById('go').addEventListener('click', show);
+  document.getElementById('prev').addEventListener('click', function () { stepKey(-1); });
+  document.getElementById('next').addEventListener('click', function () { stepKey(1); });
+  document.getElementById('key').addEventListener('keydown', function (e) { if (e.key === 'Enter') show(); });
+  sb.auth.getSession().then(function (s) { if (s.data && s.data.session) show(); else document.getElementById('status').textContent = 'sign in to load the pool'; });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+/* ==========================================================================
+   THE PLAYER CARD
+
+   The artwork is the card. This file does not draw any of it — no frame, no
+   panel, no boxes, no wordmark. It places the supplied PNG at full size and
+   positions the photo and the text on top of it, at percentages of the
+   artwork so the whole thing scales as one picture from a phone to a
+   projector.
+
+   Type sizes are in cqw — hundredths of the card's own width — for the same
+   reason. Nothing here uses a breakpoint.
+   ========================================================================== */
+
+.mplc-wrap { container-type: inline-size; width: 100%; }
+
+.mplc {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--ratio, 1.5);
+  overflow: hidden;
+  font-family: 'Barlow Condensed', 'Oswald', system-ui, sans-serif;
+  color: #fff;
+  isolation: isolate;
+  contain: layout paint;
+  background: #000;
+}
+
+/* the artwork itself, edge to edge */
+.mplc-art {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  object-fit: fill;          /* the overlay percentages assume the full frame */
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ---------- the photo, inside the panel the artwork draws ---------- */
+.mplc-stand {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 1.2cqw;
+  display: grid;
+  place-items: center;
+}
+.mplc-photo {
+  width: 100%; height: 100%;
+  display: block;
+  object-fit: cover;
+  /* object-position and filter are set per photo from its own pixels */
+  object-position: 50% 18%;
+  /* The panel is lit from a single overhead source. Feathering the photo's
+     edges into the dark is what lets a flat phone snapshot sit inside that
+     light instead of looking pasted onto it — and it is why a hard cutout
+     is not needed for the card to read correctly. */
+  -webkit-mask-image:
+    radial-gradient(74% 78% at 50% 32%, #000 46%, rgba(0,0,0,.72) 70%, transparent 93%),
+    linear-gradient(180deg, #000 58%, rgba(0,0,0,.4) 84%, transparent 99%);
+  mask-image:
+    radial-gradient(74% 78% at 50% 32%, #000 46%, rgba(0,0,0,.72) 70%, transparent 93%),
+    linear-gradient(180deg, #000 58%, rgba(0,0,0,.4) 84%, transparent 99%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.mplc-photo.is-broken { display: none; }
+.mplc-initial {
+  font-weight: 700;
+  font-size: 9cqw;
+  color: rgba(255, 255, 255, .14);
+  letter-spacing: .04em;
+}
+
+/* ---------- text on the artwork ---------- */
+.mplc-name {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  font-weight: 700;
+  font-size: 5.1cqw;
+  line-height: 1.02;
+  letter-spacing: .012em;
+  text-transform: uppercase;
+  text-shadow: 0 0 2.2cqw rgba(255, 92, 96, .3), 0 .16cqw .4cqw rgba(0, 0, 0, .92);
+  overflow-wrap: anywhere;
+}
+.mplc-name[data-step="long"]  { font-size: 4.2cqw; }
+.mplc-name[data-step="xlong"] { font-size: 3.4cqw; line-height: 1.06; }
+
+/* one box on the artwork: label above its red rule, value below */
+.mplc-tile,
+.mplc-price {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 .5cqw;
+  text-align: center;
+}
+.mplc-tile-k {
+  font-family: 'Barlow', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.02cqw;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: #9a9da4;
+  white-space: nowrap;
+  /* sit just above the rule the artwork already draws */
+  height: var(--rule, 30%);
+  display: flex;
+  align-items: center;
+}
+.mplc-tile-v {
+  font-weight: 700;
+  font-size: 2.7cqw;
+  line-height: 1.04;
+  color: #fff;
+  white-space: nowrap;
+  margin-top: .55cqw;
+}
+.mplc-tile-v.is-empty { color: rgba(255, 255, 255, .3); }
+.mplc-tile-v i {
+  display: block;
+  font-family: 'Barlow', system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: .9cqw;
+  letter-spacing: .17em;
+  color: #ff9d9f;
+  margin-top: .05cqw;
+}
+
+.mplc-price { justify-content: center; }
+.mplc-price .mplc-tile-k { color: #ffcccd; height: auto; margin-bottom: .35cqw; }
+.mplc-price-v {
+  font-weight: 700;
+  font-size: 4.4cqw;
+  line-height: 1;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 0 1.8cqw rgba(255, 122, 124, .42);
+}
+
+/* auction state is not part of the artwork, so it stays at the corner */
+.mplc-flag {
+  position: absolute; top: 0; left: 0;
+  z-index: 3;
+  font-size: 1.35cqw; font-weight: 700;
+  letter-spacing: .26em; text-transform: uppercase;
+  padding: .5cqw 1.2cqw;
+  border-radius: 0 0 .9cqw 0;
+  background: linear-gradient(120deg, #b8161a, #e5262d);
+  box-shadow: 0 .3cqw 1.6cqw rgba(0, 0, 0, .6);
+}
+.mplc-flag--unsold { background: linear-gradient(120deg, #3a3d45, #5a5e68); }
