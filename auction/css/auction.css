@@ -554,45 +554,83 @@ body.mn-blownup .app {
 
 /* ============================================================
    WELCOME
-   The captain's own name, at the top of the block. It is a
-   greeting, not a control, so it stays quiet: it must never pull
-   attention off the player on the card underneath it.
+   The captain's own name, at the top of their screen. It is a
+   greeting, not a control: the name carries it, everything around
+   it stays quiet, and it steps aside entirely in projector mode.
    ============================================================ */
 .welcome {
   position: relative;
   z-index: 2;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  margin: 0 0 clamp(14px, 1.8vh, 22px);
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--mn-line, rgba(255, 255, 255, .09));
+  gap: 4px 16px;
+  margin: 0 0 clamp(16px, 2vh, 24px);
+  padding: 14px 20px;
+  border: 1px solid var(--mn-line, rgba(255, 255, 255, .09));
+  border-left: 3px solid var(--red, #e5262d);
+  border-radius: 12px;
+  background:
+    linear-gradient(100deg, rgba(229, 38, 45, .10), rgba(12, 12, 15, .55) 46%, rgba(8, 8, 11, .5));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
 }
 .welcome-hi {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-family: 'Barlow', system-ui, sans-serif;
-  font-size: 15px;
-  color: #9a9da4;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  color: #8b8e95;
 }
 .welcome-hi b {
   font-family: 'Barlow Condensed', 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: clamp(19px, 2.4vw, 26px);
-  letter-spacing: .02em;
+  font-size: clamp(22px, 2.8vw, 32px);
+  line-height: 1.05;
+  letter-spacing: .015em;
   text-transform: uppercase;
   color: #fff;
+  text-shadow: 0 0 22px rgba(255, 96, 100, .3);
 }
 .welcome-team {
   margin: 0 0 0 auto;
+  padding: 5px 13px;
+  border: 1px solid rgba(229, 38, 45, .38);
+  border-radius: 999px;
+  background: rgba(229, 38, 45, .1);
   font-family: 'Barlow Condensed', 'Oswald', sans-serif;
   font-weight: 600;
-  font-size: clamp(13px, 1.5vw, 16px);
-  letter-spacing: .22em;
+  font-size: clamp(12px, 1.4vw, 15px);
+  letter-spacing: .2em;
   text-transform: uppercase;
-  color: #e5262d;
-  text-shadow: 0 0 14px rgba(229, 38, 45, .45);
+  color: #ff9d9f;
+  white-space: nowrap;
 }
-/* the greeting is for the captain, not the room */
+@media (max-width: 560px) {
+  .welcome-team { margin-left: 0; }
+}
+
+/* ---------- projector mode: the card, and nothing else ----------
+   A captain can throw their own screen up too, and when they do the
+   greeting, the bid readout and the ticker are all noise. */
 .stage:fullscreen .welcome,
-.stage.is-blownup .welcome { display: none; }
+.stage.is-blownup .welcome,
+.stage:fullscreen .stage-tag,
+.stage.is-blownup .stage-tag,
+.stage:fullscreen .bid-panel,
+.stage.is-blownup .bid-panel,
+.stage:fullscreen .bid-msg,
+.stage.is-blownup .bid-msg,
+.stage:fullscreen .ticker,
+.stage.is-blownup .ticker { display: none; }
+
+/* fit to whichever runs out first, the width or the height */
+.stage:fullscreen #lotCard,
+.stage.is-blownup #lotCard {
+  width: min(100%, calc(88vh * 1.5));
+  margin: 0 auto;
+}

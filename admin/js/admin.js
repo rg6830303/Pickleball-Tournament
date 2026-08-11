@@ -1002,7 +1002,6 @@
     const live = aState && aState.status === "live" && aState.current_lot_id;
     const lot = live ? aLots.find((l) => l.id === aState.current_lot_id) : null;
 
-    $("#aucTag").textContent = lot ? "On the block" : "Waiting for the next player";
     renderPlayerCard(lot);
 
     const empty = $("#aucEmptyStage");

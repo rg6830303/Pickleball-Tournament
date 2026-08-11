@@ -81,17 +81,19 @@
     var g = raw.getContext('2d');
     var r = rng(seed);
 
-    function puff(cx, cy, rad, a, mode) {
-      var col = mode === 'destination-out' ? '0,0,0' : tone;
-      var grd = g.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    function puff(cx, cy, rad, a, mode, col) {
+      col = col || (mode === 'destination-out' ? '0,0,0' : tone);
+      var grd = g.createRadialGradient(cx, cy, rad * 0.12, cx, cy, rad);
       grd.addColorStop(0.00, 'rgba(' + col + ',' + a.toFixed(4) + ')');
-      grd.addColorStop(0.48, 'rgba(' + col + ',' + (a * 0.55).toFixed(4) + ')');
+      grd.addColorStop(0.42, 'rgba(' + col + ',' + (a * 0.62).toFixed(4) + ')');
+      grd.addColorStop(0.74, 'rgba(' + col + ',' + (a * 0.20).toFixed(4) + ')');
       grd.addColorStop(1.00, 'rgba(' + col + ',0)');
       g.globalCompositeOperation = mode;
       g.fillStyle = grd;
       g.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
     }
 
+    /* the mass: big soft bodies packed along a wavy baseline */
     for (var i = 0; i < blobs; i++) {
       var t = r();
       var bx = t * w;
@@ -99,25 +101,46 @@
                  Math.sin(t * 6.2832 * 4.3 + seed * 1.7) * h * 0.05;
       var by = h * 0.66 + wave - r() * h * 0.44;
       var rad = h * (0.13 + r() * 0.31);
-      var a = 0.050 + r() * 0.085;
+      var a = 0.075 + r() * 0.115;
       for (var k = 0; k < 3; k++) puff(bx + k * w, by, rad, a, 'source-over');
     }
+
+    /* Detail. Without this a cloud is a smudge: what makes one read as
+       cloud is the small stuff riding on the big stuff. These are tighter
+       and brighter, sitting on the upper faces where the light would
+       catch, which is what gives the bank its billows. */
+    var detail = Math.round(blobs * 1.35);
+    for (var d2 = 0; d2 < detail; d2++) {
+      var dt = r();
+      var dx = dt * w;
+      var dw2 = Math.sin(dt * 6.2832 * 1.7 + seed) * h * 0.11 +
+                Math.sin(dt * 6.2832 * 4.3 + seed * 1.7) * h * 0.05;
+      var dy = h * 0.60 + dw2 - r() * h * 0.46;
+      var drad = h * (0.045 + r() * 0.105);
+      var da = 0.085 + r() * 0.13;
+      var lit = r() < 0.42;                    /* a few catch the light */
+      for (var k2 = 0; k2 < 3; k2++) {
+        puff(dx + k2 * w, dy, drad, da, 'source-over', lit ? '186,194,214' : null);
+      }
+    }
+
+    /* tear it open so it wisps at the edges instead of reading as circles */
     for (var j = 0; j < holes; j++) {
       var ex = r() * w;
       var ey = h * (0.14 + r() * 0.78);
-      var er = h * (0.06 + r() * 0.21);
-      var ea = 0.16 + r() * 0.36;
-      for (var k2 = 0; k2 < 3; k2++) puff(ex + k2 * w, ey, er, ea, 'destination-out');
+      var er = h * (0.05 + r() * 0.19);
+      var ea = 0.20 + r() * 0.42;
+      for (var k3 = 0; k3 < 3; k3++) puff(ex + k3 * w, ey, er, ea, 'destination-out');
     }
 
-    /* fade top and bottom to nothing — this is what makes a bank instead of
-       a box. Left and right are deliberately left alone: they tile. */
+    /* fade top and bottom to nothing so it is a bank, not a box.
+       Left and right tile, so they are left alone. */
     g.globalCompositeOperation = 'destination-in';
     var vg = g.createLinearGradient(0, 0, 0, h);
     vg.addColorStop(0.00, 'rgba(0,0,0,0)');
     vg.addColorStop(0.14, 'rgba(0,0,0,0.45)');
     vg.addColorStop(0.40, 'rgba(0,0,0,1)');
-    vg.addColorStop(0.74, 'rgba(0,0,0,0.82)');
+    vg.addColorStop(0.74, 'rgba(0,0,0,0.86)');
     vg.addColorStop(1.00, 'rgba(0,0,0,0)');
     g.fillStyle = vg;
     g.fillRect(0, 0, w * 3, h);
@@ -126,7 +149,9 @@
     var out = document.createElement('canvas');
     out.width = w; out.height = h;
     var o = out.getContext('2d');
-    try { o.filter = 'blur(3px)'; } catch (e) {}
+    /* Barely any blur now. The old 3px was smearing the detail back into the
+       smudge it was added to fix; this only takes the hard edge off. */
+    try { o.filter = 'blur(1.1px) contrast(1.22) saturate(.9)'; } catch (e) {}
     o.drawImage(raw, -w, 0);
     try { o.filter = 'none'; } catch (e) {}
     return out;
@@ -134,9 +159,9 @@
 
   /* three planes at different depth, drift speed and weight */
   var PLANE = [
-    { img: null, seed: 11, tone: '150,158,180', blobs: 64, holes: 30, y: -0.14, h: 0.52, w: 1.45, sp: 5.5,  a: 0.30 },
-    { img: null, seed: 37, tone: '142,150,172', blobs: 80, holes: 38, y: -0.10, h: 0.44, w: 1.30, sp: 10.5, a: 0.40 },
-    { img: null, seed: 73, tone: '132,140,164', blobs: 92, holes: 46, y: -0.05, h: 0.36, w: 1.18, sp: 17.0, a: 0.52 }
+    { img: null, seed: 11, tone: '150,158,180', blobs: 74, holes: 34, y: -0.14, h: 0.52, w: 1.45, sp: 5.5,  a: 0.34 },
+    { img: null, seed: 37, tone: '142,150,172', blobs: 92, holes: 44, y: -0.10, h: 0.44, w: 1.30, sp: 10.5, a: 0.46 },
+    { img: null, seed: 73, tone: '132,140,164', blobs: 108, holes: 54, y: -0.05, h: 0.36, w: 1.18, sp: 17.0, a: 0.60 }
   ];
   function buildClouds() {
     for (var i = 0; i < PLANE.length; i++) {
