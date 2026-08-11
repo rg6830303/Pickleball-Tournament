@@ -220,6 +220,9 @@
     if (!el) return;
     el.innerHTML = html(d, opts);
     fitAll(el);
+    /* In projector mode the weather is painted inside this markup, and we have
+       just replaced it. Put it back. */
+    if (window.MNSky && MNSky.relocate) MNSky.relocate();
   }
 
   window.MNCard = {

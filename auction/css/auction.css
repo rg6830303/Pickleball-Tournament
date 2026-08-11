@@ -643,6 +643,7 @@ body.mn-blownup .app {
   border: none;
   border-radius: 0;
   box-shadow: none;
+  padding: 0;
 }
 .stage:fullscreen::before,
 .stage.is-blownup::before { display: none; }
@@ -650,8 +651,7 @@ body.mn-blownup .app {
 /* fit to whichever runs out first, the width or the height */
 .stage:fullscreen #lotCard,
 .stage.is-blownup #lotCard {
-  width: min(100%, calc(86vh * 1.5));
+  /* as large as 3:2 goes without cropping the artwork */
+  width: min(100vw, calc(100vh * 1.5));
   margin: 0 auto;
-  /* lift it off the weather so the card reads as an object in the room */
-  filter: drop-shadow(0 3vh 6vh rgba(0, 0, 0, .85));
 }

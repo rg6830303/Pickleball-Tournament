@@ -38,7 +38,7 @@
 
   var cv, ctx;
   var W = 0, H = 0, DPR = 1;
-  var host = null, nested = false;
+  var host = null, nested = false, inCard = false;
   var raf = 0, prev = 0, clock = 0, alive = false;
 
   /* ---- quality ladder --------------------------------------------------
@@ -53,8 +53,9 @@
   function Q() { return LADDER[qi]; }
 
   /* How hard it is raining. One in normal use; wound up when the card goes
-     full screen, because there the weather IS the room — the panel chrome is
-     gone and the storm runs edge to edge behind the artwork. */
+     full screen. Inside the card it is wound DOWN instead: there the weather
+     is playing across the artwork itself, so it has to read as atmosphere
+     behind the player rather than as weather in front of him. */
   var BOOST = 1;
 
   /* ---- deterministic noise, so a sprite always builds the same way ---- */
@@ -445,8 +446,9 @@
       var gy = H * 0.14;
       var gr = Math.max(W, H) * (storm.close ? 0.72 : 0.95);
       var bg = ctx.createRadialGradient(storm.ox * W, gy, 0, storm.ox * W, gy, gr);
-      bg.addColorStop(0.00, 'rgba(206,228,255,' + (0.50 * flash).toFixed(3) + ')');
-      bg.addColorStop(0.34, 'rgba(160,190,238,' + (0.22 * flash).toFixed(3) + ')');
+      var bk = inCard ? 0.4 : 1;
+      bg.addColorStop(0.00, 'rgba(206,228,255,' + (0.50 * flash * bk).toFixed(3) + ')');
+      bg.addColorStop(0.34, 'rgba(160,190,238,' + (0.22 * flash * bk).toFixed(3) + ')');
       bg.addColorStop(1.00, 'rgba(120,150,205,0)');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
@@ -459,7 +461,7 @@
       if (!P.img) continue;
       var dw = W * P.w, dh = H * P.h;
       var x = -((clock * P.sp) % dw);
-      ctx.globalAlpha = Math.min(1, P.a * (1 + flash * 0.85));
+      ctx.globalAlpha = Math.min(1, P.a * (1 + flash * 0.85) * (inCard ? 0.3 : 1));
       ctx.drawImage(P.img, x, P.y * H, dw, dh);
       ctx.drawImage(P.img, x + dw, P.y * H, dw, dh);
     }
@@ -470,7 +472,7 @@
       var F = PLANE[2];
       if (F.img) {
         ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = Math.min(0.65, flash * 0.55);
+        ctx.globalAlpha = Math.min(0.65, flash * 0.55) * (inCard ? 0.35 : 1);
         var fdw = W * F.w, fdh = H * F.h;
         var fx = -((clock * F.sp) % fdw);
         ctx.drawImage(F.img, fx, F.y * H, fdw, fdh);
@@ -486,21 +488,25 @@
     /* Haze on the floor, so rain has somewhere to arrive. It goes down before
        the bolt: lightning is the brightest thing in the room and has to punch
        through the murk, not sit behind it. */
-    ctx.fillStyle = floorGrad;
-    ctx.fillRect(0, H * 0.62, W, H * 0.38);
+    if (!inCard) {
+      ctx.fillStyle = floorGrad;
+      ctx.fillRect(0, H * 0.62, W, H * 0.38);
+    }
 
     for (var b = 0; b < storm.bolts.length; b++) paintBolt(storm.bolts[b], flash);
 
     /* the monsoon red, breathing */
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.80 + 0.20 * Math.sin(clock * 0.55);
-    ctx.fillStyle = bloomGrad;
-    ctx.fillRect(0, 0, W, H);
-    ctx.globalAlpha = 1;
+    if (!inCard) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.80 + 0.20 * Math.sin(clock * 0.55);
+      ctx.fillStyle = bloomGrad;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
 
     /* the room flash, over everything */
     if (flash > 0.01) {
-      var f = flash * (storm.close ? 0.30 : 0.14) * (BOOST > 1 ? 1.35 : 1);
+      var f = flash * (storm.close ? 0.30 : 0.14) * (inCard ? 0.55 : (BOOST > 1 ? 1.35 : 1));
       var wg = ctx.createLinearGradient(0, 0, 0, H);
       wg.addColorStop(0.00, 'rgba(196,220,255,' + f.toFixed(3) + ')');
       wg.addColorStop(0.52, 'rgba(150,178,232,' + (f * 0.34).toFixed(3) + ')');
@@ -541,12 +547,21 @@
     seedDrops();
   }
 
-  function mount(el) {
+  function mount(el, opts) {
+    opts = opts || {};
+    inCard = !!opts.inCard;
     nested = !!el;
     host = el || document.body;
-    BOOST = nested ? 1.85 : 1;
+    BOOST = inCard ? 1.3 : (nested ? 1.85 : 1);
     drops.length = 0;                 // reseed at the new density
-    if (nested) {
+    if (inCard) {
+      /* Slot it in directly after the artwork, so it plays over the printed
+         card and under the photo and the type. The card clips it, which is
+         what keeps the weather inside the frame. */
+      cv.style.position = 'absolute';
+      cv.style.zIndex = '1';
+      host.insertBefore(cv, host.children[1] || null);
+    } else if (nested) {
       cv.style.position = 'absolute';
       cv.style.zIndex = '-1';               // above the panel's own background,
       host.insertBefore(cv, host.firstChild); // below every child of it
@@ -595,14 +610,29 @@
     });
     document.addEventListener('fullscreenchange', relocate);
     document.addEventListener('webkitfullscreenchange', relocate);
+    /* The fallback projector path is a class on the body, and a new player
+       replaces the card's markup underneath us, so watch for both rather than
+       asking either app to remember to tell us. */
+    if (window.MutationObserver) {
+      new MutationObserver(function () { relocate(); })
+        .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
   }
 
   /* In projector mode the stage goes full screen, and only that subtree is
      painted — so the sky has to travel with it. */
   function relocate() {
     var fs = document.fullscreenElement || document.webkitFullscreenElement;
-    if (fs && fs !== document.documentElement && fs !== document.body) mount(fs);
-    else mount(null);
+    var big = (fs && fs !== document.documentElement && fs !== document.body)
+      ? fs
+      : document.querySelector('.is-blownup');   // the fallback projector path
+    if (big) {
+      var card = big.querySelector('.mplc');
+      if (card) mount(card, { inCard: true });   // the weather plays on the card
+      else mount(big);
+    } else {
+      mount(null);
+    }
     /* the element is not always at its final size the instant the event
        fires, and this is the projector path — measure again once it has
        settled rather than leave the sky the wrong size on the big screen */
@@ -640,7 +670,7 @@
         drops: drops.length, ripples: ripples.length,
         planes: Q().planes, shadow: Q().shadow, boost: BOOST,
         clouds: PLANE.filter(function (p) { return !!p.img; }).length,
-        nested: nested, running: alive, frameMs: Math.round(ema * 10) / 10,
+        nested: nested, inCard: inCard, running: alive, frameMs: Math.round(ema * 10) / 10,
         flash: storm.pulses.length ? envelope(storm.pulses, storm.t) : 0,
         bolts: storm.bolts.length, nextStrike: Math.round(storm.next * 10) / 10
       };
