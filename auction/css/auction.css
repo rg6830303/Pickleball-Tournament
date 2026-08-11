@@ -565,10 +565,11 @@ body.mn-blownup .app {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 16px;
-  margin: 0 0 clamp(16px, 2vh, 24px);
-  /* the full-screen button is pinned to this corner; leave it room rather
-     than letting the team pill slide underneath it */
-  padding: 14px clamp(150px, 16vw, 190px) 14px 20px;
+  /* The full-screen button is pinned to this corner. Sitting beside it meant
+     the two kept colliding at some width or other, so the bar simply starts
+     below it. */
+  margin: 46px 0 clamp(16px, 2vh, 24px);
+  padding: 14px 20px;
   border: 1px solid var(--mn-line, rgba(255, 255, 255, .09));
   border-left: 3px solid var(--red, #e5262d);
   border-radius: 12px;
@@ -613,9 +614,7 @@ body.mn-blownup .app {
   white-space: nowrap;
 }
 @media (max-width: 640px) {
-  /* On a phone that reserved strip would leave the name nowhere to go, so the
-     bar drops below the button instead of beside it. */
-  .welcome { padding-right: 20px; margin-top: 44px; }
+  .welcome { margin-top: 44px; padding: 12px 16px; gap: 8px; }
   .welcome-team { margin-left: 0; }
 }
 
@@ -655,3 +654,56 @@ body.mn-blownup .app {
   width: min(100vw, calc(100vh * 1.5));
   margin: 0 auto;
 }
+
+
+/* ============================================================
+   PASSWORD REVEAL
+   ============================================================ */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { width: 100%; padding-right: 46px; }
+.pw-eye {
+  position: absolute;
+  right: 5px; top: 50%;
+  transform: translateY(-50%);
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #8b8e95;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pw-eye:hover { color: #fff; background: rgba(255, 255, 255, .06); }
+.pw-eye:focus-visible { outline: 2px solid #e5262d; outline-offset: 1px; }
+.pw-eye svg { width: 19px; height: 19px; }
+.pw-eye .pw-shut { display: none; }
+.pw-eye.is-on { color: #ff9d9f; }
+.pw-eye.is-on .pw-open { display: none; }
+.pw-eye.is-on .pw-shut { display: inline; }
+
+
+/* ============================================================
+   PROJECTOR ON A PHONE
+   iOS reports 100vh as the height WITHOUT the browser chrome, so a card
+   sized against it is taller than what you can actually see and gets its
+   bottom clipped. dvh is the visible height and updates as the chrome
+   hides; the vh line stays first as the fallback for anything older.
+   Rubber-banding is also switched off, so the card cannot be dragged
+   part-way off the screen mid-auction.
+   ============================================================ */
+.stage:fullscreen,
+.stage.is-blownup {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: manipulation;
+}
+.stage:fullscreen #lotCard,
+.stage.is-blownup #lotCard {
+  width: min(100vw, calc(100vh * 1.5));
+  width: min(100dvw, calc(100dvh * 1.5));
+}
+body.mn-blownup { overscroll-behavior: none; }

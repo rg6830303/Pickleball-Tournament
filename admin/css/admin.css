@@ -1540,3 +1540,56 @@ body > *:not(.mn-sky) { position: relative; z-index: 1; }
   width: min(100vw, calc(100vh * 1.5));
   margin: 0 auto;
 }
+
+
+/* ============================================================
+   PASSWORD REVEAL
+   ============================================================ */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { width: 100%; padding-right: 46px; }
+.pw-eye {
+  position: absolute;
+  right: 5px; top: 50%;
+  transform: translateY(-50%);
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #8b8e95;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pw-eye:hover { color: #fff; background: rgba(255, 255, 255, .06); }
+.pw-eye:focus-visible { outline: 2px solid #e5262d; outline-offset: 1px; }
+.pw-eye svg { width: 19px; height: 19px; }
+.pw-eye .pw-shut { display: none; }
+.pw-eye.is-on { color: #ff9d9f; }
+.pw-eye.is-on .pw-open { display: none; }
+.pw-eye.is-on .pw-shut { display: inline; }
+
+
+/* ============================================================
+   PROJECTOR ON A PHONE
+   iOS reports 100vh as the height WITHOUT the browser chrome, so a card
+   sized against it is taller than what you can actually see and gets its
+   bottom clipped. dvh is the visible height and updates as the chrome
+   hides; the vh line stays first as the fallback for anything older.
+   Rubber-banding is also switched off, so the card cannot be dragged
+   part-way off the screen mid-auction.
+   ============================================================ */
+#tab-auction .auc-stage:fullscreen,
+#tab-auction .auc-stage.is-blownup {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: manipulation;
+}
+#tab-auction .auc-stage:fullscreen #aucCard,
+#tab-auction .auc-stage.is-blownup #aucCard {
+  width: min(100vw, calc(100vh * 1.5));
+  width: min(100dvw, calc(100dvh * 1.5));
+}
+body.mn-blownup { overscroll-behavior: none; }
