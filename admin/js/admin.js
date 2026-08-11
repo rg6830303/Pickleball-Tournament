@@ -1529,6 +1529,10 @@
     const btn = $("#btnAucSell");
     const teamSel = $("#aucSellTeam").value;
     const priceIn = $("#aucSellPrice").value;
+    // Read who is on the block BEFORE selling: the sale clears the block, and
+    // realtime can null it out from under us before the call returns.
+    const sold = aLots.find((l) => l.id === (aState && aState.current_lot_id));
+    const team = aTeams.find((t) => t.id === Number(teamSel));
     busy(btn, true);
     const { error } = await sb.rpc("auction_sell", {
       p_lot_id: null,
@@ -1540,6 +1544,13 @@
     $("#aucSellPrice").value = "";
     $("#aucSellTeam").value = "";
     toast("Sold — wallet deducted and squad updated", "ok");
+    // The room is watching the projector, not this panel.
+    if (window.MNSold)
+      MNSold.show($("#aucStage"), {
+        name: sold ? sold.name : "",
+        team: team ? team.name : "",
+        price: priceIn ? Number(priceIn) : sold && sold.base_price,
+      });
     loadAuction();
   });
 

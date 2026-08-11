@@ -279,6 +279,14 @@
     } else {
       toast(`${lot.name} → ${teamName(lot.sold_to_team_id)} (${money(lot.sold_price)})`, "info");
     }
+    // A captain watching on a second screen gets the same announcement the
+    // room does, rather than the block simply going empty.
+    if (window.MNSold)
+      MNSold.show(stageEl(), {
+        name: lot.name,
+        team: teamName(lot.sold_to_team_id),
+        price: lot.sold_price,
+      });
   }
 
   /* ---------------- render ---------------- */
