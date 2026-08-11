@@ -15,7 +15,6 @@
   let lots = [];
   let state = null;
   let bids = [];
-  let lastPrice = null;
   let cards = {};          // pool id -> card resolved against the registration
   // Base price per category, refreshed from auction_categories. The reserve
   // in the max-bid formula is priced off these.
@@ -381,27 +380,10 @@
     renderCard(lot);
 
     const price = Number(state.current_price);
-    const el = $("#bidValue");
-    el.textContent = money(price);
-    if (lastPrice !== null && price !== lastPrice) {
-      el.classList.remove("bump");
-      void el.offsetWidth;
-      el.classList.add("bump");
-    }
-    lastPrice = price;
 
-    const holder = $("#bidHolder");
-    const leadingMe = state.leading_team_id === myTeamId;
-    holder.textContent = state.leading_team_id
-      ? leadingMe
-        ? "You are the highest bidder"
-        : `Highest: ${teamName(state.leading_team_id)}`
-      : "No bids yet — open at the base price";
-    holder.classList.toggle("mine", leadingMe);
-
-    // Bidding is called in the room, so this panel tells the captain where
-    // they stand rather than offering a button: their ceiling for THIS
-    // player, and why it is what it is.
+    // Bidding is called in the room and the auctioneer's screen carries the
+    // running price, so repeating it here only competed with the one number a
+    // captain actually needs: their own ceiling for THIS player.
     const t = myTeam();
     const cat = (cards[lot.id] || lot).category;
     const u = t ? unfilled(t) : null;

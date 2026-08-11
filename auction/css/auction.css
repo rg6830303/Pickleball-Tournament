@@ -707,3 +707,35 @@ body.mn-blownup .app {
   width: min(100dvw, calc(100dvh * 1.5));
 }
 body.mn-blownup { overscroll-behavior: none; }
+
+
+/* ============================================================
+   THE CEILING
+   Bidding is called in the room and the auctioneer's screen carries
+   the running price. The one number a captain needs is their own
+   limit for the player in front of them, so it is the only number
+   here, and it is sized like it matters.
+   ============================================================ */
+.bid-msg {
+  margin: clamp(14px, 2vh, 22px) 0 0;
+  padding: clamp(14px, 1.8vh, 20px) clamp(16px, 2vw, 24px);
+  border: 1px solid var(--mn-line, rgba(255, 255, 255, .09));
+  border-left: 3px solid #2ecc71;
+  border-radius: 12px;
+  background: linear-gradient(100deg, rgba(46, 204, 113, .10), rgba(10, 12, 11, .5) 55%);
+  font-family: 'Barlow Condensed', 'Oswald', sans-serif;
+  font-weight: 600;
+  font-size: clamp(17px, 2.2vw, 24px);
+  letter-spacing: .015em;
+  line-height: 1.25;
+  color: #eafff3;
+}
+/* over the limit, or quota full: the same block, saying no */
+.bid-msg:not(.ok) {
+  border-left-color: #e5262d;
+  background: linear-gradient(100deg, rgba(229, 38, 45, .12), rgba(14, 10, 11, .5) 55%);
+  color: #ffe3e4;
+}
+.bid-msg:empty { display: none; }
+.stage:fullscreen .bid-msg,
+.stage.is-blownup .bid-msg { display: none; }

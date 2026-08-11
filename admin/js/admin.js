@@ -2261,10 +2261,29 @@
   });
 
   /* ---- create / reset all 16 ---- */
+  /* Has anything actually happened yet? Used to lock off the actions that are
+     only ever safe before the first player goes under the hammer. */
+  function auctionHasBegun() {
+    return (
+      aLots.some((l) => l.status === "sold") ||
+      aTeams.some((t) => Number(t.purse_spent) > 0)
+    );
+  }
+
   $("#btnLoginApplyAll").addEventListener("click", () => {
     const key = loginKey();
     if (!keyLooksValid(key))
       return alertBox($("#aucLoginAlert"), "Paste the Supabase secret key above first.");
+    // This resets every captain's password, and it sits a few pixels from the
+    // auction controls. Once players have been sold there is no legitimate
+    // reason to press it, and a mis-click would lock all sixteen captains out
+    // in the middle of the room.
+    if (auctionHasBegun())
+      return alertBox(
+        $("#aucLoginAlert"),
+        "The auction has already started — resetting the logins now would sign every captain out. " +
+          "Reset the auction first if you really need to re-issue passwords."
+      );
     confirmDialog(
       "Create or reset all 16 captain logins to the passwords shown below? Captains using an old password will be signed out.",
       async () => {
