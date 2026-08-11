@@ -52,6 +52,11 @@
   var qi = 2, ema = 16.7, slowRun = 0, fastRun = 0;
   function Q() { return LADDER[qi]; }
 
+  /* How hard it is raining. One in normal use; wound up when the card goes
+     full screen, because there the weather IS the room — the panel chrome is
+     gone and the storm runs edge to edge behind the artwork. */
+  var BOOST = 1;
+
   /* ---- deterministic noise, so a sprite always builds the same way ---- */
   function rng(seed) {
     var s = seed >>> 0;
@@ -184,7 +189,7 @@
   var drops = [];
 
   function seedDrops() {
-    var target = Math.round(Math.max(70, Math.min(300, (W * H) / 11000)) * Q().drops);
+    var target = Math.round(Math.max(70, Math.min(300, (W * H) / 11000)) * Q().drops * BOOST);
     if (drops.length === target) return;
     while (drops.length > target) drops.pop();
     while (drops.length < target) drops.push(newDrop(pickPlane(drops.length), true));
@@ -375,7 +380,7 @@
   }
 
   function fireStrike() {
-    storm.close = Math.random() < 0.45;                 // near strikes are frequent here on purpose
+    storm.close = Math.random() < (BOOST > 1 ? 0.72 : 0.45);   // near strikes are frequent here on purpose
     storm.ox = 0.12 + Math.random() * 0.76;
     storm.pulses = pulses(storm.close ? 3 + Math.floor(Math.random() * 4) : 2 + Math.floor(Math.random() * 2));
     storm.t = 0;
@@ -384,7 +389,7 @@
       var y0 = H * 0.10 + Math.random() * H * 0.06;
       storm.bolts.push(makeBolt(storm.ox * W, y0, H * (0.95 + Math.random() * 0.10)));
       /* real lightning often restrikes the same channel a beat later */
-      storm.again = Math.random() < 0.45 ? 0.16 + Math.random() * 0.22 : -1;
+      storm.again = Math.random() < (BOOST > 1 ? 0.7 : 0.45) ? 0.16 + Math.random() * 0.22 : -1;
     } else {
       storm.again = -1;
     }
@@ -394,7 +399,7 @@
     storm.next -= dt;
     if (storm.next <= 0) {
       fireStrike();
-      storm.next = 4.5 + Math.random() * 7.5;
+      storm.next = (4.5 + Math.random() * 7.5) / BOOST;
     }
     storm.t += dt;
     if (storm.again > 0 && storm.t >= storm.again) {
@@ -495,7 +500,7 @@
 
     /* the room flash, over everything */
     if (flash > 0.01) {
-      var f = flash * (storm.close ? 0.30 : 0.14);
+      var f = flash * (storm.close ? 0.30 : 0.14) * (BOOST > 1 ? 1.35 : 1);
       var wg = ctx.createLinearGradient(0, 0, 0, H);
       wg.addColorStop(0.00, 'rgba(196,220,255,' + f.toFixed(3) + ')');
       wg.addColorStop(0.52, 'rgba(150,178,232,' + (f * 0.34).toFixed(3) + ')');
@@ -539,6 +544,8 @@
   function mount(el) {
     nested = !!el;
     host = el || document.body;
+    BOOST = nested ? 1.85 : 1;
+    drops.length = 0;                 // reseed at the new density
     if (nested) {
       cv.style.position = 'absolute';
       cv.style.zIndex = '-1';               // above the panel's own background,
@@ -631,7 +638,7 @@
       return {
         quality: qi, dpr: DPR, w: W, h: H,
         drops: drops.length, ripples: ripples.length,
-        planes: Q().planes, shadow: Q().shadow,
+        planes: Q().planes, shadow: Q().shadow, boost: BOOST,
         clouds: PLANE.filter(function (p) { return !!p.img; }).length,
         nested: nested, running: alive, frameMs: Math.round(ema * 10) / 10,
         flash: storm.pulses.length ? envelope(storm.pulses, storm.t) : 0,

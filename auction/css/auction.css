@@ -566,7 +566,9 @@ body.mn-blownup .app {
   flex-wrap: wrap;
   gap: 4px 16px;
   margin: 0 0 clamp(16px, 2vh, 24px);
-  padding: 14px 20px;
+  /* the full-screen button is pinned to this corner; leave it room rather
+     than letting the team pill slide underneath it */
+  padding: 14px clamp(150px, 16vw, 190px) 14px 20px;
   border: 1px solid var(--mn-line, rgba(255, 255, 255, .09));
   border-left: 3px solid var(--red, #e5262d);
   border-radius: 12px;
@@ -610,7 +612,10 @@ body.mn-blownup .app {
   color: #ff9d9f;
   white-space: nowrap;
 }
-@media (max-width: 560px) {
+@media (max-width: 640px) {
+  /* On a phone that reserved strip would leave the name nowhere to go, so the
+     bar drops below the button instead of beside it. */
+  .welcome { padding-right: 20px; margin-top: 44px; }
   .welcome-team { margin-left: 0; }
 }
 
@@ -628,9 +633,25 @@ body.mn-blownup .app {
 .stage:fullscreen .ticker,
 .stage.is-blownup .ticker { display: none; }
 
+/* Full screen is the card standing in the weather. The panel it lives in
+   during normal use — its fill, its border, its rounded corners, its inner
+   glow — would read as a second box drawn around the artwork, so all of it
+   goes and the storm runs edge to edge behind it. */
+.stage:fullscreen,
+.stage.is-blownup {
+  background: #000;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.stage:fullscreen::before,
+.stage.is-blownup::before { display: none; }
+
 /* fit to whichever runs out first, the width or the height */
 .stage:fullscreen #lotCard,
 .stage.is-blownup #lotCard {
-  width: min(100%, calc(88vh * 1.5));
+  width: min(100%, calc(86vh * 1.5));
   margin: 0 auto;
+  /* lift it off the weather so the card reads as an object in the room */
+  filter: drop-shadow(0 3vh 6vh rgba(0, 0, 0, .85));
 }
