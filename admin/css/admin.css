@@ -994,10 +994,6 @@ table.grid {
   padding: 22px; margin-bottom: 14px;
 }
 @media (max-width: 820px) { .auc-stage { grid-template-columns: 1fr; } }
-.auc-tag {
-  font-family: var(--font-display); font-size: 11px; letter-spacing: 0.36em;
-  text-transform: uppercase; color: var(--red); margin-bottom: 8px;
-}
 .auc-player {
   font-family: var(--font-display); font-size: clamp(26px, 5vw, 40px); font-weight: 700;
   letter-spacing: 0.03em; text-transform: uppercase; line-height: 1.1; overflow-wrap: anywhere;
@@ -1400,13 +1396,6 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
 #tab-auction .auc-stage:fullscreen .mn-fs .mn-fs-out { display: inline; }
 
 /* ---------- tag ---------- */
-#tab-auction .auc-tag {
-  font-family: "Barlow Condensed", var(--font-display), sans-serif;
-  font-weight: 600; font-size: 15px; line-height: 1.5;
-  letter-spacing: .26em; text-transform: uppercase;
-  color: var(--mn-red-hot);
-  margin-bottom: 10px;
-}
 @keyframes mnCardIn {
   from { opacity: 0; transform: translateY(14px) scale(.99); filter: saturate(.7) brightness(.86) }
   to   { opacity: 1; transform: none; filter: none }
@@ -1446,7 +1435,6 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
   align-content: center;
   overflow-y: auto;
 }
-#tab-auction .auc-stage:fullscreen .auc-tag { font-size: 18px; }
 #tab-auction .auc-stage:fullscreen .mn-fs { top: 22px; right: 26px; }
 
 @media (min-width: 1500px) {
@@ -1467,7 +1455,6 @@ img.g-thumb.g-inherit { outline: 1px dashed rgba(156, 192, 255, 0.45); outline-o
   background: radial-gradient(120% 80% at 50% -20%, rgba(26,22,34,.80) 0%, rgba(11,10,16,.80) 46%, rgba(5,5,8,.83) 78%, rgba(0,0,0,.86) 100%);
 }
 body.mn-blownup { overflow: hidden; }
-#tab-auction .auc-stage.is-blownup .auc-tag { font-size: 18px; }
 #tab-auction .auc-stage.is-blownup .mn-fs { top: 22px; right: 26px; }
 #tab-auction .auc-stage.is-blownup .mn-fs .mn-fs-in { display: none; }
 #tab-auction .auc-stage.is-blownup .mn-fs .mn-fs-out { display: inline; }
@@ -1536,5 +1523,3 @@ body > *:not(.mn-sky) { position: relative; z-index: 1; }
   width: min(100%, calc(88vh * 1.5));
   margin: 0 auto;
 }
-#tab-auction .auc-stage:fullscreen .auc-tag,
-#tab-auction .auc-stage.is-blownup .auc-tag { justify-self: start; }
