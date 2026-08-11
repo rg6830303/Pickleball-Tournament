@@ -1159,3 +1159,26 @@ from public.auction_team_logins l
 left join auth.users u on u.email = l.email
 left join public.auction_teams t on t.id = l.team_id
 order by l.team_id;
+
+-- ------------------------------------------------------------
+-- THE ROSTER
+-- The captain login screen lists the teams by name before anyone
+-- has signed in, and auction_teams is readable only to
+-- authenticated users. This exposes the roster and nothing else --
+-- no purse, no spend, no squad -- which is safe: these names go on
+-- a projector in front of the room.
+-- ------------------------------------------------------------
+create or replace function public.auction_team_roster()
+returns table (id integer, name text, captain_name text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select t.id, t.name, t.captain_name
+  from public.auction_teams t
+  order by t.id;
+$$;
+
+revoke all on function public.auction_team_roster() from public;
+grant execute on function public.auction_team_roster() to anon, authenticated;
