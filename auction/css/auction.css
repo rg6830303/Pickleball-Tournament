@@ -740,105 +740,131 @@ body.mn-blownup { overscroll-behavior: none; }
 .stage:fullscreen .bid-msg,
 .stage.is-blownup .bid-msg { display: none; }
 
-
 /* ============================================================
    SOLD
-   The hammer moment. Fills whatever holds the card, so it reads
-   the same on a phone and across a projector.
+   The gavel comes down, the words land, and it is gone in three
+   seconds. Mounted on the body (or on the full-screen element),
+   so a repaint of the board cannot wipe it mid-announcement.
    ============================================================ */
 .mn-sold {
   position: absolute;
   inset: 0;
-  z-index: 6;
+  z-index: 9500;
   display: grid;
   place-items: center;
   text-align: center;
-  padding: 4%;
+  padding: 4vmin;
   background:
-    radial-gradient(70% 60% at 50% 42%, rgba(229, 38, 45, .30), rgba(8, 6, 8, .93) 62%),
-    rgba(4, 4, 6, .96);
-  /* Visible by default and animated on top, rather than starting hidden and
-     relying on a transition to reveal it. If the animation never runs — a
-     throttled tab, reduced motion, an old browser — the announcement still
-     shows. It is the loudest moment in the room; it must not depend on an
-     effect firing. */
+    radial-gradient(68% 58% at 50% 44%, rgba(229, 38, 45, .32), rgba(7, 6, 8, .94) 62%),
+    rgba(4, 4, 6, .97);
   opacity: 1;
   pointer-events: none;
 }
-.mn-sold-in { display: flex; flex-direction: column; align-items: center; gap: .4em; }
+/* `body > *:not(.mn-sky)` sets z-index 1 on every direct child of the body,
+   and at (0,1,1) it outranks a bare `.mn-sold`. Two classes beats it, which
+   is what keeps the announcement above the page rather than behind it. */
+.mn-sold.is-page {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
+.mn-sold-in {
+  display: flex; flex-direction: column; align-items: center;
+  gap: .35em;
+  max-width: 92vw;
+}
+
+/* the gavel */
+.mn-sold-gavel {
+  width: clamp(78px, 15vmin, 190px);
+  height: auto;
+  margin-bottom: .1em;
+  overflow: visible;
+  fill: #fff;
+  filter: drop-shadow(0 0 .22em rgba(255, 80, 84, .7));
+}
+.mn-sold-gavel .mn-gavel-head {
+  transform-origin: 74px 62px;
+  animation: mnGavel .75s cubic-bezier(.3, 1.4, .4, 1) 1;
+}
+.mn-sold-gavel .mn-gavel-block { fill: #ff5a5e; }
 
 .mn-sold-word {
   margin: 0;
   font-family: 'Barlow Condensed', 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: clamp(58px, 15vw, 260px);
-  line-height: .86;
-  letter-spacing: .06em;
+  font-size: clamp(40px, 11vmin, 170px);
+  line-height: .9;
+  letter-spacing: .05em;
   text-transform: uppercase;
   color: #fff;
-  text-shadow: 0 0 .18em rgba(255, 70, 74, .75), 0 0 .5em rgba(229, 38, 45, .45);
-  transform: rotate(-3deg);
-  /* lands like a stamp, then settles. Transform only — the word is never
-     hidden by an effect that might not run. */
-  animation: mnSoldStamp .58s cubic-bezier(.2, 1.5, .3, 1);
+  white-space: nowrap;
+  text-shadow: 0 0 .16em rgba(255, 70, 74, .8), 0 0 .45em rgba(229, 38, 45, .5);
+  animation: mnSoldStamp .5s .18s cubic-bezier(.2, 1.5, .3, 1) 1;
 }
 .mn-sold-name {
   margin: 0;
   font-family: 'Barlow Condensed', 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: clamp(22px, 4.6vw, 76px);
+  font-size: clamp(20px, 4.6vmin, 68px);
   line-height: 1.05;
   letter-spacing: .02em;
   text-transform: uppercase;
   color: #fff;
-  animation: mnSoldRise .5s .16s ease-out;
+  animation: mnSoldRise .45s .3s ease-out 1;
 }
 .mn-sold-to {
   margin: 0;
   font-family: 'Barlow', system-ui, sans-serif;
-  font-size: clamp(13px, 1.7vw, 27px);
+  font-size: clamp(12px, 2vmin, 24px);
   letter-spacing: .18em;
   text-transform: uppercase;
   color: #b9bcc4;
-  animation: mnSoldRise .5s .26s ease-out;
+  animation: mnSoldRise .45s .38s ease-out 1;
 }
 .mn-sold-to b { color: #ff9d9f; font-weight: 700; letter-spacing: .1em; }
 .mn-sold-price {
-  margin: .1em 0 0;
+  margin: .06em 0 0;
   font-family: 'Barlow Condensed', 'Oswald', sans-serif;
   font-weight: 700;
-  font-size: clamp(30px, 6.4vw, 108px);
+  font-size: clamp(26px, 6.4vmin, 96px);
   line-height: 1;
   color: #fff;
-  text-shadow: 0 0 .2em rgba(255, 110, 114, .5);
-  animation: mnSoldRise .5s .36s ease-out;
+  text-shadow: 0 0 .18em rgba(255, 110, 114, .55);
+  animation: mnSoldRise .45s .46s ease-out 1;
 }
 
-/* nobody bought them: same shape, no celebration */
 .mn-sold.is-unsold {
   background:
-    radial-gradient(70% 60% at 50% 42%, rgba(90, 96, 110, .26), rgba(8, 8, 10, .94) 62%),
-    rgba(4, 4, 6, .96);
+    radial-gradient(68% 58% at 50% 44%, rgba(90, 96, 110, .28), rgba(8, 8, 10, .95) 62%),
+    rgba(4, 4, 6, .97);
 }
-.mn-sold.is-unsold .mn-sold-word {
-  color: #cfd3da;
-  text-shadow: 0 0 .18em rgba(150, 158, 175, .5);
-}
+.mn-sold.is-unsold .mn-sold-word { color: #cfd3da; text-shadow: 0 0 .16em rgba(150, 158, 175, .55); }
+.mn-sold.is-unsold .mn-sold-gavel { filter: drop-shadow(0 0 .2em rgba(150, 158, 175, .5)); }
+.mn-sold.is-unsold .mn-sold-gavel .mn-gavel-block { fill: #8b8f99; }
 
+/* Motion only ever MOVES things — nothing here fades in, so a skipped
+   animation can never leave the announcement invisible. */
+@keyframes mnGavel {
+  0%   { transform: rotate(-52deg); }
+  55%  { transform: rotate(6deg); }
+  70%  { transform: rotate(-6deg); }
+  100% { transform: rotate(0deg); }
+}
 @keyframes mnSoldStamp {
-  0%   { transform: scale(2.1) rotate(-7deg); filter: blur(6px); }
+  0%   { transform: scale(1.9) rotate(-6deg); filter: blur(5px); }
   60%  { filter: blur(0); }
-  100% { transform: scale(1) rotate(-3deg); filter: blur(0); }
+  100% { transform: scale(1) rotate(-2deg); filter: blur(0); }
 }
 @keyframes mnSoldRise {
-  from { transform: translateY(.5em); }
+  from { transform: translateY(.45em); }
   to   { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mn-sold, .mn-sold-word, .mn-sold-name, .mn-sold-to, .mn-sold-price {
-    animation: none;
-    transition: none;
-  }
-  .mn-sold-word { transform: rotate(-3deg); }
+  .mn-sold *, .mn-sold { animation: none !important; }
+  .mn-sold-word { transform: rotate(-2deg); }
 }
