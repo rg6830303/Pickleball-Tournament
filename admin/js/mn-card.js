@@ -120,7 +120,8 @@
 
     return '' +
       '<div class="mplc" style="--ratio:' + T.ratio + '">' +
-        '<img class="mplc-art" src="' + esc(base + T.src) + '" alt="" decoding="async">' +
+        '<img class="mplc-art" src="' + esc(base + T.src) + '" alt="" decoding="async" ' +
+          'onerror="this.classList.add(\'is-broken\')">' +
         '<div class="mplc-stand" style="' + box(T.stand) + '">' + photo + '</div>' +
         '<div class="mplc-name" data-step="' + nameStep(name) + '" style="' + box(T.name) + '">' +
           esc(name) +

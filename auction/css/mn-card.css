@@ -65,6 +65,19 @@
   mask-composite: intersect;
 }
 .mplc-photo.is-broken { display: none; }
+
+/* If the artwork itself cannot be fetched — a stale cache pointing at a
+   filename that no longer ships, a phone on a bad connection — the browser
+   draws its own broken-image icon, which looks like a fault rather than a
+   card. Hide it and fall back to the card's own dark ground, so the player's
+   details still read as a deliberate card. */
+.mplc-art.is-broken { visibility: hidden; }
+.mplc:has(.mplc-art.is-broken) {
+  background:
+    radial-gradient(120% 90% at 50% -10%, #1a1622 0%, #0b0a10 46%, #050508 78%, #000 100%);
+  border: 1px solid rgba(229, 38, 45, .4);
+  border-radius: 2.1cqw;
+}
 .mplc-initial {
   font-weight: 700;
   font-size: 9cqw;
