@@ -503,7 +503,10 @@ begin
   create temporary table if not exists _picks (
     slot int, position int, squad_id uuid, category text
   ) on commit drop;
-  delete from _picks;
+  -- TRUNCATE, not DELETE: Supabase runs pg_safeupdate for the API roles, and a
+  -- DELETE with no WHERE is refused there ("DELETE requires a WHERE clause")
+  -- even inside a security-definer function.
+  truncate table _picks;
 
   insert into _picks (slot, position, squad_id)
   select (e->>'slot')::int, (e->>'position')::int, (e->>'squad_id')::uuid
