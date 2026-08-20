@@ -2279,3 +2279,71 @@ body.mn-blownup { overscroll-behavior: none; }
 @media (prefers-reduced-motion: reduce) {
   .md-fx.is-open { animation: none; box-shadow: 0 0 0 2px rgba(229,38,45,0.3); }
 }
+
+/* ------------------------------------------------------------
+   POINTS LEDGER + SCORE HISTORY
+   The arithmetic behind every total, and a record of what was typed.
+   ------------------------------------------------------------ */
+.ledger-intro { font-size: 13px; color: var(--text-dim); line-height: 1.6; max-width: 76ch; margin-bottom: 14px; }
+
+.grid-hint.good { color: var(--ok); }
+.grid-hint.bad  { color: var(--red); font-weight: 600; }
+
+.led {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.led > summary {
+  display: flex; align-items: baseline; gap: 12px; cursor: pointer;
+  padding: 12px 15px; list-style: none;
+}
+.led > summary::-webkit-details-marker { display: none; }
+.led > summary::before {
+  content: "▸"; color: var(--text-faint); font-size: 11px; transition: transform 0.18s;
+}
+.led[open] > summary::before { transform: rotate(90deg); }
+.led > summary b { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; }
+.led-sum { font-size: 11.5px; color: var(--text-faint); }
+.led-total {
+  margin-left: auto; font-family: var(--font-display); font-size: 15px; color: var(--red); white-space: nowrap;
+}
+.led-total.bad { color: var(--warn); }
+
+.led-table { width: 100%; border-collapse: collapse; min-width: 640px; }
+.led-table th {
+  text-align: left; padding: 8px 14px; font-size: 10.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-faint); background: var(--panel-2);
+  border-top: 1px solid var(--line);
+}
+.led-table td { padding: 9px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 13px; vertical-align: top; }
+.led-table .num { text-align: right; white-space: nowrap; }
+.led-table tbody tr.neg { background: rgba(229,38,45,0.06); }
+.led-tie { white-space: nowrap; font-size: 12px; }
+.led-tie span { display: block; color: var(--text-faint); font-size: 11px; }
+.led-detail { color: var(--text-dim); }
+.led-pts { font-family: var(--font-display); font-size: 15px; }
+.led-table tfoot td {
+  border-top: 1px solid var(--line-strong); background: var(--panel-2);
+  font-family: var(--font-display); letter-spacing: 0.08em; text-transform: uppercase; font-size: 12px;
+}
+
+.audit-wrap { max-height: 460px; overflow: auto; }
+.audit { width: 100%; border-collapse: collapse; min-width: 700px; }
+.audit th {
+  position: sticky; top: 0; text-align: left; padding: 9px 14px; background: var(--panel-2);
+  font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint);
+}
+.audit td { padding: 9px 14px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 12.5px; }
+.aud-when { white-space: nowrap; color: var(--text-dim); }
+.aud-change { font-family: var(--font-display); letter-spacing: 0.04em; white-space: nowrap; }
+.aud-by { color: var(--text-faint); overflow-wrap: anywhere; }
+.aud-tag {
+  display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.aud-tag.insert { background: rgba(47,191,113,0.15); color: var(--ok); }
+.aud-tag.update { background: rgba(232,195,90,0.15); color: var(--warn); }
+.aud-tag.delete { background: rgba(229,38,45,0.15); color: #ff8b8e; }

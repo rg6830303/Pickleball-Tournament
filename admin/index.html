@@ -294,6 +294,37 @@
         </aside>
         <div class="md-main" id="sbPanel"></div>
       </div>
+
+      <h2 class="panel-title tour-h">How every point was earned</h2>
+      <p class="ledger-intro">
+        Each line is one match and the arithmetic behind it. A team's total here is
+        added up independently of the league table above — if the two ever differ the
+        console says so, loudly. Pick a team to see its working.
+      </p>
+      <section class="toolbar">
+        <div class="filters">
+          <select id="ledTeam"><option value="">Every team</option></select>
+        </div>
+        <div class="toolbar-actions">
+          <span class="grid-hint" id="ledCheck"></span>
+          <button class="btn-mini" id="btnLedCsv" type="button">⬇ Ledger CSV</button>
+        </div>
+      </section>
+      <div id="sbLedger"></div>
+      <p class="empty" id="ledEmpty" hidden>Nothing to show yet — the working appears with the first score.</p>
+
+      <h2 class="panel-title tour-h">Score history</h2>
+      <p class="ledger-intro">
+        Every score typed, corrected or removed, newest first — who did it and what
+        changed. Nothing on this page can be altered without leaving a line here.
+      </p>
+      <div class="table-wrap audit-wrap">
+        <table class="audit">
+          <thead><tr><th>When</th><th>What</th><th>Tie</th><th>Match</th><th>Change</th><th>By</th></tr></thead>
+          <tbody id="sbAudit"></tbody>
+        </table>
+        <p class="empty" id="auditEmpty" hidden>No score has been entered yet.</p>
+      </div>
     </section>
 
     <!-- ---------- TAB: AUCTION POOL ---------- -->

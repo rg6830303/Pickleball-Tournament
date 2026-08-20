@@ -37,7 +37,8 @@
   let live = false;              // realtime socket actually subscribed
   let firstPaint = true;
 
-  const D = { teams: [], standings: [], fixtures: [], results: [], squads: [], format: [] };
+  const D = { teams: [], standings: [], fixtures: [], results: [], squads: [], format: [], ledger: [] };
+  const openLedger = new Set();  // team ids whose working is showing
   const openTies = new Set();    // tie ids the reader has expanded
   const openSquads = new Set();  // team ids the reader has expanded
   const lastScore = new Map();   // tie id -> "h-a", so a changed tie can flash
@@ -52,9 +53,10 @@
       sb.from("public_results").select("*").order("tie_id").order("slot"),
       sb.from("public_squads").select("*").order("team_id").order("sort_order"),
       sb.from("tournament_format").select("*").order("slot"),
+      sb.from("points_ledger").select("*").order("team_id").order("tie_id"),
     ];
-    const [teams, standings, fixtures, results, squads, format] = await Promise.all(q);
-    const bad = [teams, standings, fixtures, results, squads, format].find((r) => r.error);
+    const [teams, standings, fixtures, results, squads, format, ledger] = await Promise.all(q);
+    const bad = [teams, standings, fixtures, results, squads, format, ledger].find((r) => r.error);
     if (bad) throw bad.error;
 
     D.teams = teams.data || [];
@@ -63,6 +65,7 @@
     D.results = results.data || [];
     D.squads = squads.data || [];
     D.format = format.data || [];
+    D.ledger = ledger.data || [];
   }
 
   let refreshing = false;
@@ -190,13 +193,29 @@
           <p class="tbl-hint">Swipe the table sideways for W · L · PS · PC · PD · Pts</p>
         </article>`;
     }).join("");
+
+    // A tap anywhere on the row opens its working; the caret is only a hint.
+    $$("tr.can-open", host).forEach((tr) => {
+      const toggle = () => {
+        const id = Number(tr.dataset.team);
+        openLedger.has(id) ? openLedger.delete(id) : openLedger.add(id);
+        renderStandings();
+      };
+      tr.addEventListener("click", toggle);
+      tr.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      });
+    });
   }
 
   function teamRow(s) {
     const q = Number(s.rank) <= 2;
     const pd = Number(s.point_diff);
+    const open = openLedger.has(s.team_id);
+    const lines = D.ledger.filter((l) => l.team_id === s.team_id);
     return `
-      <tr class="${q ? "q" : ""}">
+      <tr class="${q ? "q" : ""}${lines.length ? " can-open" : ""}${open ? " open" : ""}"
+          data-team="${s.team_id}"${lines.length ? ' tabindex="0" role="button" aria-expanded="' + open + '"' : ""}>
         <td class="c-grp"><span class="mini-badge">${esc(s.group_code)}</span></td>
         <td class="c-rank"><span class="rank">${esc(s.rank)}</span>${
           q ? `<span class="qchip" title="In a qualifying place">Q</span>` : ""
@@ -211,7 +230,37 @@
         <td class="c-n">${esc(s.points_for)}</td>
         <td class="c-n">${esc(s.points_against)}</td>
         <td class="c-n pd ${pd > 0 ? "up" : pd < 0 ? "down" : ""}">${esc(signed(pd))}</td>
-        <td class="c-pts"><b>${esc(s.points)}</b></td>
+        <td class="c-pts"><b>${esc(s.points)}</b>${
+          lines.length ? `<i class="pts-caret" aria-hidden="true">▾</i>` : ""
+        }</td>
+      </tr>${lines.length ? ledgerRow(s, lines, open) : ""}`;
+  }
+
+  /* The working, on the public page: anyone can check a total without
+     taking anyone's word for it. */
+  function ledgerRow(s, lines, open) {
+    const total = lines.reduce((n, l) => n + Number(l.points), 0);
+    return `
+      <tr class="led-row${open ? "" : " hide"}" data-led="${s.team_id}">
+        <td colspan="10">
+          <p class="led-h">How ${esc(s.team_name)} reached ${esc(s.points)} points</p>
+          <ul class="led-lines">
+            ${lines
+              .map(
+                (l) => `
+              <li class="${Number(l.points) < 0 ? "neg" : ""}">
+                <span class="led-when">${esc(
+                  l.group_code ? "G" + l.group_code + " R" + l.round : String(l.phase).toUpperCase()
+                )} v ${esc(l.opponent_name || "—")}</span>
+                <span class="led-what">${esc(l.slot_label)}</span>
+                <span class="led-why">${esc(l.detail)}</span>
+                <b class="led-p">${Number(l.points) > 0 ? "+" : ""}${esc(l.points)}</b>
+              </li>`
+              )
+              .join("")}
+          </ul>
+          <p class="led-total">Total ${total}</p>
+        </td>
       </tr>`;
   }
 

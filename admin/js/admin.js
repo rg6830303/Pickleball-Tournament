@@ -3203,15 +3203,167 @@
     // before a score exists; a failure here must not take the tab down.
     if (!bd.error) shBoard = bd.data || [];
 
+    await loadLedger();
     renderScoreboard();
     startScoreRealtime();
+  }
+
+  /* ---- the working: one line per match, plus the audit of what was typed ---- */
+  let sbLedger = [];
+  let sbLedTotals = [];
+  let sbAudit = [];
+
+  async function loadLedger() {
+    const [lg, tt, au] = await Promise.all([
+      sb.from("points_ledger").select("*").order("team_id").order("tie_id").order("slot", { nullsFirst: false }),
+      sb.from("points_ledger_totals").select("*").eq("phase", "group"),
+      sb.from("score_audit_log").select("*").limit(200),
+    ]);
+    sbLedger = lg.error ? [] : lg.data || [];
+    sbLedTotals = tt.error ? [] : tt.data || [];
+    sbAudit = au.error ? [] : au.data || [];
   }
 
   function renderScoreboard() {
     renderStandings();
     renderScoreRail();
     renderScorePanel();
+    renderLedger();
+    renderAudit();
   }
+
+  /* The ledger adds up on its own. Showing it agree with the league table is
+     the whole point — a silent total nobody can check is worth very little. */
+  function renderLedger() {
+    const host = $("#sbLedger");
+    if (!host) return;
+
+    const sel = $("#ledTeam");
+    if (sel && sel.options.length <= 1 && squadTeams.length) {
+      sel.insertAdjacentHTML(
+        "beforeend",
+        squadTeams
+          .slice()
+          .sort((a, b) => String(a.group_code).localeCompare(String(b.group_code)) || (a.group_rank || 9) - (b.group_rank || 9))
+          .map((t) => `<option value="${t.id}">${esc(t.group_code || "?")}${t.group_rank || ""} · ${esc(t.name)}</option>`)
+          .join("")
+      );
+    }
+
+    const pick = sel && sel.value ? Number(sel.value) : null;
+    const rows = pick ? sbLedger.filter((r) => r.team_id === pick) : sbLedger;
+    $("#ledEmpty").hidden = rows.length > 0;
+
+    // reconcile every team, not only the one on screen
+    const disagree = sbLedTotals.filter((t) => {
+      const s = sbStand.find((x) => x.team_id === t.team_id);
+      return s && Number(s.points) !== Number(t.points);
+    });
+    const check = $("#ledCheck");
+    if (check) {
+      check.textContent = !sbLedTotals.length
+        ? ""
+        : disagree.length
+        ? `${disagree.length} team${disagree.length > 1 ? "s" : ""} do not reconcile`
+        : `All ${sbLedTotals.length} totals reconcile with the league table`;
+      check.classList.toggle("bad", disagree.length > 0);
+      check.classList.toggle("good", !disagree.length && sbLedTotals.length > 0);
+    }
+
+    if (!rows.length) return void (host.innerHTML = "");
+
+    const byTeam = new Map();
+    rows.forEach((r) => {
+      if (!byTeam.has(r.team_id)) byTeam.set(r.team_id, []);
+      byTeam.get(r.team_id).push(r);
+    });
+
+    host.innerHTML = [...byTeam.entries()]
+      .map(([id, lines]) => {
+        const name = lines[0].team_name;
+        const total = lines.reduce((n, l) => n + Number(l.points), 0);
+        const tablePts = sbStand.find((s) => s.team_id === id)?.points;
+        const agrees = tablePts === undefined || Number(tablePts) === total;
+        const body = lines
+          .map(
+            (l) => `
+          <tr class="${Number(l.points) < 0 ? "neg" : ""}">
+            <td class="led-tie">${esc(l.group_code ? "G" + l.group_code + " R" + l.round : String(l.phase).toUpperCase())}
+              <span>v ${esc(l.opponent_name || "—")}</span></td>
+            <td>${esc(l.slot_label)}</td>
+            <td class="num">${l.pf === null ? "—" : `${l.pf}–${l.pa}`}</td>
+            <td class="led-detail">${esc(l.detail)}</td>
+            <td class="num led-pts">${Number(l.points) > 0 ? "+" : ""}${l.points}</td>
+          </tr>`
+          )
+          .join("");
+        return `
+        <details class="led" ${pick ? "open" : ""}>
+          <summary>
+            <b>${esc(name)}</b>
+            <span class="led-sum">${lines.filter((l) => l.kind === "match").length} matches</span>
+            <span class="led-total ${agrees ? "" : "bad"}">${total} pts${
+          agrees ? "" : ` · table says ${esc(tablePts)}`
+        }</span>
+          </summary>
+          <div class="table-wrap">
+            <table class="led-table">
+              <thead><tr><th>Tie</th><th>Match</th><th class="num">Score</th><th>How it scored</th><th class="num">Pts</th></tr></thead>
+              <tbody>${body}</tbody>
+              <tfoot><tr><td colspan="4">Total</td><td class="num led-pts">${total}</td></tr></tfoot>
+            </table>
+          </div>
+        </details>`;
+      })
+      .join("");
+  }
+
+  function renderAudit() {
+    const body = $("#sbAudit");
+    if (!body) return;
+    $("#auditEmpty").hidden = sbAudit.length > 0;
+    const when = (iso) =>
+      new Intl.DateTimeFormat("en-IN", {
+        timeZone: "Asia/Kolkata", day: "2-digit", month: "short",
+        hour: "numeric", minute: "2-digit", hour12: true,
+      }).format(new Date(iso));
+    const pair = (h, a) => (h === null || h === undefined ? "—" : `${h}–${a}`);
+
+    body.innerHTML = sbAudit
+      .map(
+        (a) => `
+      <tr>
+        <td class="aud-when">${esc(when(a.at))}</td>
+        <td><span class="aud-tag ${esc(a.action)}">${esc(a.action)}</span></td>
+        <td>${esc(a.home_name || "?")} v ${esc(a.away_name || "?")}</td>
+        <td>${esc(a.slot_label)}</td>
+        <td class="aud-change">${esc(pair(a.old_home, a.old_away))} → ${esc(pair(a.new_home, a.new_away))}</td>
+        <td class="aud-by">${esc(a.actor_email || "—")}</td>
+      </tr>`
+      )
+      .join("");
+  }
+
+  $("#ledTeam")?.addEventListener("change", renderLedger);
+
+  $("#btnLedCsv")?.addEventListener("click", () => {
+    const cell = (v) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = ["team,group,round,opponent,match,score_for,score_against,outcome,match_points,trump_points,points,working"];
+    sbLedger.forEach((l) =>
+      lines.push(
+        [l.team_name, l.group_code, l.round, l.opponent_name, l.slot_label, l.pf, l.pa,
+         l.outcome, l.match_points, l.trump_points, l.points, l.detail].map(cell).join(",")
+      )
+    );
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+    a.download = `mpl-points-ledger-${stamp()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 
   /* ---- the league table, exactly as public_standings ranked it ---- */
   const STD_COLS = [
@@ -3482,6 +3634,8 @@
     if (st.data) sbStand = st.data;
     if (rs.data) sbResults = rs.data;
     if (ti.data) mdTies = ti.data;
+    // the working and the audit move with the score that caused them
+    await loadLedger();
     if (!$("#tab-scoreboard").hidden) renderScoreboard();
     if (!$("#tab-sheets").hidden) renderSheets();
   }
