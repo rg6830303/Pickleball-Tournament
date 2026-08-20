@@ -1179,3 +1179,8 @@ input, select, textarea { font-family: inherit; }
   }
   html { scroll-behavior: auto; }
 }
+
+/* A phone number is there to be tapped, so give it a thumb-sized target. */
+@media (pointer: coarse) {
+  #footerPhones a { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; }
+}

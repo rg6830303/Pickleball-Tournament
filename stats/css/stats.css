@@ -951,3 +951,29 @@ tr.open .pts-caret { transform: rotate(180deg); color: var(--red); }
   .led-when { grid-column: 1 / -1; }
   .led-p    { grid-row: 1; grid-column: 2; }
 }
+
+/* ------------------------------------------------------------
+   MOBILE HARDENING
+   This board is read on phones between matches and on a screen at
+   the venue. Nothing may fall below a size that reads at a glance.
+   ------------------------------------------------------------ */
+@media (max-width: 720px) {
+  .m-head .m-pt { font-size: 11.5px; letter-spacing: 0.04em; }
+  .trump { font-size: 11px; }
+  .m-label em { font-size: 11px; }
+  .m-note { font-size: 12px; }
+  .led-when { font-size: 12px; }
+  .legend-list li { font-size: 12.5px; }
+
+  /* the working is a wall of text on a narrow screen — give it room */
+  .led-row > td { padding: 12px 12px 14px !important; }
+  .led-lines li { padding: 10px 0; }
+
+  tr.can-open td { padding-top: 12px; padding-bottom: 12px; }
+  details.tie > summary, details.squad > summary { min-height: 48px; }
+}
+
+@media (max-width: 400px) {
+  .grp-head { flex-wrap: wrap; }
+  .tbl { font-size: 13px; }
+}

@@ -1333,3 +1333,31 @@ body.mn-blownup { overscroll-behavior: none; }
   border: 1px solid rgba(232,195,90,0.45); background: rgba(232,195,90,0.07);
   border-radius: var(--radius-sm); padding: 9px 12px;
 }
+
+/* ------------------------------------------------------------
+   MOBILE HARDENING
+   This is filled in one-handed, in a hall, against a clock. Every
+   control gets a thumb-sized target and no label drops below the
+   size a phone can render honestly.
+   ------------------------------------------------------------ */
+@media (max-width: 600px), (pointer: coarse) {
+  .ts-trump { min-height: 44px; padding: 8px 15px; font-size: 12px; }
+  .ts-trump input { width: 16px; height: 16px; }
+  .ts-notrump { font-size: 11px; }
+  .ts-pos { font-size: 11px; letter-spacing: 0.12em; }
+  .ts-clocklabel { font-size: 11px; }
+  .ts-sel select { min-height: 52px; font-size: 16px; }  /* 16px stops iOS zooming on focus */
+
+  .cap-tab { min-height: 42px; font-size: 13px; padding: 9px 16px; }
+  .btn-mini { min-height: 40px; }
+  .roster-row { padding: 13px 4px; }
+  .rr-cat { width: 24px; height: 24px; font-size: 13px; }
+  .fx { padding: 14px; }
+  .fx-when { width: 84px; }
+}
+
+/* A phone in a sports hall is often held at arm's length in bad light. */
+@media (max-width: 420px) {
+  .ts-picks { grid-template-columns: 1fr; }
+  .roster-note, .mday-sub { font-size: 12.5px; }
+}

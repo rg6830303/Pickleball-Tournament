@@ -2347,3 +2347,24 @@ body.mn-blownup { overscroll-behavior: none; }
 .aud-tag.insert { background: rgba(47,191,113,0.15); color: var(--ok); }
 .aud-tag.update { background: rgba(232,195,90,0.15); color: var(--warn); }
 .aud-tag.delete { background: rgba(229,38,45,0.15); color: #ff8b8e; }
+
+/* ------------------------------------------------------------
+   MOBILE HARDENING
+   The console is run from a laptop, but on the day it gets opened
+   on a phone at the desk — scores go in between ties.
+   ------------------------------------------------------------ */
+@media (max-width: 760px), (pointer: coarse) {
+  .btn-mini { min-height: 40px; padding: 0 15px; }
+  .btn-primary.sm { min-height: 40px; }
+  .md-fx-tag, .sh-side { font-size: 11px; }
+  .tab { min-height: 42px; }
+  .filters input, .filters select, .mini-select { min-height: 44px; font-size: 16px; }
+  .led > summary { padding: 14px 15px; }
+}
+
+@media (max-width: 760px) {
+  .toolbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .toolbar-actions, .toolbar-right { flex-wrap: wrap; }
+  .squad-board { gap: 12px; }
+  .ledger-intro { font-size: 12.5px; }
+}
