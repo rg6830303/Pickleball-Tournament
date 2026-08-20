@@ -37,7 +37,7 @@
   let live = false;              // realtime socket actually subscribed
   let firstPaint = true;
 
-  const D = { teams: [], standings: [], fixtures: [], results: [], squads: [], format: [], ledger: [] };
+  const D = { teams: [], standings: [], fixtures: [], results: [], squads: [], format: [], ledger: [], lineups: [], sheets: [] };
   const openLedger = new Set();  // team ids whose working is showing
   const openTies = new Set();    // tie ids the reader has expanded
   const openSquads = new Set();  // team ids the reader has expanded
@@ -54,9 +54,11 @@
       sb.from("public_squads").select("*").order("team_id").order("sort_order"),
       sb.from("tournament_format").select("*").order("slot"),
       sb.from("points_ledger").select("*").order("team_id").order("tie_id"),
+      sb.from("public_lineups").select("*").order("tie_id").order("slot").order("position"),
+      sb.from("public_sheet_status").select("*"),
     ];
-    const [teams, standings, fixtures, results, squads, format, ledger] = await Promise.all(q);
-    const bad = [teams, standings, fixtures, results, squads, format, ledger].find((r) => r.error);
+    const [teams, standings, fixtures, results, squads, format, ledger, lineups, sheets] = await Promise.all(q);
+    const bad = [teams, standings, fixtures, results, squads, format, ledger, lineups, sheets].find((r) => r.error);
     if (bad) throw bad.error;
 
     D.teams = teams.data || [];
@@ -66,6 +68,8 @@
     D.squads = squads.data || [];
     D.format = format.data || [];
     D.ledger = ledger.data || [];
+    D.lineups = lineups.data || [];
+    D.sheets = sheets.data || [];
   }
 
   let refreshing = false;
@@ -352,8 +356,67 @@
           }</span>
           <span class="tie-caret" aria-hidden="true"></span>
         </summary>
-        <div class="tie-body">${matchTable(t, rs)}</div>
+        <div class="tie-body">${matchTable(t, rs)}${lineupBlock(t)}</div>
       </details>`;
+  }
+
+  /* Who actually took the court, once it is safe to say.
+     A filed sheet is sealed until nobody is still waiting to name their
+     team — otherwise this page would hand a captain the opposition. */
+  function lineupBlock(t) {
+    const rows = D.lineups.filter((l) => l.tie_id === t.id);
+    const status = D.sheets.find((s) => s.tie_id === t.id);
+
+    if (!rows.length) {
+      if (!status || !status.filed) return "";
+      return `
+        <div class="lu lu-sealed">
+          <p class="lu-h">Team sheets</p>
+          <p class="lu-note">${esc(status.filed)} of ${esc(status.required)} filed${
+            status.window_open ? " — the window is still open" : ""
+          }. Line-ups are published once both captains are in.</p>
+        </div>`;
+    }
+
+    const sides = ["home", "away"].map((side) => {
+      const mine = rows.filter((r) => r.side === side);
+      if (!mine.length) return "";
+      const name = mine[0].team_name;
+      const slots = [...new Set(mine.map((r) => r.slot))].sort((a, b) => a - b);
+      return `
+        <div class="lu-side">
+          <p class="lu-team">${esc(name)}</p>
+          <ol class="lu-slots">
+            ${slots
+              .map((slot) => {
+                const players = mine.filter((r) => r.slot === slot);
+                const trump = players[0].is_trump;
+                return `
+                <li class="lu-slot${trump ? " is-trump" : ""}">
+                  <span class="lu-no">${esc(slot)}</span>
+                  <span class="lu-what">${esc(players[0].slot_label)}${
+                  trump ? `<em class="lu-trump">Trump</em>` : ""
+                }</span>
+                  <span class="lu-who">${players
+                    .map(
+                      (p) =>
+                        `<span class="lu-p"><i class="lu-cat c-${esc(p.category)}">${esc(
+                          p.category
+                        )}</i>${esc(p.player_name)}</span>`
+                    )
+                    .join("")}</span>
+                </li>`;
+              })
+              .join("")}
+          </ol>
+        </div>`;
+    });
+
+    return `
+      <div class="lu">
+        <p class="lu-h">Team sheets as filed</p>
+        <div class="lu-grid">${sides.join("")}</div>
+      </div>`;
   }
 
   function matchTable(t, rs) {
