@@ -22,4 +22,19 @@ window.MPL_AUCTION_CONFIG = {
   /* Currency formatting for purse / bid amounts */
   CURRENCY: "₹",
   LOCALE: "en-IN",
+
+  /* ------------------------------------------------------------
+     AUCTION VISIBILITY
+
+     false → captains see only their final squad. The purse strip,
+             the lot on the block, the bid button, the ticker and
+     the league purse table are all hidden, and no auction data is
+     fetched at all.
+
+     The auction engine itself is untouched — every table, policy
+     and RPC is still in place, and the organiser console still
+     runs the room. Flip this back to true to reopen the auction
+     for captains; nothing else needs changing.
+     ------------------------------------------------------------ */
+  SHOW_AUCTION: false,
 };

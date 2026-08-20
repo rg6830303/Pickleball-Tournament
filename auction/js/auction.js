@@ -9,6 +9,12 @@
   const $ = (s, r = document) => r.querySelector(s);
   const LIVE = Boolean(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 
+  // Captains see the auction room only while it is switched on. When it is
+  // off they get their final squad instead — see SHOW_AUCTION in config.js.
+  // Everything below the flag (bidding, wallet, ticker) stays in the file so
+  // the room can be reopened without a rewrite.
+  const SHOW_AUCTION = CFG.SHOW_AUCTION !== false;
+
   let sb = null;
   let myTeamId = null;
   let teams = [];
@@ -64,6 +70,19 @@
       pick.insertAdjacentHTML("beforeend", `<option value="${i}">Team ${i}</option>`);
     }
     $("#brandSeason").textContent = CFG.EVENT.season;
+
+    // The sign-in screen promises an auction room. With the room closed it has
+    // to promise the squad instead, or captains sit waiting for a lot that is
+    // never called. Restored automatically when SHOW_AUCTION goes back to true.
+    if (!SHOW_AUCTION) {
+      document.title = "MPL Squad — Team Captain";
+      const title = document.querySelector(".auth-title");
+      if (title) title.textContent = "Team Squad";
+      const label = document.querySelector("#btnLogin .btn-label");
+      if (label) label.textContent = "View My Squad";
+      const fine = document.querySelector(".auth-fine");
+      if (fine) fine.textContent = "Captains only. Sign in to see the nine players in your franchise.";
+    }
 
     if (!LIVE || !window.supabase) {
       alertBox($("#authAlert"), "Auction backend isn't configured yet. Check auction/js/config.js.");
@@ -153,12 +172,79 @@
     myTeamId = data;
     $("#authWrap").hidden = true;
     $("#app").hidden = false;
+    $("#brandMark").textContent = String(myTeamId);
+
+    if (!SHOW_AUCTION) {
+      await enterSquadOnly();
+      return;
+    }
+
     $("#brandTeam").textContent = teamName(myTeamId);
     renderWelcome();
-    $("#brandMark").textContent = String(myTeamId);
 
     await refreshAll();
     startRealtime();
+  }
+
+  /* ============================================================
+     SQUAD-ONLY MODE
+     No purse, no lot, no bidding — just the nine names the
+     captain finished the auction with, read from team_squads.
+     ============================================================ */
+  async function enterSquadOnly() {
+    document.querySelector(".wallet")?.setAttribute("hidden", "");
+    document.querySelector(".stage")?.setAttribute("hidden", "");
+    document.querySelector(".cols")?.setAttribute("hidden", "");
+    $("#roster").hidden = false;
+    const sub = document.querySelector(".brand-sub");
+    if (sub) sub.textContent = `Squad · ${CFG.EVENT.season}`;
+
+    // The realtime badge would sit there saying "connecting…" forever with no
+    // auction channel open, so it goes with the rest of the auction chrome.
+    $("#liveDot")?.setAttribute("hidden", "");
+
+    const [t, s] = await Promise.all([
+      sb.from("auction_teams").select("id,name,captain_name,group_code,group_rank").eq("id", myTeamId).maybeSingle(),
+      sb.from("team_squads").select("*").eq("team_id", myTeamId).order("sort_order"),
+    ]);
+
+    const team = t.data || { id: myTeamId, name: `Team ${myTeamId}` };
+    $("#brandTeam").textContent = team.name;
+    $("#rosterTeam").textContent = team.name;
+    $("#rosterCap").textContent = team.captain_name ? `Captain · ${team.captain_name}` : "";
+    $("#rosterGroup").textContent = team.group_code
+      ? `Group ${team.group_code} · ${String(team.group_rank ?? "").padStart(2, "0")}`
+      : "The Franchises";
+
+    const list = $("#rosterList");
+    if (s.error) {
+      list.innerHTML = "";
+      $("#rosterNote").textContent =
+        "Couldn't load your squad: " + (s.error.message || s.error);
+      return;
+    }
+
+    const squad = s.data || [];
+    if (!squad.length) {
+      list.innerHTML = "";
+      $("#rosterNote").textContent =
+        "Your squad hasn't been published yet. It will appear here the moment the organiser posts it.";
+      return;
+    }
+
+    list.innerHTML = squad
+      .map(
+        (p, i) => `
+        <li class="roster-row">
+          <span class="rr-no">${String(i + 1).padStart(2, "0")}</span>
+          <span class="rr-cat c-${esc(p.category)}">${esc(p.category)}</span>
+          <span class="rr-name">${esc(p.player_name)}</span>
+          ${p.retained ? '<span class="rr-ret" title="Retained player">R</span>' : ""}
+        </li>`
+      )
+      .join("");
+
+    $("#rosterNote").textContent = `${squad.length} players · 9 per squad`;
   }
 
   async function refreshAll() {

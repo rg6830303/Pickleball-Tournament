@@ -868,3 +868,106 @@ body.mn-blownup { overscroll-behavior: none; }
   .mn-sold *, .mn-sold { animation: none !important; }
   .mn-sold-word { transform: rotate(-2deg); }
 }
+
+/* ------------------------------------------------------------
+   FINAL SQUAD (auction closed to captains)
+   One franchise card, nine names, read the way the line-up
+   poster reads them.
+   ------------------------------------------------------------ */
+.roster {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 22px 18px 30px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  border-top: 3px solid var(--red);
+}
+
+.roster-head { text-align: center; margin-bottom: 20px; }
+
+.roster-kicker {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 6px;
+}
+
+.roster-team {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 7vw, 40px);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.roster-cap { font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+
+.roster-list { list-style: none; display: flex; flex-direction: column; }
+
+.roster-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 4px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 16px;
+  min-width: 0;
+}
+.roster-row:first-child { border-top: none; }
+
+.rr-no {
+  flex: none;
+  width: 22px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.rr-cat, .rl-cat {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  font-style: normal;
+}
+.rr-cat.c-A, .rl-cat.c-A { background: var(--red); }
+.rr-cat.c-B, .rl-cat.c-B { background: #3f3f45; }
+.rr-cat.c-C, .rl-cat.c-C { background: #26262b; color: var(--text-dim); }
+
+.rr-name { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; }
+
+.rr-ret, .rl-ret {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--red);
+  font-style: normal;
+}
+.rr-ret { align-self: flex-start; margin-top: 2px; margin-right: auto; }
+
+.roster-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.roster-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.roster-legend .rl-cat { width: 17px; height: 17px; font-size: 10px; }
+
+.roster-note { margin-top: 10px; font-size: 12px; color: var(--text-dim); text-align: center; }

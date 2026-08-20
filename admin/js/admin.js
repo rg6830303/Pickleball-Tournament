@@ -288,6 +288,7 @@
       });
       $$(".tabpane").forEach((p) => (p.hidden = p.id !== `tab-${t.dataset.tab}`));
       if (t.dataset.tab === "grid") renderGrid();
+      if (t.dataset.tab === "teams") loadTeams();
       if (t.dataset.tab === "pool") loadPool();
       if (t.dataset.tab === "auction") loadAuction();
     })
@@ -836,6 +837,183 @@
   $("#btnCsvAll").addEventListener("click", () =>
     exportCsv(rows, `mpl-full-backup-${stamp()}.csv`)
   );
+
+  /* ============================================================
+     TEAMS — the sixteen squads, straight from team_squads.
+     Read-only board: the auction writes the squads, this shows them.
+     ============================================================ */
+  let squadTeams = [];   // auction_teams rows, with group_code / group_rank
+  let squadRows = [];    // team_squads rows
+  let squadLive = false; // realtime channel opened once
+
+  async function loadTeams() {
+    const [t, s] = await Promise.all([
+      sb.from("auction_teams").select("id,name,captain_name,group_code,group_rank").order("id"),
+      sb.from("team_squads").select("*").order("team_id").order("sort_order"),
+    ]);
+
+    if (t.error || s.error) {
+      const msg = (t.error || s.error).message || "";
+      $("#squadBoard").innerHTML = "";
+      $("#teamsEmpty").hidden = false;
+      $("#teamsEmpty").innerHTML = /does not exist|schema cache/i.test(msg)
+        ? 'The squad table is missing — run <code>supabase/team-squads.sql</code> in the Supabase SQL editor.'
+        : "Couldn't load the squads: " + esc(msg);
+      return;
+    }
+
+    squadTeams = t.data || [];
+    squadRows = s.data || [];
+    renderTeamsBoard();
+    startSquadRealtime();
+  }
+
+  /* squads change rarely, but when they do the console should not need a reload */
+  function startSquadRealtime() {
+    if (squadLive) return;
+    squadLive = true;
+    try {
+      sb.channel("squads-live")
+        .on("postgres_changes", { event: "*", schema: "public", table: "team_squads" }, () => {
+          sb.from("team_squads")
+            .select("*")
+            .order("team_id")
+            .order("sort_order")
+            .then(({ data, error }) => {
+              if (error) return;
+              squadRows = data || [];
+              renderTeamsBoard();
+            });
+        })
+        .subscribe();
+    } catch {
+      squadLive = false;
+    }
+  }
+
+  const GROUPS = ["A", "B", "C", "D"];
+
+  function teamsFiltered() {
+    const q = ($("#teamsQ")?.value || "").trim().toLowerCase();
+    if (!q) return { teams: squadTeams, match: () => false };
+    const hit = (s) => String(s ?? "").toLowerCase().includes(q);
+    const teams = squadTeams.filter(
+      (t) =>
+        hit(t.name) ||
+        hit(t.captain_name) ||
+        squadRows.some((r) => r.team_id === t.id && hit(r.player_name))
+    );
+    return { teams, match: (name) => hit(name) };
+  }
+
+  function renderTeamsBoard() {
+    const board = $("#squadBoard");
+    const { teams, match } = teamsFiltered();
+
+    $("#teamsEmpty").hidden = squadRows.length > 0;
+
+    const players = squadRows.length;
+    const retained = squadRows.filter((r) => r.retained).length;
+    const short = squadTeams.filter(
+      (t) => squadRows.filter((r) => r.team_id === t.id).length !== 9
+    ).length;
+    $("#teamsStats").innerHTML = [
+      `<div class="stat"><p class="n">${squadTeams.length}</p><p class="l">Teams</p></div>`,
+      `<div class="stat"><p class="n">${players}</p><p class="l">Players</p></div>`,
+      `<div class="stat"><p class="n">${retained}</p><p class="l">Retained</p></div>`,
+      short
+        ? `<div class="stat warn"><p class="n">${short}</p><p class="l">Squads not at 9</p></div>`
+        : `<div class="stat ok"><p class="n">9</p><p class="l">Per squad</p></div>`,
+    ].join("");
+
+    // Teams without a group still need a home, so anything unassigned is
+    // gathered under a trailing column rather than silently dropped.
+    const ungrouped = teams.filter((t) => !GROUPS.includes(t.group_code));
+    const cols = GROUPS.map((g) => ({
+      code: g,
+      label: `Group ${g}`,
+      list: teams
+        .filter((t) => t.group_code === g)
+        .sort((a, b) => (a.group_rank || 99) - (b.group_rank || 99)),
+    }));
+    if (ungrouped.length) cols.push({ code: "?", label: "Ungrouped", list: ungrouped });
+
+    board.innerHTML = cols
+      .map(
+        (c) => `
+      <div class="sq-col">
+        <p class="sq-group">${esc(c.label)}</p>
+        ${c.list.map((t) => teamCard(t, match)).join("") ||
+          '<p class="sq-none">No teams in this group.</p>'}
+      </div>`
+      )
+      .join("");
+  }
+
+  function teamCard(t, match) {
+    const squad = squadRows
+      .filter((r) => r.team_id === t.id)
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    const rows = squad
+      .map(
+        (p) => `
+        <li class="sq-player${match(p.player_name) ? " hit" : ""}">
+          <span class="sq-cat c-${esc(p.category)}">${esc(p.category)}</span>
+          <span class="sq-name">${esc(p.player_name)}</span>
+          ${p.retained ? '<span class="sq-ret" title="Retained player">R</span>' : ""}
+        </li>`
+      )
+      .join("");
+
+    return `
+      <article class="sq-card">
+        <header class="sq-head">
+          <span class="sq-rank">${String(t.group_rank ?? "").padStart(2, "0")}</span>
+          <div class="sq-id">
+            <h3 class="sq-team">${esc(t.name)}</h3>
+            <p class="sq-cap">${esc(t.captain_name || "—")}</p>
+          </div>
+          <span class="sq-count${squad.length === 9 ? "" : " off"}">${squad.length}/9</span>
+        </header>
+        <ol class="sq-list">${rows || '<li class="sq-empty">No players yet.</li>'}</ol>
+      </article>`;
+  }
+
+  $("#teamsQ")?.addEventListener("input", renderTeamsBoard);
+
+  $("#btnTeamsCsv")?.addEventListener("click", () => {
+    const byId = new Map(squadTeams.map((t) => [t.id, t]));
+    const cell = (v) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = ["group,group_rank,team,captain,slot,player,category,retained"];
+    squadRows
+      .slice()
+      .sort((a, b) => {
+        const ta = byId.get(a.team_id) || {};
+        const tb = byId.get(b.team_id) || {};
+        return (
+          String(ta.group_code).localeCompare(String(tb.group_code)) ||
+          (ta.group_rank || 99) - (tb.group_rank || 99) ||
+          a.sort_order - b.sort_order
+        );
+      })
+      .forEach((r) => {
+        const t = byId.get(r.team_id) || {};
+        lines.push(
+          [t.group_code, t.group_rank, t.name, t.captain_name, r.sort_order, r.player_name, r.category, r.retained ? "R" : ""]
+            .map(cell)
+            .join(",")
+        );
+      });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+    a.download = `mpl-squads-${stamp()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
 
   /* ---- one-time auction install helper (shown when tables are missing) ---- */
   (() => {

@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/mn-card.css?v=202608111740" />
-  <link rel="stylesheet" href="css/admin.css?v=202608111740" />
+  <link rel="stylesheet" href="css/mn-card.css?v=202608200900" />
+  <link rel="stylesheet" href="css/admin.css?v=202608200900" />
 </head>
 <body>
 
@@ -95,6 +95,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab on" data-tab="registrations" role="tab" aria-selected="true">Registrations</button>
       <button class="tab" data-tab="grid" role="tab" aria-selected="false">Full Table (Live)</button>
+      <button class="tab" data-tab="teams" role="tab" aria-selected="false">Teams</button>
       <button class="tab" data-tab="pool" role="tab" aria-selected="false">Auction Pool</button>
       <button class="tab" data-tab="auction" role="tab" aria-selected="false">Auction</button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">Event Controls</button>
@@ -164,6 +165,24 @@
 
       <!-- used by the per-row photo upload buttons in the sheet -->
       <input type="file" id="gridPhotoInput" accept="image/*" hidden />
+    </section>
+
+    <!-- ---------- TAB: TEAMS ---------- -->
+    <section class="tabpane" id="tab-teams" hidden>
+      <section class="toolbar">
+        <div class="filters">
+          <input type="search" id="teamsQ" placeholder="Search a player or a team…" />
+        </div>
+        <div class="toolbar-actions">
+          <span class="grid-hint" id="teamsHint">Live from the squad table — captains see the same list</span>
+          <button class="btn-mini" id="btnTeamsCsv" type="button">⬇ Download CSV</button>
+        </div>
+      </section>
+
+      <section class="stats" id="teamsStats" aria-label="Squad statistics"></section>
+
+      <div class="squad-board" id="squadBoard"></div>
+      <p class="empty" id="teamsEmpty" hidden>No squads yet — run <code>supabase/team-squads.sql</code>.</p>
     </section>
 
     <!-- ---------- TAB: AUCTION POOL ---------- -->
@@ -517,12 +536,12 @@
   <div class="lightbox" id="lightbox" hidden><img alt="Attachment preview" id="lightboxImg" /></div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/mn-sky.js?v=202608111740"></script>
-  <script src="js/mn-card.js?v=202608111740"></script>
-  <script src="js/mn-pw.js?v=202608111740"></script>
-  <script src="js/mn-sold.js?v=202608111740"></script>
+  <script src="js/mn-sky.js?v=202608200900"></script>
+  <script src="js/mn-card.js?v=202608200900"></script>
+  <script src="js/mn-pw.js?v=202608200900"></script>
+  <script src="js/mn-sold.js?v=202608200900"></script>
   <script src="js/vendor/supabase.js" defer></script>
-  <script src="js/config.js?v=202608111740"></script>
-  <script src="js/admin.js?v=202608111740" defer></script>
+  <script src="js/config.js?v=202608200900"></script>
+  <script src="js/admin.js?v=202608200900" defer></script>
 </body>
 </html>

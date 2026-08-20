@@ -1722,3 +1722,118 @@ body.mn-blownup { overscroll-behavior: none; }
   .mn-sold *, .mn-sold { animation: none !important; }
   .mn-sold-word { transform: rotate(-2deg); }
 }
+
+/* ------------------------------------------------------------
+   TEAMS — the sixteen squads
+   Four group columns, four franchise cards each, exactly as the
+   line-up poster reads. Collapses to one column on a phone.
+   ------------------------------------------------------------ */
+.squad-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.sq-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.sq-group {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(100deg, var(--red), var(--red-deep));
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+}
+
+.sq-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius-sm);
+  padding: 13px 14px 11px;
+  min-width: 0;
+}
+
+.sq-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 10px; }
+
+.sq-rank {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--red);
+  line-height: 1;
+}
+
+.sq-id { flex: 1; min-width: 0; }
+
+.sq-team {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.sq-cap { font-size: 11.5px; color: var(--text-faint); line-height: 1.35; overflow-wrap: anywhere; }
+
+.sq-count {
+  font-size: 11px;
+  color: var(--text-faint);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+.sq-count.off { color: var(--warn); border-color: rgba(232,195,90,0.45); }
+
+.sq-list { list-style: none; display: flex; flex-direction: column; gap: 1px; }
+
+.sq-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 4px;
+  border-top: 1px solid rgba(255,255,255,0.045);
+  font-size: 13.5px;
+  min-width: 0;
+}
+.sq-player:first-child { border-top: none; }
+.sq-player.hit { background: rgba(229,38,45,0.13); border-radius: 6px; }
+
+.sq-cat {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+}
+.sq-cat.c-A { background: var(--red); }
+.sq-cat.c-B { background: #3f3f45; }
+.sq-cat.c-C { background: #26262b; color: var(--text-dim); }
+
+.sq-name { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; }
+
+.sq-ret {
+  flex: none;
+  margin-right: auto;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--red);
+  transform: translateY(-4px);
+}
+
+.sq-empty, .sq-none { font-size: 12.5px; color: var(--text-faint); padding: 6px 2px; }
+
+@media (max-width: 1180px) { .squad-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px)  { .squad-board { grid-template-columns: 1fr; } }
