@@ -289,6 +289,7 @@
       $$(".tabpane").forEach((p) => (p.hidden = p.id !== `tab-${t.dataset.tab}`));
       if (t.dataset.tab === "grid") renderGrid();
       if (t.dataset.tab === "teams") loadTeams();
+      if (t.dataset.tab === "tournament") loadTournament();
       if (t.dataset.tab === "pool") loadPool();
       if (t.dataset.tab === "auction") loadAuction();
     })
@@ -1011,6 +1012,154 @@
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
     a.download = `mpl-squads-${stamp()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  /* ============================================================
+     TOURNAMENT — match day: the run of show, the ladder, the rules
+     ============================================================ */
+  const FMT = window.MPL_FORMAT;
+  let ties = [];
+  let tourLive = false;
+
+  async function loadTournament() {
+    const [tt, ti] = await Promise.all([
+      squadTeams.length
+        ? Promise.resolve({ data: squadTeams })
+        : sb.from("auction_teams").select("id,name,captain_name,group_code,group_rank").order("id"),
+      sb.from("tournament_ties").select("*").order("sort_order"),
+    ]);
+    if (tt.data) squadTeams = tt.data;
+
+    if (ti.error) {
+      const msg = ti.error.message || "";
+      $("#tourEmpty").hidden = false;
+      $("#tourEmpty").innerHTML = /does not exist|schema cache/i.test(msg)
+        ? 'The fixture table is missing — run <code>supabase/tournament.sql</code> in the Supabase SQL editor.'
+        : "Couldn't load the schedule: " + esc(msg);
+      return;
+    }
+
+    ties = ti.data || [];
+    renderTournament();
+    startTourRealtime();
+  }
+
+  function startTourRealtime() {
+    if (tourLive) return;
+    tourLive = true;
+    try {
+      sb.channel("ties-live")
+        .on("postgres_changes", { event: "*", schema: "public", table: "tournament_ties" }, () => {
+          sb.from("tournament_ties")
+            .select("*")
+            .order("sort_order")
+            .then(({ data, error }) => {
+              if (error) return;
+              ties = data || [];
+              renderTournament();
+            });
+        })
+        .subscribe();
+    } catch {
+      tourLive = false;
+    }
+  }
+
+  const tourNameOf = (id) => (id ? squadTeams.find((t) => t.id === id)?.name || null : null);
+
+  function renderTournament() {
+    $("#tourEmpty").hidden = ties.length > 0;
+    $("#tourWhen").textContent = `${FMT.DATA.when} · ${FMT.DATA.where} · ${FMT.DATA.firstServe}`;
+
+    const group = ties.filter((t) => t.phase === "group");
+    $("#tourStats").innerHTML = [
+      `<div class="stat"><p class="n">${squadTeams.length}</p><p class="l">Teams</p></div>`,
+      `<div class="stat"><p class="n">${squadTeams.length * 9}</p><p class="l">Players</p></div>`,
+      `<div class="stat"><p class="n">${ties.length}</p><p class="l">Ties</p></div>`,
+      `<div class="stat"><p class="n">${ties.length * 5}</p><p class="l">Games</p></div>`,
+    ].join("");
+
+    $("#tourFormat").innerHTML = FMT.tieStrip();
+    $("#tourRules").innerHTML = FMT.rules();
+    $("#tourLadder").innerHTML = FMT.ladder(ties, tourNameOf);
+
+    renderRunOfShow(group);
+  }
+
+  function renderRunOfShow(group) {
+    const q = ($("#tourQ")?.value || "").trim().toLowerCase();
+    const gf = $("#tourGroup")?.value || "";
+    const courts = [...new Set(group.map((t) => t.court))].sort((a, b) => a - b);
+    const slots = [...new Set(group.map((t) => t.slot_no))].sort((a, b) => a - b);
+
+    $("#runHead").innerHTML =
+      `<th class="run-time">Time</th>` + courts.map((c) => `<th>Court ${c}</th>`).join("");
+
+    const nameFor = (t, side) =>
+      tourNameOf(side === "home" ? t.home_team_id : t.away_team_id) ||
+      (side === "home" ? t.home_label : t.away_label);
+
+    $("#runBody").innerHTML = slots
+      .map((s) => {
+        const row = group.filter((t) => t.slot_no === s);
+        const first = row[0];
+        const cells = courts
+          .map((c) => {
+            const t = row.find((x) => x.court === c);
+            if (!t) return `<td class="run-none">—</td>`;
+
+            const home = nameFor(t, "home");
+            const away = nameFor(t, "away");
+            const dim =
+              (gf && t.group_code !== gf) ||
+              (q && !`${home} ${away}`.toLowerCase().includes(q));
+
+            return `
+              <td class="run-cell${dim ? " dim" : ""}">
+                <p class="run-tag"><b>Group ${esc(t.group_code)}</b> Round ${t.round}</p>
+                <p class="run-team">${esc(home)}</p>
+                <p class="run-vs">vs</p>
+                <p class="run-team">${esc(away)}</p>
+              </td>`;
+          })
+          .join("");
+        return `<tr><th class="run-time"><b>${esc(FMT.timeOf(first?.starts_at))}</b><span>to ${esc(
+          FMT.timeOf(first?.ends_at)
+        )}</span></th>${cells}</tr>`;
+      })
+      .join("");
+  }
+
+  $("#tourQ")?.addEventListener("input", () => renderRunOfShow(ties.filter((t) => t.phase === "group")));
+  $("#tourGroup")?.addEventListener("change", () => renderRunOfShow(ties.filter((t) => t.phase === "group")));
+
+  $("#btnTourCsv")?.addEventListener("click", () => {
+    const cell = (v) => {
+      const s = String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = ["tie,phase,group,round,time,court,home,away"];
+    ties.forEach((t) =>
+      lines.push(
+        [
+          t.id,
+          t.phase,
+          t.group_code || "",
+          t.round || "",
+          t.starts_at ? FMT.windowOf(t.starts_at, t.ends_at) : "TBC",
+          t.court || "",
+          tourNameOf(t.home_team_id) || t.home_label,
+          tourNameOf(t.away_team_id) || t.away_label,
+        ]
+          .map(cell)
+          .join(",")
+      )
+    );
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+    a.download = `mpl-schedule-${stamp()}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   });

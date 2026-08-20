@@ -122,8 +122,35 @@
       </div>
     </section>
 
-    <!-- ===== FINAL SQUAD (shown when the auction is closed to captains) ===== -->
-    <section class="roster" id="roster" hidden>
+    <!-- ===== CAPTAIN VIEW (shown when the auction is closed to captains) ===== -->
+    <nav class="cap-tabs" id="capTabs" role="tablist" hidden>
+      <button class="cap-tab on" data-cap="squad" type="button" role="tab" aria-selected="true">My Squad</button>
+      <button class="cap-tab" data-cap="matches" type="button" role="tab" aria-selected="false">My Matches</button>
+      <button class="cap-tab" data-cap="rules" type="button" role="tab" aria-selected="false">Format &amp; Rules</button>
+    </nav>
+
+    <!-- ----- my matches ----- -->
+    <section class="cappane" id="capMatches" hidden>
+      <header class="mday">
+        <p class="mday-kicker">Match Day</p>
+        <h2 class="mday-title" id="mdayWhen">Sunday 23 August 2026</h2>
+        <p class="mday-sub" id="mdayWhere"></p>
+        <p class="mday-report" id="mdayReport"></p>
+      </header>
+      <div class="fixtures" id="fixtures"></div>
+      <p class="roster-note" id="fixNote"></p>
+      <h3 class="cap-h">Championship ladder</h3>
+      <div id="capLadder"></div>
+    </section>
+
+    <!-- ----- format & rules ----- -->
+    <section class="cappane" id="capRules" hidden>
+      <div id="capFormat"></div>
+      <div id="capRuleBlocks"></div>
+    </section>
+
+    <!-- ----- final squad ----- -->
+    <section class="roster cappane" id="roster" hidden>
       <header class="roster-head">
         <p class="roster-kicker" id="rosterGroup">The Franchises</p>
         <h2 class="roster-team" id="rosterTeam">Team</h2>
@@ -162,6 +189,7 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
+  <script src="js/mpl-format.js?v=202608200900"></script>
   <script src="js/mn-sky.js?v=202608200900"></script>
   <script src="js/mn-card.js?v=202608200900"></script>
   <script src="js/mn-pw.js?v=202608200900"></script>

@@ -245,7 +245,96 @@
       .join("");
 
     $("#rosterNote").textContent = `${squad.length} players · 9 per squad`;
+
+    await loadMatchDay(team);
   }
+
+  /* ---------------- match day: the ties this team plays ---------------- */
+  const FMT = window.MPL_FORMAT;
+
+  async function loadMatchDay(team) {
+    $("#capTabs").hidden = false;
+    $("#capFormat").innerHTML = FMT.tieStrip();
+    $("#capRuleBlocks").innerHTML = FMT.rules();
+    $("#mdayWhen").textContent = FMT.DATA.when;
+    $("#mdayWhere").textContent = `${FMT.DATA.where} · ${FMT.DATA.firstServe}`;
+
+    // Groups A & B are on court first, so they are called in early; C & D are
+    // told relative to their own tie rather than to the start of the day.
+    $("#mdayReport").textContent = ["A", "B"].includes(team.group_code)
+      ? "Group A & B report at 8:30 AM."
+      : "Report 30 minutes before your scheduled tie.";
+
+    const [ti, tr] = await Promise.all([
+      sb.from("tournament_ties").select("*").order("sort_order"),
+      sb.rpc("auction_team_roster"),
+    ]);
+
+    if (ti.error) {
+      $("#fixtures").innerHTML = "";
+      $("#fixNote").textContent = "Couldn't load the schedule: " + (ti.error.message || ti.error);
+      return;
+    }
+
+    const names = {};
+    (tr.data || []).forEach((t) => (names[t.id] = t.name));
+    const nameOf = (id) => (id ? names[id] || null : null);
+
+    const all = ti.data || [];
+    const mine = all.filter((t) => t.home_team_id === myTeamId || t.away_team_id === myTeamId);
+    $("#capLadder").innerHTML = FMT.ladder(all, nameOf);
+
+    if (!mine.length) {
+      $("#fixtures").innerHTML = "";
+      $("#fixNote").textContent = "Your fixtures haven't been published yet.";
+      return;
+    }
+
+    // "Up next" is the first tie that has not finished; once the day is over
+    // nothing is highlighted rather than the last tie pretending to be next.
+    const now = Date.now();
+    const nextId = mine.find((t) => t.ends_at && new Date(t.ends_at).getTime() > now)?.id;
+
+    $("#fixtures").innerHTML = mine
+      .map((t) => {
+        const home = t.home_team_id === myTeamId;
+        const oppId = home ? t.away_team_id : t.home_team_id;
+        const opp = nameOf(oppId) || (home ? t.away_label : t.home_label);
+        return `
+        <article class="fx${t.id === nextId ? " next" : ""}">
+          <div class="fx-when">
+            <p class="fx-time">${esc(FMT.timeOf(t.starts_at))}</p>
+            <p class="fx-till">to ${esc(FMT.timeOf(t.ends_at))}</p>
+            <p class="fx-court">${t.court ? "Court " + t.court : "Court TBC"}</p>
+          </div>
+          <div class="fx-who">
+            <p class="fx-tag">${
+              t.group_code ? `<b>Group ${esc(t.group_code)}</b> Round ${t.round}` : esc(t.phase.toUpperCase())
+            }${t.id === nextId ? ' <span class="fx-next">Up next</span>' : ""}</p>
+            <p class="fx-vs">vs</p>
+            <p class="fx-opp">${esc(opp)}</p>
+          </div>
+        </article>`;
+      })
+      .join("");
+
+    const courts = [...new Set(mine.map((t) => t.court).filter(Boolean))].sort();
+    $("#fixNote").textContent =
+      `${mine.length} ties · ${mine.length * 5} matches` +
+      (courts.length ? ` · ${courts.length > 1 ? "Courts" : "Court"} ${courts.join(" & ")}` : "");
+  }
+
+  /* squad / matches / rules — one at a time on a phone */
+  document.querySelectorAll(".cap-tab").forEach((b) =>
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".cap-tab").forEach((x) => {
+        x.classList.toggle("on", x === b);
+        x.setAttribute("aria-selected", x === b ? "true" : "false");
+      });
+      const pane = { squad: "roster", matches: "capMatches", rules: "capRules" }[b.dataset.cap];
+      document.querySelectorAll(".cappane").forEach((p) => (p.hidden = p.id !== pane));
+    })
+  );
 
   async function refreshAll() {
     const [t, l, s, b, cd, cat] = await Promise.all([

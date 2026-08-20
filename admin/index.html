@@ -96,6 +96,7 @@
       <button class="tab on" data-tab="registrations" role="tab" aria-selected="true">Registrations</button>
       <button class="tab" data-tab="grid" role="tab" aria-selected="false">Full Table (Live)</button>
       <button class="tab" data-tab="teams" role="tab" aria-selected="false">Teams</button>
+      <button class="tab" data-tab="tournament" role="tab" aria-selected="false">Tournament</button>
       <button class="tab" data-tab="pool" role="tab" aria-selected="false">Auction Pool</button>
       <button class="tab" data-tab="auction" role="tab" aria-selected="false">Auction</button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">Event Controls</button>
@@ -183,6 +184,45 @@
 
       <div class="squad-board" id="squadBoard"></div>
       <p class="empty" id="teamsEmpty" hidden>No squads yet — run <code>supabase/team-squads.sql</code>.</p>
+    </section>
+
+    <!-- ---------- TAB: TOURNAMENT ---------- -->
+    <section class="tabpane" id="tab-tournament" hidden>
+      <section class="toolbar">
+        <div class="filters">
+          <input type="search" id="tourQ" placeholder="Search a team…" />
+          <select id="tourGroup">
+            <option value="">All groups</option>
+            <option value="A">Group A</option>
+            <option value="B">Group B</option>
+            <option value="C">Group C</option>
+            <option value="D">Group D</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <span class="grid-hint" id="tourWhen"></span>
+          <button class="btn-mini" id="btnTourCsv" type="button">⬇ Download CSV</button>
+        </div>
+      </section>
+
+      <section class="stats" id="tourStats" aria-label="Match day statistics"></section>
+
+      <div id="tourFormat"></div>
+
+      <h2 class="panel-title tour-h">Run of show</h2>
+      <div class="run-wrap">
+        <table class="run">
+          <thead><tr id="runHead"></tr></thead>
+          <tbody id="runBody"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="tourEmpty" hidden>No fixtures yet — run <code>supabase/tournament.sql</code>.</p>
+
+      <h2 class="panel-title tour-h">Championship ladder</h2>
+      <div id="tourLadder"></div>
+
+      <h2 class="panel-title tour-h">The rules that decide it</h2>
+      <div id="tourRules"></div>
     </section>
 
     <!-- ---------- TAB: AUCTION POOL ---------- -->
@@ -536,6 +576,7 @@
   <div class="lightbox" id="lightbox" hidden><img alt="Attachment preview" id="lightboxImg" /></div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
+  <script src="js/mpl-format.js?v=202608200900"></script>
   <script src="js/mn-sky.js?v=202608200900"></script>
   <script src="js/mn-card.js?v=202608200900"></script>
   <script src="js/mn-pw.js?v=202608200900"></script>
