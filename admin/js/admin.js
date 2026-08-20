@@ -290,6 +290,10 @@
       if (t.dataset.tab === "grid") renderGrid();
       if (t.dataset.tab === "teams") loadTeams();
       if (t.dataset.tab === "tournament") loadTournament();
+      if (t.dataset.tab === "sheets") loadSheets();
+      if (t.dataset.tab === "scoreboard") loadScoreboard();
+      // one countdown interval, and only while the sheets tab is up
+      if (t.dataset.tab !== "sheets") stopSheetClock();
       if (t.dataset.tab === "pool") loadPool();
       if (t.dataset.tab === "auction") loadAuction();
     })
@@ -2729,6 +2733,959 @@
 
 
 
+
+
+  /* ============================================================
+     MATCH DAY — the team sheets desk and the scoreboard.
+     Both tabs run off the same three tables, so the fixture rail,
+     the tie lookup and the format labels are shared by the pair.
+     ============================================================ */
+  let mdTies = [];          // all 31 ties, in sort_order
+  let mdFormat = [];        // tournament_format, slots 1..5
+  let mdFormatLoaded = false;
+
+  const mdSide = (t, side) =>
+    tourNameOf(side === "home" ? t.home_team_id : t.away_team_id) ||
+    (side === "home" ? t.home_label : t.away_label) ||
+    "To be decided";
+
+  const mdPhase = (t) =>
+    t.phase === "group"
+      ? `Group ${t.group_code} R${t.round}`
+      : t.phase === "qf"
+      ? "Quarter-final"
+      : t.phase === "sf"
+      ? "Semi-final"
+      : "The final";
+
+  const mdSeated = (t) => t.home_team_id != null && t.away_team_id != null;
+
+  // The organiser's clock is the venue clock. FMT.timeOf prints 9:00 AM for the
+  // poster; a submission stamp wants the flat 24-hour form so two of them can
+  // be compared at a glance.
+  const IST_HM = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const istHM = (iso) => (iso ? IST_HM.format(new Date(iso)) : "—");
+
+  function mmss(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  }
+
+  /* Teams and fixtures are shared with the Tournament tab; the format table
+     cannot change during the day, so it is fetched once and kept. */
+  async function mdLoadCore() {
+    const [ti, tt, fm] = await Promise.all([
+      sb.from("tournament_ties").select("*").order("sort_order"),
+      squadTeams.length
+        ? Promise.resolve({ data: squadTeams })
+        : sb.from("auction_teams").select("id,name,captain_name,group_code,group_rank").order("id"),
+      mdFormatLoaded
+        ? Promise.resolve({ data: mdFormat })
+        : sb.from("tournament_format").select("*").order("slot"),
+    ]);
+    if (tt.data && tt.data.length) squadTeams = tt.data;
+    if (fm.data && fm.data.length) {
+      mdFormat = fm.data;
+      mdFormatLoaded = true;
+    }
+    if (ti.error) return ti.error;
+    mdTies = ti.data || [];
+    // The five slots must exist even if tournament_format was never seeded,
+    // or the score sheet would render zero rows and look broken.
+    if (!mdFormat.length)
+      mdFormat = [1, 2, 3, 4, 5].map((slot) => ({
+        slot,
+        label: `Match ${slot}`,
+        note: "",
+        kind: slot === 3 ? "singles" : "doubles",
+      }));
+    return null;
+  }
+
+  /* One fixture rail, used by both tabs. `badgeFor` decides the chip on the
+     right and any state class (an open window, a finished tie). */
+  function mdRail(list, selectedId, attr, badgeFor) {
+    return list
+      .map((t) => {
+        const b = (badgeFor && badgeFor(t)) || {};
+        return `<button type="button" class="md-fx${t.id === selectedId ? " on" : ""}${
+          b.cls || ""
+        }" ${attr}="${t.id}">
+          <span class="md-fx-top">
+            <b>${esc(FMT.timeOf(t.starts_at))}</b>
+            <span class="md-fx-court">${t.court ? "Court " + t.court : "Court TBC"}</span>
+            ${b.html || ""}
+          </span>
+          <span class="md-fx-tag">${esc(mdPhase(t))}</span>
+          <span class="md-fx-team">${esc(mdSide(t, "home"))}</span>
+          <span class="md-fx-team">${esc(mdSide(t, "away"))}</span>
+        </button>`;
+      })
+      .join("");
+  }
+
+  function mdTieHead(t) {
+    return `<header class="md-head">
+      <p class="md-kick">${esc(mdPhase(t))} · Tie ${t.id}${
+      t.court ? " · Court " + t.court : ""
+    }</p>
+      <h3 class="md-title"><span>${esc(mdSide(t, "home"))}</span><i>v</i><span>${esc(
+      mdSide(t, "away")
+    )}</span></h3>
+      <p class="md-when">${esc(FMT.windowOf(t.starts_at, t.ends_at))}</p>
+    </header>`;
+  }
+
+  /* ------------------------------------------------------------
+     TAB: TEAM SHEETS — open the window, watch both line-ups land
+     ------------------------------------------------------------ */
+  let shBoard = [];         // sheet_board() rows, both sides of every tie
+  let shTie = null;         // selected tie id
+  let shMinutes = 15;
+  let shTimer = null;       // the one and only countdown interval
+  let shLive = false;
+  let shSoon = null;
+
+  async function loadSheets() {
+    const err = await mdLoadCore();
+    if (err) return shFail("Couldn't load the fixtures: " + err.message);
+
+    const { data, error } = await sb.rpc("sheet_board");
+    if (error) return shFail(shBoardError(error));
+    shBoard = data || [];
+    $("#shAlert").classList.remove("show");
+    renderSheets();
+    startSheetClock();
+    startSheetRealtime();
+  }
+
+  function shFail(msg) {
+    alertBox($("#shAlert"), msg);
+    $("#shFixtures").innerHTML = "";
+    $("#shPanel").innerHTML = "";
+    $("#shEmpty").hidden = true;
+  }
+
+  // sheet_board() is staff-gated inside the function body, so a captain gets an
+  // empty set rather than an error. A missing function or a denied call is what
+  // actually shows up here, and both deserve plain words.
+  function shBoardError(error) {
+    const m = error.message || String(error);
+    if (/does not exist|schema cache|not find the function/i.test(m))
+      return "The match-day functions aren't installed — run supabase/match-day-ops.sql in the Supabase SQL editor.";
+    if (/permission|denied|policy|staff/i.test(m))
+      return "This account isn't on the tournament staff list, so the team sheets are sealed to it. Ask the organiser to add it.";
+    return "Couldn't load the team sheets: " + m;
+  }
+
+  const shFor = (tieId, teamId) =>
+    shBoard.find((s) => s.tie_id === tieId && s.team_id === teamId);
+
+  function shBadge(t) {
+    const sheets = shBoard.filter((s) => s.tie_id === t.id);
+    const done = sheets.filter((s) => s.status === "submitted").length;
+    const now = Date.now();
+    const open = sheets.some((s) => s.status === "open" && new Date(s.deadline).getTime() > now);
+    const late = sheets.some((s) => s.status === "open" && new Date(s.deadline).getTime() <= now);
+    return {
+      cls: open ? " is-open" : late ? " is-late" : "",
+      html: `<span class="md-fx-badge${done === 2 ? " in" : ""}">${done}/2${
+        done === 2 ? " in" : ""
+      }</span>`,
+    };
+  }
+
+  function renderSheets() {
+    const q = ($("#shQ").value || "").trim().toLowerCase();
+    const g = $("#shGroup").value || "";
+    const seated = mdTies.filter(mdSeated);
+    const list = seated.filter((t) => {
+      if (g && t.group_code !== g) return false;
+      if (!q) return true;
+      return `${mdSide(t, "home")} ${mdSide(t, "away")}`.toLowerCase().includes(q);
+    });
+
+    $("#shEmpty").hidden = list.length > 0;
+    $("#shEmpty").textContent = seated.length
+      ? "No fixtures match that search."
+      : "No fixtures with both teams known yet — seat the knockouts on the Scoreboard tab.";
+
+    if (shTie != null && !list.some((t) => t.id === shTie) && !seated.some((t) => t.id === shTie))
+      shTie = null;
+    if (shTie == null && list.length) shTie = list[0].id;
+
+    const openNow = shBoard.filter(
+      (s) => s.status === "open" && new Date(s.deadline).getTime() > Date.now()
+    ).length;
+    $("#shHint").textContent = openNow
+      ? `${openNow} sheet${openNow === 1 ? "" : "s"} open right now`
+      : "Open a 15-minute window and watch both line-ups land";
+
+    $("#shFixtures").innerHTML = mdRail(list, shTie, "data-sh-tie", shBadge);
+    renderSheetPanel();
+  }
+
+  function shState(s) {
+    if (!s) return { cls: "idle", html: "Not opened yet" };
+    if (s.status === "submitted")
+      return { cls: "in", html: `Submitted ${esc(istHM(s.submitted_at))}` };
+    if (s.status === "void") return { cls: "shut", html: "Window closed" };
+    const left = new Date(s.deadline).getTime() - Date.now();
+    if (left <= 0) return { cls: "late", html: "Missed the deadline" };
+    return {
+      cls: "open",
+      html: `Open — <span class="sh-clock${left < 120000 ? " urgent" : ""}" data-deadline="${esc(
+        s.deadline
+      )}">${mmss(left)}</span> left`,
+    };
+  }
+
+  function shLineup(s) {
+    const picks = Array.isArray(s && s.picks) ? s.picks : [];
+    if (!picks.length)
+      return `<p class="sh-none">${
+        s && s.status === "open" ? "Waiting on the captain." : "No line-up filed."
+      }</p>`;
+    return (
+      `<ol class="sh-slots">` +
+      mdFormat
+        .map((f) => {
+          const on = picks
+            .filter((p) => p.slot === f.slot)
+            .sort((a, b) => a.position - b.position);
+          const trump = s.trump_slot === f.slot;
+          return `<li class="sh-slot${trump ? " is-trump" : ""}">
+            <span class="sh-no">${f.slot}</span>
+            <div class="sh-slot-main">
+              <p class="sh-slot-label">${esc(f.label)}${
+            trump ? `<span class="sh-trump">Trump</span>` : ""
+          }</p>
+              <p class="sh-players">${
+                on
+                  .map(
+                    (p) =>
+                      `<span class="sh-player"><i class="sq-cat c-${esc(p.category)}">${esc(
+                        p.category
+                      )}</i>${esc(p.player_name)}</span>`
+                  )
+                  .join("") || `<span class="sh-none">—</span>`
+              }</p>
+            </div>
+          </li>`;
+        })
+        .join("") +
+      `</ol>`
+    );
+  }
+
+  function shCard(t, side) {
+    const teamId = side === "home" ? t.home_team_id : t.away_team_id;
+    const s = shFor(t.id, teamId);
+    const st = shState(s);
+    return `<article class="sh-card is-${st.cls}">
+      <header class="sh-card-head">
+        <span class="sh-side">${side}</span>
+        <h4 class="sh-team">${esc(tourNameOf(teamId) || "—")}</h4>
+        <p class="sh-state">${st.html}</p>
+        ${
+          s && s.filed_by_staff
+            ? `<p class="sh-bystaff">filed by the organiser</p>`
+            : ""
+        }
+      </header>
+      <div class="sh-body">${shLineup(s)}</div>
+      <footer class="sh-card-foot">
+        <button type="button" class="btn-mini" data-sh-act="reset-team" data-sh-team="${teamId}">
+          Reset this team
+        </button>
+      </footer>
+    </article>`;
+  }
+
+  function renderSheetPanel() {
+    const host = $("#shPanel");
+    const t = mdTies.find((x) => x.id === shTie);
+    if (!t) {
+      host.innerHTML = `<p class="md-idle">Pick a fixture on the left to open its line-up window.</p>`;
+      return;
+    }
+    host.innerHTML = `<div class="panel md-panel">
+      ${mdTieHead(t)}
+      <div class="md-actions">
+        <label class="md-mins">
+          <span>Minutes</span>
+          <input type="number" id="shMinutes" min="1" max="240" step="1" value="${shMinutes}" />
+        </label>
+        <button type="button" class="btn-primary sm" data-sh-act="open">
+          <span class="spin" aria-hidden="true"></span><span class="btn-label">Open both sheets</span>
+        </button>
+        <button type="button" class="btn-mini" data-sh-act="reset">Reset both</button>
+        <button type="button" class="btn-mini danger" data-sh-act="close">Close the window</button>
+      </div>
+      <div class="sh-cards">${shCard(t, "home")}${shCard(t, "away")}</div>
+    </div>`;
+  }
+
+  /* One interval for the whole tab. It only rewrites the digits, so nothing
+     the organiser is typing into is rebuilt underneath them. */
+  function startSheetClock() {
+    if (shTimer) return;
+    shTimer = setInterval(tickSheetClocks, 1000);
+  }
+  function stopSheetClock() {
+    if (!shTimer) return;
+    clearInterval(shTimer);
+    shTimer = null;
+  }
+  function tickSheetClocks() {
+    const clocks = $$(".sh-clock", $("#tab-sheets"));
+    if (!clocks.length) return;
+    let expired = false;
+    clocks.forEach((el) => {
+      const left = new Date(el.dataset.deadline).getTime() - Date.now();
+      if (left <= 0) {
+        expired = true;
+        return;
+      }
+      el.textContent = mmss(left);
+      el.classList.toggle("urgent", left < 120000);
+    });
+    // A window just ran out: repaint so "Open — 00:00 left" becomes the truth,
+    // "Missed the deadline". After that there are no clocks left to expire.
+    if (expired) renderSheets();
+  }
+
+  async function shReload() {
+    const { data, error } = await sb.rpc("sheet_board");
+    if (error) return;
+    shBoard = data || [];
+    if (!$("#tab-sheets").hidden) renderSheets();
+    if (!$("#tab-scoreboard").hidden) renderScorePanel();
+  }
+
+  /* A captain pressing send writes one sheet row and nine pick rows. Firing a
+     reload on each would be ten round trips for one submission. */
+  function shRefreshSoon() {
+    clearTimeout(shSoon);
+    shSoon = setTimeout(shReload, 250);
+  }
+
+  function startSheetRealtime() {
+    if (shLive) return;
+    shLive = true;
+    try {
+      sb.channel("sheets-live")
+        .on("postgres_changes", { event: "*", schema: "public", table: "team_sheets" }, shRefreshSoon)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "team_sheet_picks" },
+          shRefreshSoon
+        )
+        .subscribe();
+    } catch {
+      shLive = false;
+    }
+  }
+
+  function shReadMinutes() {
+    const el = $("#shMinutes");
+    const v = el ? Number(el.value) : shMinutes;
+    if (!Number.isFinite(v) || v < 1 || v > 240) return null;
+    return Math.round(v);
+  }
+
+  document.addEventListener("input", (e) => {
+    if (e.target.id !== "shMinutes") return;
+    const v = Number(e.target.value);
+    if (Number.isFinite(v) && v >= 1 && v <= 240) shMinutes = Math.round(v);
+  });
+
+  ["shQ", "shGroup"].forEach((id) =>
+    $("#" + id).addEventListener("input", () => {
+      if (!$("#tab-sheets").hidden) renderSheets();
+    })
+  );
+  $("#btnShRefresh").addEventListener("click", () => {
+    loadSheets();
+    toast("Team sheets refreshed", "info");
+  });
+
+  document.addEventListener("click", async (e) => {
+    const fx = e.target.closest("[data-sh-tie]");
+    if (fx) {
+      shTie = Number(fx.dataset.shTie);
+      renderSheets();
+      return;
+    }
+
+    const act = e.target.closest("[data-sh-act]");
+    if (!act) return;
+    const kind = act.dataset.shAct;
+    const t = mdTies.find((x) => x.id === shTie);
+    if (!t) return;
+
+    const mins = shReadMinutes();
+    if (kind !== "close" && mins == null)
+      return toast("The clock must be a whole number of minutes, 1 to 240", "err");
+
+    const teamId = kind === "reset-team" ? Number(act.dataset.shTeam) : null;
+    const run = async () => {
+      busy(act, true);
+      let res;
+      if (kind === "open") res = await sb.rpc("sheet_open", { p_tie_id: t.id, p_minutes: mins });
+      else if (kind === "reset")
+        res = await sb.rpc("sheet_reset", { p_tie_id: t.id, p_team_id: null, p_minutes: mins });
+      else if (kind === "close") res = await sb.rpc("sheet_close", { p_tie_id: t.id });
+      else res = await sb.rpc("sheet_reset", { p_tie_id: t.id, p_team_id: teamId, p_minutes: mins });
+      busy(act, false);
+      if (res.error) return toast(res.error.message, "err");
+      toast(
+        kind === "close"
+          ? "Window closed — neither captain can file now"
+          : kind === "reset-team"
+          ? `${tourNameOf(teamId) || "That team"} reset — ${mins} minutes on the clock`
+          : `Both sheets open — ${mins} minutes on the clock`,
+        kind === "close" ? "info" : "ok"
+      );
+      await shReload();
+    };
+
+    // Opening and resetting both wipe whatever was filed. That is the point,
+    // but not when a captain has already sent a line-up in.
+    const wiped = shBoard.filter(
+      (s) =>
+        s.tie_id === t.id &&
+        s.status === "submitted" &&
+        (teamId == null || s.team_id === teamId)
+    );
+    if (kind !== "close" && wiped.length) {
+      confirmDialog(
+        `${wiped.map((s) => s.team_name).join(" and ")} already filed a line-up. ` +
+          `Restarting the clock deletes it and they must pick all nine again. Continue?`,
+        run,
+        "Restart the clock",
+        false
+      );
+      return;
+    }
+    run();
+  });
+
+  /* ------------------------------------------------------------
+     TAB: SCOREBOARD — the league table and the five-match score sheet
+     ------------------------------------------------------------ */
+  let sbStand = [];
+  let sbResults = [];
+  let sbTie = null;
+  let sbLive = false;
+  let sbSoon = null;
+  let sbDirty = false;   // a refresh arrived while a score box had focus
+
+  async function loadScoreboard() {
+    const err = await mdLoadCore();
+    if (err) return alertBox($("#sbAlert"), "Couldn't load the fixtures: " + err.message);
+
+    const [st, rs, bd] = await Promise.all([
+      sb.from("public_standings").select("*").order("group_code").order("rank"),
+      sb.from("match_results").select("*").order("tie_id").order("slot"),
+      sb.rpc("sheet_board"),
+    ]);
+    if (st.error) alertBox($("#sbAlert"), "Couldn't load the league table: " + st.error.message);
+    else $("#sbAlert").classList.remove("show");
+    sbStand = st.data || [];
+    sbResults = rs.data || [];
+    // Only used to preview which match each captain declared as their trump
+    // before a score exists; a failure here must not take the tab down.
+    if (!bd.error) shBoard = bd.data || [];
+
+    renderScoreboard();
+    startScoreRealtime();
+  }
+
+  function renderScoreboard() {
+    renderStandings();
+    renderScoreRail();
+    renderScorePanel();
+  }
+
+  /* ---- the league table, exactly as public_standings ranked it ---- */
+  const STD_COLS = [
+    ["Group", 0], ["Rank", 0], ["Team", 0],
+    ["MP", 1], ["W", 1], ["L", 1], ["PS", 1], ["PC", 1], ["PD", 1], ["Pts", 1],
+  ];
+
+  function renderStandings() {
+    const host = $("#sbStandings");
+    $("#sbStandEmpty").hidden = sbStand.length > 0;
+    if (!sbStand.length) {
+      host.innerHTML = "";
+      $("#sbLegend").innerHTML = stdLegend();
+      return;
+    }
+    host.innerHTML = GROUPS.map((g) => {
+      const list = sbStand.filter((r) => r.group_code === g);
+      if (!list.length) return "";
+      return `<section class="std-block">
+        <p class="std-h">Group ${g}</p>
+        <div class="std-wrap">
+          <table class="std">
+            <thead><tr>${STD_COLS.map(
+              ([l, num]) => `<th class="${num ? "num" : ""}">${l}</th>`
+            ).join("")}</tr></thead>
+            <tbody>${list.map(stdRow).join("")}</tbody>
+          </table>
+        </div>
+      </section>`;
+    }).join("");
+    $("#sbLegend").innerHTML = stdLegend();
+  }
+
+  function stdRow(r) {
+    // The counters come back as bigints; PostgREST may hand them over as
+    // strings, and "10" < "9" would put the wrong two teams through.
+    const n = (v) => Number(v ?? 0);
+    const rank = n(r.rank);
+    const q = rank <= 2;
+    const diff = n(r.point_diff);
+    return `<tr class="${q ? "is-q" : ""}">
+      <td class="std-g">${esc(r.group_code)}</td>
+      <td class="num std-rank">${rank}${
+      q ? `<span class="std-q" title="Top two qualify for the quarter-finals">Q</span>` : ""
+    }</td>
+      <td class="std-team"><b>${esc(r.team_name)}</b><span>${esc(r.captain_name || "")}</span></td>
+      <td class="num">${n(r.matches_played)}</td>
+      <td class="num">${n(r.won)}</td>
+      <td class="num">${n(r.lost)}</td>
+      <td class="num">${n(r.points_for)}</td>
+      <td class="num">${n(r.points_against)}</td>
+      <td class="num">${diff > 0 ? "+" : ""}${diff}</td>
+      <td class="num std-pts">${n(r.points)}</td>
+    </tr>`;
+  }
+
+  const stdLegend = () => `
+    <ul class="std-legend">
+      <li><b>3</b><span>win a match</span></li>
+      <li><b>1</b><span>lose by 2 points or less</span></li>
+      <li><b>0</b><span>lose by more than 2</span></li>
+      <li><b class="red">+2</b><span>clean sweep — all 5 matches of a tie</span></li>
+      <li><b class="red">+2</b><span>win the match you trumped</span></li>
+      <li><b class="red">−2</b><span>both teams trumped it and you lost</span></li>
+      <li><b class="ok">Q</b><span>top two of every group reach the quarter-finals</span></li>
+    </ul>`;
+
+  /* ---- the fixture rail: all 31 ties, knockouts included ---- */
+  function sbBadge(t) {
+    const n = sbResults.filter((r) => r.tie_id === t.id).length;
+    if (!n) return { cls: "", html: `<span class="md-fx-badge">0/5</span>` };
+    const score = `${t.home_score ?? 0}–${t.away_score ?? 0}`;
+    return {
+      cls: n === 5 ? " is-done" : " is-open",
+      html: `<span class="md-fx-badge ${n === 5 ? "in" : "live"}">${score}${
+        n < 5 ? ` · ${n}/5` : ""
+      }</span>`,
+    };
+  }
+
+  function renderScoreRail() {
+    const q = ($("#sbQ").value || "").trim().toLowerCase();
+    const ph = $("#sbPhase").value || "";
+    const list = mdTies.filter((t) => {
+      if (ph && t.phase !== ph) return false;
+      if (!q) return true;
+      return `${mdSide(t, "home")} ${mdSide(t, "away")}`.toLowerCase().includes(q);
+    });
+
+    $("#sbEmpty").hidden = list.length > 0;
+    $("#sbEmpty").textContent = mdTies.length
+      ? "No ties match that search."
+      : "No fixtures yet — run supabase/tournament.sql.";
+
+    if (sbTie != null && !mdTies.some((t) => t.id === sbTie)) sbTie = null;
+    if (sbTie == null && list.length) sbTie = list[0].id;
+
+    $("#sbFixtures").innerHTML = mdRail(list, sbTie, "data-sb-tie", sbBadge);
+  }
+
+  /* ---- one tie: five matches, the running result, the shootout ---- */
+  function renderScorePanel() {
+    const host = $("#sbPanel");
+    const t = mdTies.find((x) => x.id === sbTie);
+    if (!t) {
+      host.innerHTML = `<p class="md-idle">Pick a tie on the left to record its five matches.</p>`;
+      return;
+    }
+    // Never rebuild a score box under the organiser's fingers — realtime fires
+    // on every save, including their own.
+    const a = document.activeElement;
+    if (a && host.contains(a) && a.matches("input, select")) {
+      sbDirty = true;
+      return;
+    }
+    sbDirty = false;
+
+    host.innerHTML = `<div class="panel md-panel">
+      ${mdTieHead(t)}
+      ${sbSeatRow(t)}
+      ${
+        mdSeated(t)
+          ? `<div class="sc-rows">${mdFormat.map((f) => sbRow(t, f)).join("")}</div>${sbSummary(t)}`
+          : `<p class="md-idle">Seat both teams above before scoring this tie.</p>`
+      }
+    </div>`;
+  }
+
+  // The knockout ties carry a poster label ("Winner Group A") until the groups
+  // decide who fills them, so the label is the placeholder on the dropdown.
+  function sbSeatRow(t) {
+    if (t.phase === "group") return "";
+    const opts = (sel) =>
+      squadTeams
+        .map((x) => `<option value="${x.id}"${x.id === sel ? " selected" : ""}>${esc(x.name)}</option>`)
+        .join("");
+    return `<div class="sc-seat">
+      <p class="sc-seat-h">Seat the teams</p>
+      <label class="sc-seat-f"><span>Home</span>
+        <select data-seat="home"><option value="">${esc(t.home_label || "To be decided")}</option>${opts(
+      t.home_team_id
+    )}</select></label>
+      <label class="sc-seat-f"><span>Away</span>
+        <select data-seat="away"><option value="">${esc(t.away_label || "To be decided")}</option>${opts(
+      t.away_team_id
+    )}</select></label>
+      <button type="button" class="btn-mini" data-sc-seat="${t.id}">Seat teams</button>
+    </div>`;
+  }
+
+  function sbRow(t, f) {
+    const r = sbResults.find((x) => x.tie_id === t.id && x.slot === f.slot);
+    // Before a score exists the badges preview what the captains declared, so
+    // the desk can see the trump coming; after it, they are the stored flags.
+    const declared = (teamId) =>
+      shBoard.some(
+        (s) =>
+          s.tie_id === t.id && s.team_id === teamId && s.status === "submitted" && s.trump_slot === f.slot
+      );
+    const hT = r ? !!r.home_trump : declared(t.home_team_id);
+    const aT = r ? !!r.away_trump : declared(t.away_team_id);
+    const pend = r ? "" : " pending";
+    const why = r ? "" : " — declared on the team sheet, not yet scored";
+
+    const trumps =
+      f.kind === "singles"
+        ? `<span class="sc-tr none" title="The singles can never be trumped">—</span>`
+        : hT || aT
+        ? `${
+            hT
+              ? `<span class="sc-tr home${pend}" title="${esc(mdSide(t, "home"))} trump${esc(why)}">T</span>`
+              : ""
+          }${
+            aT
+              ? `<span class="sc-tr away${pend}" title="${esc(mdSide(t, "away"))} trump${esc(why)}">T</span>`
+              : ""
+          }${
+            hT && aT
+              ? `<span class="sc-clash" title="Both teams trumped this match — winner +2, loser −2">clash</span>`
+              : ""
+          }`
+        : `<span class="sc-tr none">—</span>`;
+
+    return `<div class="sc-row${r ? " has" : ""}" data-slot="${f.slot}">
+      <span class="sc-no">${f.slot}</span>
+      <div class="sc-label"><b>${esc(f.label)}</b><span>${esc(f.note || "")}</span></div>
+      <div class="sc-scores">
+        <label class="sc-side">
+          <span class="sc-team">${esc(mdSide(t, "home"))}</span>
+          <input type="number" min="0" max="99" step="1" inputmode="numeric"
+                 data-sc-home="${f.slot}" value="${r ? r.home_points : ""}"
+                 aria-label="${esc(mdSide(t, "home"))} points, match ${f.slot}" />
+        </label>
+        <span class="sc-dash">–</span>
+        <label class="sc-side away">
+          <input type="number" min="0" max="99" step="1" inputmode="numeric"
+                 data-sc-away="${f.slot}" value="${r ? r.away_points : ""}"
+                 aria-label="${esc(mdSide(t, "away"))} points, match ${f.slot}" />
+          <span class="sc-team">${esc(mdSide(t, "away"))}</span>
+        </label>
+      </div>
+      <div class="sc-trumps">${trumps}</div>
+      <div class="sc-acts">
+        <button type="button" class="btn-mini" data-sc-save="${f.slot}">Save</button>
+        <button type="button" class="btn-mini ghost" data-sc-clear="${f.slot}"${
+      r ? "" : " disabled"
+    }>Clear</button>
+      </div>
+    </div>`;
+  }
+
+  function sbSummary(t) {
+    const rs = sbResults.filter((x) => x.tie_id === t.id);
+    const h = rs.filter((x) => x.home_points > x.away_points).length;
+    const a = rs.filter((x) => x.away_points > x.home_points).length;
+    const home = mdSide(t, "home");
+    const away = mdSide(t, "away");
+
+    let verdict;
+    let shoot = "";
+    if (rs.length < 5) {
+      const left = 5 - rs.length;
+      verdict = `<p class="sc-verdict wait">${left} match${
+        left === 1 ? "" : "es"
+      } still to score.</p>`;
+    } else if (h !== a) {
+      verdict = `<p class="sc-verdict win">${esc(h > a ? home : away)} win the tie ${Math.max(
+        h,
+        a
+      )}–${Math.min(h, a)}.</p>`;
+    } else {
+      // Five matches cannot split 2.5–2.5, so a level tie means at least one
+      // match finished dead level. The shootout is the only way out.
+      const w = t.shootout_winner_team_id;
+      verdict = w
+        ? `<p class="sc-verdict win">Level at ${h}–${a} — ${esc(
+            tourNameOf(w) || "the shootout winner"
+          )} take it on the 7-point Open Doubles shootout.</p>`
+        : `<p class="sc-verdict warn">Level at ${h}–${a}. A 7-point Open Doubles shootout decides this tie.</p>`;
+      shoot = `<div class="sc-shoot">
+        <label for="sbShoot">7-point Open Doubles shootout</label>
+        <select id="sbShoot" data-sc-shoot="${t.id}">
+          <option value="">— who won the shootout? —</option>
+          <option value="${t.home_team_id}"${
+        w === t.home_team_id ? " selected" : ""
+      }>${esc(home)}</option>
+          <option value="${t.away_team_id}"${
+        w === t.away_team_id ? " selected" : ""
+      }>${esc(away)}</option>
+        </select>
+      </div>`;
+    }
+
+    return `<div class="sc-summary">
+      <p class="sc-line"><b>${esc(home)}</b> <em>${h}</em>–<em>${a}</em> <b>${esc(
+      away
+    )}</b> <span>(matches won)</span></p>
+      ${verdict}${shoot}
+    </div>`;
+  }
+
+  async function sbReload() {
+    const [st, rs, ti] = await Promise.all([
+      sb.from("public_standings").select("*").order("group_code").order("rank"),
+      sb.from("match_results").select("*").order("tie_id").order("slot"),
+      sb.from("tournament_ties").select("*").order("sort_order"),
+    ]);
+    if (st.data) sbStand = st.data;
+    if (rs.data) sbResults = rs.data;
+    if (ti.data) mdTies = ti.data;
+    if (!$("#tab-scoreboard").hidden) renderScoreboard();
+    if (!$("#tab-sheets").hidden) renderSheets();
+  }
+
+  function sbRefreshSoon() {
+    clearTimeout(sbSoon);
+    sbSoon = setTimeout(sbReload, 250);
+  }
+
+  function startScoreRealtime() {
+    if (sbLive) return;
+    sbLive = true;
+    try {
+      sb.channel("scoreboard-live")
+        .on("postgres_changes", { event: "*", schema: "public", table: "match_results" }, sbRefreshSoon)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "tournament_ties" },
+          sbRefreshSoon
+        )
+        .subscribe();
+    } catch {
+      sbLive = false;
+    }
+  }
+
+  // The guard in renderScorePanel skips the repaint while a box has focus;
+  // this is where the skipped repaint is paid back.
+  $("#sbPanel").addEventListener("focusout", () => {
+    setTimeout(() => {
+      const a = document.activeElement;
+      if (a && $("#sbPanel").contains(a)) return;
+      if (sbDirty) renderScorePanel();
+    }, 0);
+  });
+
+  ["sbQ", "sbPhase"].forEach((id) =>
+    $("#" + id).addEventListener("input", () => {
+      if (!$("#tab-scoreboard").hidden) {
+        renderScoreRail();
+        renderScorePanel();
+      }
+    })
+  );
+
+  function sbScoreInputs(slot) {
+    const host = $("#sbPanel");
+    return [$(`[data-sc-home="${slot}"]`, host), $(`[data-sc-away="${slot}"]`, host)];
+  }
+
+  async function sbSave(slot, btn) {
+    const t = mdTies.find((x) => x.id === sbTie);
+    if (!t) return;
+    const [hi, ai] = sbScoreInputs(slot);
+    if (!hi || !ai) return;
+    const h = Number(hi.value);
+    const a = Number(ai.value);
+    const bad = (v, raw) => raw === "" || !Number.isInteger(v) || v < 0 || v > 99;
+    if (bad(h, hi.value.trim()) || bad(a, ai.value.trim()))
+      return toast("Both scores are needed, as whole numbers from 0 to 99", "err");
+
+    if (btn) busy(btn, true);
+    const { data, error } = await sb.rpc("result_set", {
+      p_tie_id: t.id,
+      p_slot: slot,
+      p_home: h,
+      p_away: a,
+    });
+    if (btn) busy(btn, false);
+    if (error) return toast(error.message, "err");
+
+    // Paint the saved row from the server's own copy, then let the reload
+    // rebuild the table behind it.
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row) {
+      const i = sbResults.findIndex((x) => x.tie_id === t.id && x.slot === slot);
+      if (i > -1) sbResults[i] = row;
+      else sbResults.push(row);
+    }
+    toast(`Match ${slot} saved — ${h}–${a}`, "ok");
+    hi.blur();
+    ai.blur();
+    sbReload();
+  }
+
+  document.addEventListener("click", async (e) => {
+    const fx = e.target.closest("[data-sb-tie]");
+    if (fx) {
+      sbTie = Number(fx.dataset.sbTie);
+      sbDirty = false;
+      renderScoreRail();
+      renderScorePanel();
+      return;
+    }
+
+    const save = e.target.closest("[data-sc-save]");
+    if (save) return sbSave(Number(save.dataset.scSave), save);
+
+    const clear = e.target.closest("[data-sc-clear]");
+    if (clear) {
+      const slot = Number(clear.dataset.scClear);
+      const t = mdTies.find((x) => x.id === sbTie);
+      if (!t) return;
+      busy(clear, true);
+      const { error } = await sb.rpc("result_clear", { p_tie_id: t.id, p_slot: slot });
+      busy(clear, false);
+      if (error) return toast(error.message, "err");
+      sbResults = sbResults.filter((x) => !(x.tie_id === t.id && x.slot === slot));
+      toast(`Match ${slot} cleared`, "info");
+      sbReload();
+      return;
+    }
+
+    const seat = e.target.closest("[data-sc-seat]");
+    if (seat) {
+      const id = Number(seat.dataset.scSeat);
+      const host = $("#sbPanel");
+      const home = $('[data-seat="home"]', host).value;
+      const away = $('[data-seat="away"]', host).value;
+      if (home && away && home === away) return toast("A team cannot play itself", "err");
+      busy(seat, true);
+      const { error } = await sb.rpc("tie_set_teams", {
+        p_tie_id: id,
+        p_home: home ? Number(home) : null,
+        p_away: away ? Number(away) : null,
+      });
+      busy(seat, false);
+      if (error) return toast(error.message, "err");
+      toast("Teams seated", "ok");
+      sbReload();
+      return;
+    }
+  });
+
+  document.addEventListener("change", async (e) => {
+    const sel = e.target.closest("[data-sc-shoot]");
+    if (!sel) return;
+    const id = Number(sel.dataset.scShoot);
+    const winner = sel.value ? Number(sel.value) : null;
+    // Plain update: staff RLS on tournament_ties allows it, and the table's own
+    // trigger re-decides the tie from the new shootout winner.
+    const { error } = await sb
+      .from("tournament_ties")
+      .update({ shootout_winner_team_id: winner })
+      .eq("id", id);
+    if (error) return toast(error.message, "err");
+    toast(winner ? `${tourNameOf(winner)} win the shootout` : "Shootout winner cleared", "ok");
+    sbReload();
+  });
+
+  // Enter commits the row the organiser is on, the way a scorer expects.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const el = e.target.closest && e.target.closest("[data-sc-home], [data-sc-away]");
+    if (!el) return;
+    e.preventDefault();
+    sbSave(Number(el.dataset.scHome || el.dataset.scAway), null);
+  });
+
+  /* ---- CSV: the table, and every score recorded so far ---- */
+  const csvCell = (v) => {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  function csvDownload(lines, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  $("#btnSbStandCsv").addEventListener("click", () => {
+    if (!sbStand.length) return toast("No standings to export yet", "info");
+    const lines = ["group,rank,team,captain,ties_played,matches_played,won,lost,points_for,points_against,point_diff,points"];
+    sbStand.forEach((r) =>
+      lines.push(
+        [r.group_code, r.rank, r.team_name, r.captain_name, r.ties_played, r.matches_played,
+          r.won, r.lost, r.points_for, r.points_against, r.point_diff, r.points]
+          .map(csvCell)
+          .join(",")
+      )
+    );
+    csvDownload(lines, `mpl-standings-${stamp()}.csv`);
+  });
+
+  $("#btnSbResCsv").addEventListener("click", () => {
+    if (!sbResults.length) return toast("No scores recorded yet", "info");
+    const byTie = new Map(mdTies.map((t) => [t.id, t]));
+    const lines = ["tie,phase,group,round,court,slot,match,home,home_points,away_points,away,home_trump,away_trump"];
+    sbResults.forEach((r) => {
+      const t = byTie.get(r.tie_id);
+      const f = mdFormat.find((x) => x.slot === r.slot);
+      if (!t) return;
+      lines.push(
+        [t.id, t.phase, t.group_code || "", t.round || "", t.court || "", r.slot,
+          f ? f.label : "", mdSide(t, "home"), r.home_points, r.away_points, mdSide(t, "away"),
+          r.home_trump ? "T" : "", r.away_trump ? "T" : ""]
+          .map(csvCell)
+          .join(",")
+      );
+    });
+    csvDownload(lines, `mpl-results-${stamp()}.csv`);
+  });
 
 
   window.addEventListener("DOMContentLoaded", boot);

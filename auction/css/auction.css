@@ -1127,3 +1127,209 @@ body.mn-blownup { overscroll-behavior: none; }
 .fx-vs { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.1em; }
 .fx-opp { font-family: var(--font-display); font-size: 17px; letter-spacing: 0.03em;
   text-transform: uppercase; line-height: 1.2; overflow-wrap: anywhere; }
+
+/* ---- the running score on My Matches ---- */
+.fx.scored { border-left-color: var(--gold); }
+.fx-score { flex: none; margin-left: auto; text-align: right; align-self: center; }
+.fx-sc { font-family: var(--font-display); font-size: 26px; line-height: 1; letter-spacing: 0.02em; }
+.fx-sc i { font-style: normal; color: var(--text-faint); margin: 0 2px; }
+.fx-res { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-faint); margin-top: 4px; }
+.fx-res.won { color: var(--ok); }
+.fx-res.lost { color: var(--red); }
+.fx-res.live { color: var(--warn, var(--gold)); }
+
+/* ------------------------------------------------------------
+   TEAM SHEET — the nine names, filed against a 15-minute clock.
+   Every control here is thumbed one-handed in a loud hall, so
+   nothing is smaller than 44px and nothing is subtle.
+   ------------------------------------------------------------ */
+#capSheet { max-width: 620px; margin: 0 auto; padding: 0 18px 40px; }
+#sheetCards { display: flex; flex-direction: column; gap: 16px; }
+
+/* an open sheet nags from the tab strip */
+.cap-tab.nag { position: relative; }
+.cap-tab.nag::after {
+  content: ""; position: absolute; top: 4px; right: 7px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--red);
+  box-shadow: 0 0 0 2px var(--bg);
+  animation: tsDot 1.4s ease-in-out infinite;
+}
+.cap-tab.on.nag::after { background: #fff; box-shadow: none; }
+@keyframes tsDot { 50% { opacity: 0.25; } }
+
+.ts {
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong); border-radius: var(--radius);
+  padding: 14px 15px 16px;
+}
+.ts.is-open { border-left-color: var(--red); box-shadow: 0 0 0 1px rgba(229,38,45,0.2); }
+.ts.is-submitted { border-left-color: var(--ok); }
+
+.ts-head { display: flex; gap: 12px; align-items: flex-start; }
+.ts-headmain { flex: 1; min-width: 0; }
+.ts-tag { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); }
+.ts-opp { font-family: var(--font-display); font-size: 20px; letter-spacing: 0.03em;
+  text-transform: uppercase; line-height: 1.15; margin-top: 3px; overflow-wrap: anywhere; }
+.ts-meta { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+.ts-clockwrap { flex: none; text-align: right; }
+.ts-clocklabel { font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint); }
+.ts-clock {
+  font-family: var(--font-display); font-size: 34px; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em; color: var(--text);
+}
+.ts-clock.hot { color: var(--red); animation: tsPulse 1s ease-in-out infinite; }
+@keyframes tsPulse { 50% { opacity: 0.35; transform: scale(1.04); } }
+
+.ts-badge {
+  flex: none; font-family: var(--font-display); font-size: 11px; letter-spacing: 0.16em;
+  text-transform: uppercase; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--line-strong); color: var(--text-dim); white-space: nowrap;
+}
+.ts-badge.s-submitted { border-color: rgba(47,191,113,0.5); color: var(--ok); }
+
+.ts-msg {
+  margin-top: 14px; font-size: 14px; line-height: 1.6; color: var(--text-dim);
+  border-left: 2px solid var(--line-strong); padding-left: 12px;
+}
+.ts-msg.warn { border-left-color: var(--red); color: #ffd7d8; }
+.ts-msg.ok { border-left-color: var(--ok); }
+
+/* ---- the form ---- */
+.ts-trumpline {
+  margin-top: 14px; font-size: 12.5px; line-height: 1.55; color: var(--text-dim);
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 9px 12px;
+}
+.ts-trumpline b {
+  font-family: var(--font-display); font-size: 11.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--red); margin-right: 6px;
+}
+
+.ts-slots { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.ts-slot {
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 11px 12px 12px;
+}
+.ts-slot.trumped { border-color: rgba(232,195,90,0.55); background: rgba(232,195,90,0.05); }
+
+.ts-slot-top { display: flex; align-items: center; gap: 9px; }
+.ts-no {
+  flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px;
+  border-radius: 5px; background: var(--red); color: #fff;
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+}
+.ts-label {
+  flex: 1; min-width: 0; font-family: var(--font-display); font-size: 14.5px;
+  letter-spacing: 0.05em; text-transform: uppercase;
+}
+.ts-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.45; margin: 5px 0 9px; }
+
+/* the trump chip, attached to the four doubles */
+.ts-trump {
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--panel);
+  font-family: var(--font-display); font-size: 11.5px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-faint);
+  transition: all 0.18s;
+}
+.ts-trump input { appearance: none; width: 13px; height: 13px; margin: 0; border-radius: 50%;
+  border: 2px solid currentColor; background: transparent; }
+.ts-trump.on { border-color: var(--gold); color: #0d0d0e; background: var(--gold); font-weight: 700; }
+.ts-trump.on input { background: #0d0d0e; border-color: #0d0d0e; }
+.ts-notrump {
+  flex: none; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-faint); padding-right: 4px;
+}
+
+.ts-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.ts-pick { display: block; min-width: 0; }
+.ts-pick:only-child { grid-column: 1 / -1; }
+.ts-pos {
+  display: block; font-size: 9.5px; font-weight: 600; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-faint); margin-bottom: 5px;
+}
+.ts-sel { position: relative; display: block; }
+.ts-sel select {
+  width: 100%; min-height: 48px; appearance: none;
+  background: var(--panel); border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-size: 16px; padding: 12px 34px 12px 40px; outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239d9a96' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 11px center;
+  text-overflow: ellipsis;
+}
+.ts-sel select:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(229,38,45,0.16); }
+.ts-pick.filled .ts-sel select { border-color: var(--line); background-color: var(--panel-2); }
+
+.ts-cat {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  font-style: normal; color: #fff; pointer-events: none;
+}
+.ts-cat.c-A { background: var(--red); }
+.ts-cat.c-B { background: #3f3f45; }
+.ts-cat.c-C { background: #26262b; color: var(--text-dim); }
+.ts-cat.none { background: transparent; border: 1px dashed var(--line-strong); color: var(--text-faint); }
+
+.ts-progress {
+  margin-top: 14px; font-size: 13px; line-height: 1.5; color: var(--text-dim);
+  border-left: 2px solid var(--red); padding-left: 11px;
+}
+.ts-progress b { font-family: var(--font-display); font-size: 14px; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text); }
+.ts-progress.ok { border-left-color: var(--ok); }
+.ts-progress.ok b { color: var(--ok); }
+
+.ts-err {
+  display: none; margin-top: 11px; border: 1px solid rgba(229,38,45,0.55);
+  background: rgba(229,38,45,0.07); color: #ffd7d8;
+  border-radius: var(--radius-sm); padding: 11px 13px; font-size: 13.5px; line-height: 1.5;
+}
+.ts-err.show { display: block; animation: shake 0.5s var(--ease-out); }
+
+.ts-actions { display: flex; align-items: center; gap: 10px; margin-top: 13px; }
+.ts-actions .btn-primary { flex: 1; padding: 17px 14px; }
+.ts-clear { flex: none; min-height: 48px; }
+.ts-clear.armed { border-color: var(--red); color: #ffd7d8; }
+.ts-fine { margin-top: 9px; font-size: 11.5px; color: var(--text-faint); text-align: center; }
+
+/* ---- the filed line-up ---- */
+.ts-filed { margin-top: 13px; display: flex; flex-direction: column; gap: 8px; }
+.ts-frow {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.ts-frow.trumped { border-color: rgba(232,195,90,0.55); background: rgba(232,195,90,0.05); }
+.ts-fmain { flex: 1; min-width: 0; }
+.ts-flabel {
+  font-family: var(--font-display); font-size: 12px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-faint);
+}
+.ts-fchip {
+  font-family: var(--font-display); font-size: 10.5px; letter-spacing: 0.12em;
+  color: #0d0d0e; background: var(--gold); border-radius: 4px; padding: 1px 6px; margin-left: 6px;
+}
+.ts-fnames { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 5px; }
+.ts-fname { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; overflow-wrap: anywhere; }
+.ts-fname .ts-cat { position: static; transform: none; }
+
+@media (max-width: 400px) {
+  .ts { padding: 13px 12px 15px; }
+  .ts-picks { grid-template-columns: 1fr; }
+  .ts-clock { font-size: 30px; }
+  .ts-opp { font-size: 18px; }
+  .ts-actions { flex-wrap: wrap; }
+  .ts-actions .btn-primary { flex: 1 0 100%; }
+  .ts-clear { width: 100%; }
+}
+
+.ts-carry {
+  margin-top: 12px; font-size: 12.5px; line-height: 1.55; color: #ffe9b8;
+  border: 1px solid rgba(232,195,90,0.45); background: rgba(232,195,90,0.07);
+  border-radius: var(--radius-sm); padding: 9px 12px;
+}

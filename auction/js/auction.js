@@ -225,6 +225,7 @@
     }
 
     const squad = s.data || [];
+    mySquad = squad;   // the team sheet form may name these nine and nobody else
     if (!squad.length) {
       list.innerHTML = "";
       $("#rosterNote").textContent =
@@ -247,10 +248,12 @@
     $("#rosterNote").textContent = `${squad.length} players · 9 per squad`;
 
     await loadMatchDay(team);
+    await loadSheets();
   }
 
   /* ---------------- match day: the ties this team plays ---------------- */
   const FMT = window.MPL_FORMAT;
+  let mdNames = null;      // team id -> name, kept for the score refresh
 
   async function loadMatchDay(team) {
     $("#capTabs").hidden = false;
@@ -278,6 +281,7 @@
 
     const names = {};
     (tr.data || []).forEach((t) => (names[t.id] = t.name));
+    mdNames = names;
     const nameOf = (id) => (id ? names[id] || null : null);
 
     const all = ti.data || [];
@@ -290,6 +294,13 @@
       return;
     }
 
+    renderFixtures(mine, nameOf);
+  }
+
+  /* The team's own ties, with the running match score once the organiser has
+     recorded one. home_score/away_score are matches won, not game points —
+     tie_recount() keeps them in step with match_results. */
+  function renderFixtures(mine, nameOf) {
     // "Up next" is the first tie that has not finished; once the day is over
     // nothing is highlighted rather than the last tie pretending to be next.
     const now = Date.now();
@@ -300,8 +311,20 @@
         const home = t.home_team_id === myTeamId;
         const oppId = home ? t.away_team_id : t.home_team_id;
         const opp = nameOf(oppId) || (home ? t.away_label : t.home_label);
+
+        const scored = t.status === "live" || t.status === "done";
+        const us = Number(home ? t.home_score : t.away_score) || 0;
+        const them = Number(home ? t.away_score : t.home_score) || 0;
+        let res = "In play", resCls = "live";
+        if (t.status === "done") {
+          if (t.winner_team_id === myTeamId) { res = "Won"; resCls = "won"; }
+          else if (t.winner_team_id) { res = "Lost"; resCls = "lost"; }
+          else { res = "Level"; resCls = ""; }
+          if (t.decided_by === "shootout") res += " · shootout";
+        }
+
         return `
-        <article class="fx${t.id === nextId ? " next" : ""}">
+        <article class="fx${t.id === nextId ? " next" : ""}${scored ? " scored" : ""}">
           <div class="fx-when">
             <p class="fx-time">${esc(FMT.timeOf(t.starts_at))}</p>
             <p class="fx-till">to ${esc(FMT.timeOf(t.ends_at))}</p>
@@ -314,14 +337,35 @@
             <p class="fx-vs">vs</p>
             <p class="fx-opp">${esc(opp)}</p>
           </div>
+          ${
+            scored
+              ? `<div class="fx-score">
+                   <p class="fx-sc">${us}<i>–</i>${them}</p>
+                   <p class="fx-res ${resCls}">${esc(res)}</p>
+                 </div>`
+              : ""
+          }
         </article>`;
       })
       .join("");
 
     const courts = [...new Set(mine.map((t) => t.court).filter(Boolean))].sort();
+    const played = mine.filter((t) => t.status === "live" || t.status === "done").length;
     $("#fixNote").textContent =
       `${mine.length} ties · ${mine.length * 5} matches` +
-      (courts.length ? ` · ${courts.length > 1 ? "Courts" : "Court"} ${courts.join(" & ")}` : "");
+      (courts.length ? ` · ${courts.length > 1 ? "Courts" : "Court"} ${courts.join(" & ")}` : "") +
+      (played ? ` · ${played} under way` : "");
+  }
+
+  /* Scores land while the captain is looking at another pane. Re-read just the
+     ties rather than the whole match-day header. */
+  async function refreshFixtures() {
+    if (!mdNames) return;
+    const { data, error } = await sb.from("tournament_ties").select("*").order("sort_order");
+    if (error || !data) return;
+    const mine = data.filter((t) => t.home_team_id === myTeamId || t.away_team_id === myTeamId);
+    if (mine.length) renderFixtures(mine, (id) => (id ? mdNames[id] || null : null));
+    $("#capLadder").innerHTML = FMT.ladder(data, (id) => (id ? mdNames[id] || null : null));
   }
 
   /* squad / matches / rules — one at a time on a phone */
@@ -331,7 +375,7 @@
         x.classList.toggle("on", x === b);
         x.setAttribute("aria-selected", x === b ? "true" : "false");
       });
-      const pane = { squad: "roster", matches: "capMatches", rules: "capRules" }[b.dataset.cap];
+      const pane = { squad: "roster", sheet: "capSheet", matches: "capMatches", rules: "capRules" }[b.dataset.cap];
       document.querySelectorAll(".cappane").forEach((p) => (p.hidden = p.id !== pane));
     })
   );
@@ -824,6 +868,534 @@
 
 
 
+
+
+  /* ============================================================
+     TEAM SHEET
+     The nine names a captain files per tie, against the organiser's
+     15-minute clock. The server (sheet_file) is the authority on every
+     rule below — the form only exists so a captain never finds out they
+     got it wrong by being rejected with 40 seconds left on the clock.
+     ============================================================ */
+
+  // The five matches in play order. tournament_format carries the wording the
+  // organiser publishes; these are the fallback so the form still draws when
+  // that read fails on stadium wifi.
+  const TS_SLOTS = [
+    { slot: 1, cells: 2, label: "AB / BB Doubles", note: "Your A with a B — or two B players when the A takes the singles" },
+    { slot: 2, cells: 2, label: "BC Doubles",      note: "One Category B player with a Category C player" },
+    { slot: 3, cells: 1, label: "Singles",         note: "A single player — your A or a B" },
+    { slot: 4, cells: 2, label: "BC Doubles",      note: "A second B + C pair — different players" },
+    { slot: 5, cells: 2, label: "CC Doubles",      note: "Two Category C players" },
+  ];
+  const TS_TRUMPABLE = [1, 2, 4, 5];
+  const TS_TRUMP_LINE =
+    "Win your trump match and it is +2. If both teams trump the same match: winner +2, loser −2.";
+
+  let mySquad = [];      // team_squads rows for this team, in sort_order
+  let sheetRows = [];    // my_sheets()
+  let sheetDraft = {};   // tie_id -> { p: { "1.1": squad_id, … }, trump: int|null }
+  let sheetSeen = {};    // tie_id -> the window we last painted, to spot a reopen
+  let sheetSig = null;   // what is painted, so a repaint never lands mid-tap;
+                         // null, not "", or an empty board would never paint
+  let sheetTimer = null;
+  let sheetTick = 0;
+
+  const squadById = (id) => mySquad.find((p) => p.id === id) || null;
+  const catOf = (id) => (id ? squadById(id)?.category || null : null);
+
+  function draftOf(tieId) {
+    if (!sheetDraft[tieId]) sheetDraft[tieId] = { p: {}, trump: null };
+    return sheetDraft[tieId];
+  }
+
+  function mmss(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  /* An open sheet whose clock has run out is still 'open' in the database —
+     only the organiser can change that — but it is dead to the captain. */
+  function tsState(r) {
+    if (r.status === "submitted") return "submitted";
+    if (r.status === "void") return "void";
+    if (r.deadline && Date.now() > new Date(r.deadline).getTime()) return "expired";
+    return "open";
+  }
+
+  /* Which categories may still go in this cell, given everything else picked.
+     Together with "already used elsewhere" this is what makes an illegal
+     line-up unreachable rather than merely rejected. */
+  function tsAllowed(d, slot, pos) {
+    const other = (s, p) => catOf(d.p[`${s}.${p}`]);
+    if (slot === 3) return ["A", "B"];
+    if (slot === 5) return ["C"];
+    if (slot === 2 || slot === 4) {
+      const o = other(slot, pos === 1 ? 2 : 1);
+      if (o === "B") return ["C"];
+      if (o === "C") return ["B"];
+      return ["B", "C"];
+    }
+    // slot 1 follows the singles: the A plays one or the other, never both
+    const singles = other(3, 1);
+    if (singles === "A") return ["B"];
+    const o = other(1, pos === 1 ? 2 : 1);
+    if (singles === "B") return o === "A" ? ["B"] : o === "B" ? ["A"] : ["A", "B"];
+    return o === "A" ? ["B"] : ["A", "B"];
+  }
+
+  function tsNamed(d) {
+    let n = 0;
+    TS_SLOTS.forEach((s) => {
+      for (let p = 1; p <= s.cells; p++) if (d.p[`${s.slot}.${p}`]) n++;
+    });
+    return n;
+  }
+
+  /* The one thing standing between this sheet and the submit button, in the
+     words a captain would use. Mirrors sheet_file()'s checks, in its order. */
+  function tsProblem(d) {
+    const at = (s, p) => d.p[`${s}.${p}`] || null;
+
+    for (const s of TS_SLOTS) {
+      for (let p = 1; p <= s.cells; p++) {
+        if (at(s.slot, p)) continue;
+        if (s.slot === 3) return "Match 3 still needs your singles player";
+        const partner = at(s.slot, p === 1 ? 2 : 1);
+        return `Match ${s.slot} still needs ${partner ? "one more player" : "two players"}`;
+      }
+    }
+
+    const ids = [];
+    TS_SLOTS.forEach((s) => {
+      for (let p = 1; p <= s.cells; p++) ids.push(at(s.slot, p));
+    });
+    if (new Set(ids).size !== 9) return "Each player can only be named once";
+
+    const singles = catOf(at(3, 1));
+    if (singles !== "A" && singles !== "B")
+      return "The singles must be played by your A or a B — not a C";
+
+    const one = [catOf(at(1, 1)), catOf(at(1, 2))];
+    if (singles === "A") {
+      if (one.filter((c) => c === "B").length !== 2)
+        return "Your A is playing the singles, so match 1 must be two B players";
+    } else if (!(one.includes("A") && one.includes("B"))) {
+      return "Match 1 must be your A with a B — your A is not in the singles";
+    }
+
+    for (const s of [2, 4]) {
+      const cs = [catOf(at(s, 1)), catOf(at(s, 2))];
+      if (cs.filter((c) => c === "B").length !== 1 || cs.filter((c) => c === "C").length !== 1)
+        return `Match ${s} must be one B with one C`;
+    }
+    if ([catOf(at(5, 1)), catOf(at(5, 2))].filter((c) => c === "C").length !== 2)
+      return "Match 5 must be two C players";
+
+    if (!TS_TRUMPABLE.includes(d.trump)) return "Declare your trump on match 1, 2, 4 or 5";
+    return null;
+  }
+
+  /* ---------------- the form ---------------- */
+  function tsSelect(tieId, d, slot, pos) {
+    const key = `${slot}.${pos}`;
+    const chosen = d.p[key] || "";
+    const used = new Set(
+      Object.keys(d.p).filter((k) => k !== key && d.p[k]).map((k) => d.p[k])
+    );
+    const allow = tsAllowed(d, slot, pos);
+    const opts = mySquad
+      .filter((p) => p.id === chosen || (!used.has(p.id) && allow.includes(p.category)))
+      .map(
+        (p) =>
+          `<option value="${esc(p.id)}"${p.id === chosen ? " selected" : ""}>${esc(
+            p.player_name
+          )} · ${esc(p.category)}</option>`
+      )
+      .join("");
+    const cat = catOf(chosen);
+    return `<label class="ts-pick${chosen ? " filled" : ""}">
+        <span class="ts-pos">${slot === 3 ? "Singles" : "Player " + pos}</span>
+        <span class="ts-sel">
+          <select data-tie="${tieId}" data-slot="${slot}" data-pos="${pos}"
+                  aria-label="Match ${slot}${slot === 3 ? "" : " player " + pos}">
+            <option value="">Choose a player…</option>${opts}
+          </select>
+          <i class="ts-cat${cat ? " c-" + esc(cat) : " none"}">${cat ? esc(cat) : "?"}</i>
+        </span>
+      </label>`;
+  }
+
+  function tsForm(r) {
+    const d = draftOf(r.tie_id);
+    const slots = TS_SLOTS.map((s) => {
+      const cells = [];
+      for (let p = 1; p <= s.cells; p++) cells.push(tsSelect(r.tie_id, d, s.slot, p));
+      const trump = TS_TRUMPABLE.includes(s.slot)
+        ? `<label class="ts-trump${d.trump === s.slot ? " on" : ""}">
+             <input type="radio" name="trump-${r.tie_id}" value="${s.slot}" data-tie="${r.tie_id}"
+                    aria-label="Trump match ${s.slot}"${d.trump === s.slot ? " checked" : ""} />
+             <span>Trump</span>
+           </label>`
+        : `<span class="ts-notrump">No trump</span>`;
+      return `<div class="ts-slot${d.trump === s.slot ? " trumped" : ""}">
+          <div class="ts-slot-top">
+            <span class="ts-no">${s.slot}</span>
+            <span class="ts-label">${esc(s.label)}</span>
+            ${trump}
+          </div>
+          <p class="ts-note">${esc(s.note)}</p>
+          <div class="ts-picks">${cells.join("")}</div>
+        </div>`;
+    }).join("");
+
+    const named = tsNamed(d);
+    const prob = tsProblem(d);
+    return `
+      ${
+        r.carried
+          ? '<p class="ts-carry">The organiser reopened this sheet. The names you had are still here — change what you need, or start over.</p>'
+          : ""
+      }
+      <p class="ts-trumpline"><b>Trump</b> ${esc(TS_TRUMP_LINE)}</p>
+      <div class="ts-slots">${slots}</div>
+      <p class="ts-progress${prob ? "" : " ok"}">
+        <b>${named} of 9 named</b>${
+          prob ? " · " + esc(prob) : " · trump on match " + d.trump + " · ready to file"
+        }
+      </p>
+      <div class="ts-err" id="ts-err-${r.tie_id}"></div>
+      <div class="ts-actions">
+        <button type="button" class="btn-primary ts-submit" data-tie="${r.tie_id}"${
+      prob ? " disabled" : ""
+    }>
+          <span class="spin" aria-hidden="true"></span><span class="btn-label">File this line-up</span>
+        </button>
+        <button type="button" class="btn-mini ghost ts-clear" data-tie="${r.tie_id}">Start over</button>
+      </div>
+      <p class="ts-fine">You can file once. After that only the organiser can reopen the sheet.</p>`;
+  }
+
+  /* ---------------- the filed line-up, read only ---------------- */
+  function tsFiled(r) {
+    const picks = Array.isArray(r.picks) ? r.picks : [];
+    const rows = TS_SLOTS.map((s) => {
+      const names = picks
+        .filter((p) => Number(p.slot) === s.slot)
+        .sort((a, b) => a.position - b.position)
+        .map(
+          (p) =>
+            `<span class="ts-fname"><i class="ts-cat c-${esc(p.category)}">${esc(
+              p.category
+            )}</i>${esc(p.player_name)}</span>`
+        )
+        .join("");
+      const isTrump = r.trump_slot === s.slot;
+      return `<div class="ts-frow${isTrump ? " trumped" : ""}">
+          <span class="ts-no">${s.slot}</span>
+          <div class="ts-fmain">
+            <p class="ts-flabel">${esc(s.label)}${
+        isTrump ? ' <b class="ts-fchip">Trump +2</b>' : ""
+      }</p>
+            <div class="ts-fnames">${names || '<span class="ts-fname">—</span>'}</div>
+          </div>
+        </div>`;
+    }).join("");
+
+    return `
+      <p class="ts-msg ok">Line-up filed${
+        r.submitted_at ? " at " + esc(FMT.timeOf(r.submitted_at)) : ""
+      }. Only the organiser can change it now — find them courtside and ask for a reset.</p>
+      <div class="ts-filed">${rows}</div>`;
+  }
+
+  function sheetCardHTML(r) {
+    const st = tsState(r);
+    const tag = r.group_code
+      ? `Group ${esc(r.group_code)} · Round ${r.round}`
+      : esc(String(r.phase || "").toUpperCase());
+    const clock =
+      st === "open"
+        ? `<div class="ts-clockwrap">
+             <p class="ts-clocklabel">Time left</p>
+             <p class="ts-clock" data-deadline="${esc(r.deadline || "")}">${mmss(
+            new Date(r.deadline || 0).getTime() - Date.now()
+          )}</p>
+           </div>`
+        : `<span class="ts-badge s-${st}">${
+            { submitted: "Filed", expired: "Closed", void: "Closed" }[st]
+          }</span>`;
+
+    const head = `<header class="ts-head">
+        <div class="ts-headmain">
+          <p class="ts-tag">${tag}</p>
+          <p class="ts-opp">vs ${esc(r.opponent || "To be confirmed")}</p>
+          <p class="ts-meta">${esc(FMT.timeOf(r.starts_at))}${
+      r.court ? " · Court " + r.court : ""
+    }</p>
+        </div>
+        ${clock}
+      </header>`;
+
+    if (st === "open") return head + tsForm(r);
+    if (st === "submitted") return head + tsFiled(r);
+    if (st === "expired")
+      return head + `<p class="ts-msg warn">The window closed. Ask the organiser to reset your sheet.</p>`;
+    return head + `<p class="ts-msg warn">The organiser closed this window.</p>`;
+  }
+
+  /* ---------------- painting ---------------- */
+  function renderSheets() {
+    const wrap = $("#sheetCards");
+    if (!wrap) return;
+    const sig = sheetRows
+      .map((r) => `${r.tie_id}:${tsState(r)}:${r.deadline || ""}:${r.submitted_at || ""}`)
+      .join("|");
+    if (sig === sheetSig) return;
+    sheetSig = sig;
+
+    // Names already in a form the organiser has just reopened. Keyed off this
+    // tie's own window changing, so a repaint caused by another card never
+    // accuses a captain of carrying names they are typing right now.
+    sheetRows.forEach((r) => {
+      const st = tsState(r);
+      const dl = r.deadline || "";
+      const seen = r.tie_id in sheetSeen;
+      const moved = seen && (sheetSeen[r.tie_id].st !== st || sheetSeen[r.tie_id].dl !== dl);
+      sheetSeen[r.tie_id] = { st, dl };
+      r.carried = moved && st === "open" && tsNamed(draftOf(r.tie_id)) > 0;
+    });
+
+    if (!sheetRows.length) {
+      wrap.innerHTML = `<p class="empty">The organiser hasn't opened a team sheet yet. Leave this page open — it wakes up on its own the moment they do.</p>`;
+      $("#sheetNote").textContent = "";
+    } else {
+      wrap.innerHTML = sheetRows
+        .map(
+          (r) => `<article class="ts is-${tsState(r)}" id="ts-${r.tie_id}">${sheetCardHTML(r)}</article>`
+        )
+        .join("");
+      $("#sheetNote").textContent = "Your line-up is sealed — the opposition never sees it.";
+    }
+
+    // A captain in a noisy hall is not watching the tab strip; the dot is.
+    document
+      .querySelector('.cap-tab[data-cap="sheet"]')
+      ?.classList.toggle("nag", sheetRows.some((r) => tsState(r) === "open"));
+  }
+
+  /* One card only, so choosing a player never disturbs the other ties. */
+  function repaintSheet(tieId) {
+    const r = sheetRows.find((x) => x.tie_id === tieId);
+    const el = document.getElementById("ts-" + tieId);
+    if (!r || !el) return;
+    el.className = "ts is-" + tsState(r);
+    el.innerHTML = sheetCardHTML(r);
+  }
+
+  /* ---------------- loading ---------------- */
+  async function loadSheets() {
+    const [ms, fm] = await Promise.all([
+      sb.rpc("my_sheets"),
+      sb.from("tournament_format").select("slot,label,note,kind").order("slot"),
+    ]);
+    if (!fm.error && fm.data) {
+      fm.data.forEach((f) => {
+        const s = TS_SLOTS.find((x) => x.slot === f.slot);
+        if (!s) return;
+        if (f.label) s.label = f.label;
+        if (f.note) s.note = f.note;
+      });
+    }
+    if (ms.error) {
+      $("#sheetCards").innerHTML = "";
+      $("#sheetNote").textContent =
+        "Couldn't load your team sheets: " + (ms.error.message || ms.error);
+      return;
+    }
+    sheetRows = ms.data || [];
+    seedDrafts();
+    sheetSig = null;
+    renderSheets();
+    if (!sheetTimer) sheetTimer = setInterval(tickSheets, 1000);
+    startSheetRealtime();
+  }
+
+  let refreshingSheets = false;
+  async function refreshSheets() {
+    if (refreshingSheets) return;
+    refreshingSheets = true;
+    const { data, error } = await sb.rpc("my_sheets");
+    refreshingSheets = false;
+    if (error) return;
+    sheetRows = data || [];
+    seedDrafts();
+    renderSheets();
+  }
+
+  /* A sheet the organiser filed, or one this phone filed before a reload,
+     comes back with its picks. Pre-load them so a reset costs nine taps of
+     correction rather than nine taps of retyping. */
+  function seedDrafts() {
+    sheetRows.forEach((r) => {
+      if (sheetDraft[r.tie_id]) return;
+      const picks = Array.isArray(r.picks) ? r.picks : [];
+      if (!picks.length) return;
+      const d = draftOf(r.tie_id);
+      picks.forEach((p) => (d.p[`${p.slot}.${p.position}`] = p.squad_id));
+      d.trump = r.trump_slot ?? null;
+    });
+  }
+
+  function tickSheets() {
+    if (!sheetRows.length) return;
+    let flip = false;
+    document.querySelectorAll("#capSheet .ts-clock").forEach((el) => {
+      const left = new Date(el.dataset.deadline).getTime() - Date.now();
+      if (left <= 0) {
+        el.textContent = "00:00";
+        flip = true;
+        return;
+      }
+      el.textContent = mmss(left);
+      el.classList.toggle("hot", left < 120000);
+    });
+    // The clock hitting zero locks the form without anyone touching the page.
+    if (flip) renderSheets();
+    // Stadium wifi drops the socket silently. A slow poll means an organiser's
+    // reset still lands even when realtime has gone to sleep.
+    if (++sheetTick % 30 === 0 && !document.hidden) {
+      refreshSheets();
+      refreshFixtures();
+    }
+  }
+
+  let sheetChannel = null;
+  function startSheetRealtime() {
+    if (sheetChannel) return;
+    try {
+      sheetChannel = sb
+        .channel("sheets-" + myTeamId)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "team_sheets", filter: `team_id=eq.${myTeamId}` },
+          () => refreshSheets()
+        )
+        // the running score on My Matches, without the captain reloading
+        .on("postgres_changes", { event: "*", schema: "public", table: "tournament_ties" }, () =>
+          refreshFixtures()
+        )
+        .subscribe();
+    } catch {
+      // the slow poll in tickSheets still covers it
+    }
+  }
+
+  /* ---------------- interaction ---------------- */
+  document.addEventListener("change", (e) => {
+    const el = e.target;
+    if (!el || !el.dataset || !el.dataset.tie || !el.closest || !el.closest("#capSheet")) return;
+    const tie = Number(el.dataset.tie);
+    const d = draftOf(tie);
+    if (el.tagName === "SELECT") d.p[`${el.dataset.slot}.${el.dataset.pos}`] = el.value || null;
+    else if (el.type === "radio") d.trump = Number(el.value);
+    else return;
+    const row = sheetRows.find((x) => x.tie_id === tie);
+    if (row) row.carried = false;   // they have taken the hint
+    repaintSheet(tie);
+  });
+
+  document.addEventListener("click", (e) => {
+    const clr = e.target.closest && e.target.closest(".ts-clear");
+    if (clr) {
+      // Two taps to wipe nine names: a thumb in a crowd should not be able to
+      // destroy a line-up by brushing the wrong button.
+      if (clr.dataset.armed !== "1") {
+        clr.dataset.armed = "1";
+        clr.textContent = "Tap again to clear";
+        clr.classList.add("armed");
+        setTimeout(() => {
+          if (!clr.isConnected || clr.dataset.armed !== "1") return;
+          clr.dataset.armed = "";
+          clr.textContent = "Start over";
+          clr.classList.remove("armed");
+        }, 4000);
+        return;
+      }
+      const tie = Number(clr.dataset.tie);
+      sheetDraft[tie] = { p: {}, trump: null };
+      const row = sheetRows.find((x) => x.tie_id === tie);
+      if (row) row.carried = false;
+      repaintSheet(tie);
+      return;
+    }
+    const sub = e.target.closest && e.target.closest(".ts-submit");
+    if (sub) submitSheet(Number(sub.dataset.tie), sub);
+  });
+
+  async function submitSheet(tieId, btn) {
+    const d = draftOf(tieId);
+    const err = document.getElementById("ts-err-" + tieId);
+    const show = (m) => {
+      if (!err) return toast(m, "err");
+      err.textContent = m;
+      err.classList.remove("show");
+      void err.offsetWidth;
+      err.classList.add("show");
+    };
+
+    const prob = tsProblem(d);
+    if (prob) return show(prob);
+
+    const picks = [];
+    TS_SLOTS.forEach((s) => {
+      for (let p = 1; p <= s.cells; p++)
+        picks.push({ slot: s.slot, position: p, squad_id: d.p[`${s.slot}.${p}`] });
+    });
+
+    busy(btn, true);
+    const { data, error } = await sb.rpc("sheet_submit", {
+      p_tie_id: tieId,
+      p_picks: picks,
+      p_trump: d.trump,
+    });
+    busy(btn, false);
+
+    if (error) {
+      // The server is the authority on the format. Say exactly what it said.
+      show(error.message || String(error));
+      toast("Line-up not accepted", "err");
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    const i = sheetRows.findIndex((x) => x.tie_id === tieId);
+    if (i > -1) {
+      sheetRows[i] = Object.assign({}, sheetRows[i], {
+        status: row?.status || "submitted",
+        submitted_at: row?.submitted_at || new Date().toISOString(),
+        trump_slot: row?.trump_slot ?? d.trump,
+        picks: picks.map((p) => ({
+          slot: p.slot,
+          position: p.position,
+          squad_id: p.squad_id,
+          player_name: squadById(p.squad_id)?.player_name || "",
+          category: catOf(p.squad_id) || "",
+        })),
+      });
+    }
+    renderSheets();
+    toast("Line-up filed. Good luck.", "ok");
+    refreshSheets();
+  }
+
+  // Phones suspend background tabs; coming back must not show a stale clock.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && !SHOW_AUCTION && myTeamId !== null) {
+      refreshSheets();
+      refreshFixtures();
+    }
+  });
 
 
   window.addEventListener("DOMContentLoaded", boot);

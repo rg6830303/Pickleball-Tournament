@@ -22,7 +22,17 @@
       "destination": "/auction/:path"
     },
     {
-      "source": "/:path((?!site/|site$|admin/|admin$|auction/|auction$).*)",
+      "source": "/:path((?!stats/|stats$).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "mplstats.vercel.app"
+        }
+      ],
+      "destination": "/stats/:path"
+    },
+    {
+      "source": "/:path((?!site/|site$|admin/|admin$|auction/|auction$|stats/|stats$).*)",
       "destination": "/site/:path"
     }
   ],

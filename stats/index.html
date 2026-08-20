@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MPL Live Scoreboard — Monsoon Pickle League Season 1</title>
+  <meta name="description" content="Live standings, results and squads from Monsoon Pickle League Season 1 — Sunday 23 August 2026, Sportsplex Kolkata. Sixteen teams, 144 players, 31 ties." />
+  <meta name="theme-color" content="#070707" />
+  <meta property="og:title" content="MPL Live Scoreboard — Season 1" />
+  <meta property="og:description" content="Every group table, every tie, every match. Live from Sportsplex Kolkata, 23 August 2026." />
+  <meta property="og:type" content="website" />
+  <link rel="canonical" href="https://mplstats.vercel.app/" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='%23e5262d'/%3E%3Ccircle cx='35' cy='38' r='6' fill='%23070707'/%3E%3Ccircle cx='60' cy='30' r='6' fill='%23070707'/%3E%3Ccircle cx='70' cy='55' r='6' fill='%23070707'/%3E%3Ccircle cx='48' cy='62' r='6' fill='%23070707'/%3E%3Ccircle cx='30' cy='64' r='6' fill='%23070707'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/stats.css?v=202608201200" />
+</head>
+<body>
+
+  <!-- pickleball glyph, reused by the hero and the section marks -->
+  <svg width="0" height="0" class="svg-sprite" aria-hidden="true" focusable="false">
+    <symbol id="pball" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="4" />
+      <circle cx="38" cy="28" r="5.4" fill="currentColor" />
+      <circle cx="63" cy="26" r="5.4" fill="currentColor" />
+      <circle cx="74" cy="47" r="5.4" fill="currentColor" />
+      <circle cx="51" cy="50" r="5.4" fill="currentColor" />
+      <circle cx="28" cy="50" r="5.4" fill="currentColor" />
+      <circle cx="60" cy="70" r="5.4" fill="currentColor" />
+      <circle cx="37" cy="72" r="5.4" fill="currentColor" />
+    </symbol>
+  </svg>
+
+  <main class="shell">
+
+    <!-- ================= 1. HERO ================= -->
+    <header class="hero" id="hero">
+      <span class="hero-ball" aria-hidden="true"><svg class="pb"><use href="#pball"></use></svg></span>
+      <p class="hero-kicker">Monsoon</p>
+      <h1 class="hero-title">Pickle League</h1>
+      <p class="hero-season" id="heroSeason">Season 1 — Live Scoreboard</p>
+
+      <p class="hero-meta" id="heroMeta"></p>
+
+      <div class="hero-live" id="heroLive" hidden>
+        <span class="pulse" aria-hidden="true"></span>
+        <span id="heroLiveText">Live now</span>
+      </div>
+
+      <div class="counters" id="counters">
+        <div class="counter"><b id="cTeams">—</b><span>Teams</span></div>
+        <div class="counter"><b id="cPlayers">—</b><span>Players</span></div>
+        <div class="counter"><b id="cTies">—</b><span>Ties</span></div>
+        <div class="counter red"><b id="cMatches">—</b><span>Matches played</span></div>
+      </div>
+
+      <p class="stamp" id="stamp" role="status" aria-live="polite">Connecting…</p>
+    </header>
+
+    <!-- ================= 2. THE SCOREBOARD ================= -->
+    <section class="sec" id="sec-standings" aria-labelledby="h-standings">
+      <div class="sec-head">
+        <h2 class="sec-h" id="h-standings">The Scoreboard</h2>
+        <p class="sec-sub">Four groups of four. Top two of every group go through to the quarter-finals.</p>
+      </div>
+
+      <div class="groups" id="groups"><p class="empty">Loading the tables…</p></div>
+
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <!-- ================= 3. RESULTS / RUN OF SHOW ================= -->
+    <section class="sec" id="sec-ties" aria-labelledby="h-ties">
+      <div class="sec-head">
+        <h2 class="sec-h" id="h-ties">Run of Show</h2>
+        <p class="sec-sub">Every group tie in playing order. Tap a tie to open its five matches. Times are Kolkata time.</p>
+      </div>
+      <div class="ties" id="ties"><p class="empty">Loading the schedule…</p></div>
+    </section>
+
+    <!-- ================= 4. THE LADDER ================= -->
+    <section class="sec" id="sec-ladder" aria-labelledby="h-ladder">
+      <div class="sec-head">
+        <h2 class="sec-h" id="h-ladder">The Ladder</h2>
+        <p class="sec-sub">Quarter-finals, semi-finals and the final. Names appear as each seat is filled.</p>
+      </div>
+      <div class="ladder" id="ladder"><p class="empty">Loading the ladder…</p></div>
+    </section>
+
+    <!-- ================= 5. SQUADS ================= -->
+    <section class="sec" id="sec-squads" aria-labelledby="h-squads">
+      <div class="sec-head">
+        <h2 class="sec-h" id="h-squads">Squads</h2>
+        <p class="sec-sub">Nine players a side — one A, four B, four C. <b class="tag-r">R</b> marks a retained player.</p>
+      </div>
+      <div class="squads" id="squads"><p class="empty">Loading the squads…</p></div>
+    </section>
+
+    <footer class="foot">
+      <p><b>Monsoon Pickle League</b> · Season 1 · Sportsplex, Kolkata</p>
+      <p class="foot-fine">This board updates itself. Leave it open — scores land here seconds after the organiser enters them.</p>
+    </footer>
+
+  </main>
+
+  <script src="js/vendor/supabase.js?v=202608201200"></script>
+  <script src="js/config.js?v=202608201200"></script>
+  <script src="js/stats.js?v=202608201200"></script>
+</body>
+</html>

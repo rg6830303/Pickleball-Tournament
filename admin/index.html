@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/mn-card.css?v=202608200900" />
-  <link rel="stylesheet" href="css/admin.css?v=202608200900" />
+  <link rel="stylesheet" href="css/admin.css?v=202608201200" />
 </head>
 <body>
 
@@ -97,6 +97,8 @@
       <button class="tab" data-tab="grid" role="tab" aria-selected="false">Full Table (Live)</button>
       <button class="tab" data-tab="teams" role="tab" aria-selected="false">Teams</button>
       <button class="tab" data-tab="tournament" role="tab" aria-selected="false">Tournament</button>
+      <button class="tab" data-tab="sheets" role="tab" aria-selected="false">Team Sheets</button>
+      <button class="tab" data-tab="scoreboard" role="tab" aria-selected="false">Scoreboard</button>
       <button class="tab" data-tab="pool" role="tab" aria-selected="false">Auction Pool</button>
       <button class="tab" data-tab="auction" role="tab" aria-selected="false">Auction</button>
       <button class="tab" data-tab="settings" role="tab" aria-selected="false">Event Controls</button>
@@ -223,6 +225,75 @@
 
       <h2 class="panel-title tour-h">The rules that decide it</h2>
       <div id="tourRules"></div>
+    </section>
+
+    <!-- ---------- TAB: TEAM SHEETS ---------- -->
+    <section class="tabpane" id="tab-sheets" hidden>
+      <section class="toolbar">
+        <div class="filters">
+          <input type="search" id="shQ" placeholder="Search a team…" />
+          <select id="shGroup">
+            <option value="">All groups</option>
+            <option value="A">Group A</option>
+            <option value="B">Group B</option>
+            <option value="C">Group C</option>
+            <option value="D">Group D</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <span class="grid-hint" id="shHint">Open a 15-minute window and watch both line-ups land</span>
+          <button class="btn-mini" id="btnShRefresh" type="button">↻ Refresh</button>
+        </div>
+      </section>
+
+      <div class="alert" id="shAlert" role="alert"></div>
+
+      <div class="md-layout">
+        <aside class="md-rail">
+          <p class="md-rail-h">Fixtures</p>
+          <div class="md-list" id="shFixtures"></div>
+          <p class="empty" id="shEmpty" hidden>No fixtures with both teams known yet.</p>
+        </aside>
+        <div class="md-main" id="shPanel"></div>
+      </div>
+    </section>
+
+    <!-- ---------- TAB: SCOREBOARD ---------- -->
+    <section class="tabpane" id="tab-scoreboard" hidden>
+      <section class="toolbar">
+        <div class="filters">
+          <input type="search" id="sbQ" placeholder="Search a team…" />
+          <select id="sbPhase">
+            <option value="">All ties</option>
+            <option value="group">Group stage</option>
+            <option value="qf">Quarter-finals</option>
+            <option value="sf">Semi-finals</option>
+            <option value="final">The final</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <span class="grid-hint" id="sbHint">Every score you save rebuilds the table instantly</span>
+          <button class="btn-mini" id="btnSbStandCsv" type="button">⬇ Standings CSV</button>
+          <button class="btn-mini" id="btnSbResCsv" type="button">⬇ Results CSV</button>
+        </div>
+      </section>
+
+      <div class="alert" id="sbAlert" role="alert"></div>
+
+      <h2 class="panel-title tour-h">The league table</h2>
+      <div class="std-grid" id="sbStandings"></div>
+      <p class="empty" id="sbStandEmpty" hidden>No standings yet — the table appears as soon as the first score is saved.</p>
+      <div id="sbLegend"></div>
+
+      <h2 class="panel-title tour-h">Score a tie</h2>
+      <div class="md-layout">
+        <aside class="md-rail">
+          <p class="md-rail-h">All 31 ties</p>
+          <div class="md-list" id="sbFixtures"></div>
+          <p class="empty" id="sbEmpty" hidden>No fixtures yet — run <code>supabase/tournament.sql</code>.</p>
+        </aside>
+        <div class="md-main" id="sbPanel"></div>
+      </div>
     </section>
 
     <!-- ---------- TAB: AUCTION POOL ---------- -->
@@ -583,6 +654,6 @@
   <script src="js/mn-sold.js?v=202608200900"></script>
   <script src="js/vendor/supabase.js" defer></script>
   <script src="js/config.js?v=202608200900"></script>
-  <script src="js/admin.js?v=202608200900" defer></script>
+  <script src="js/admin.js?v=202608201200" defer></script>
 </body>
 </html>
