@@ -1432,3 +1432,8 @@ body.playoffs #sec-ladder .sec-h::after {
   .lk-presents { flex-direction: column; }
   .lk-presents-txt { text-align: center; }
 }
+
+/* The crest is the page's title now, so it is sized as one: big enough to
+   read the wordmark inside it on a phone, capped so it does not push the
+   scoreboard off a laptop's first screen. */
+.lk-mpl { width: clamp(250px, 68vw, 430px); }

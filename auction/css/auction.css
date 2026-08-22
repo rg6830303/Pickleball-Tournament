@@ -1756,3 +1756,6 @@ body.mn-blownup { overscroll-behavior: none; }
 /* with the badge gone the name sits alone; give it the room it frees */
 .brand { gap: 0; }
 .brand-team { font-size: clamp(15px, 4.4vw, 19px); }
+
+/* the sign-in card is narrower than the board, so the crest is scaled to it */
+.lockup-auth .lk-mpl { width: clamp(190px, 62vw, 250px); }
