@@ -3057,9 +3057,13 @@
   function renderSheets() {
     const q = ($("#shQ").value || "").trim().toLowerCase();
     const g = $("#shGroup").value || "";
-    const seated = mdTies.filter(mdSeated);
+    // Every tie, not only the seated ones. A quarter-final with no teams yet
+    // still belongs on this list: the organiser needs somewhere to seat it,
+    // and needs to see it waiting on the group stage.
+    const seated = mdTies;
     const list = seated.filter((t) => {
-      if (g && t.group_code !== g) return false;
+      if (g && g.length === 1 && t.group_code !== g) return false;
+      if (g && g.length > 1 && t.phase !== g) return false;
       if (!q) return true;
       return `${mdSide(t, "home")} ${mdSide(t, "away")}`.toLowerCase().includes(q);
     });
@@ -3161,6 +3165,54 @@
     </article>`;
   }
 
+  /* A knockout tie seats itself from the final league table the moment the
+     last group tie is scored. Until then — and whenever the organiser wants
+     to overrule it — the two seats can be set by hand here. */
+  function shSeatBlock(t) {
+    const opts = (sel) =>
+      `<option value="">—</option>` +
+      squadTeams
+        .slice()
+        .sort((a, b) =>
+          String(a.group_code).localeCompare(String(b.group_code)) || (a.group_rank || 9) - (b.group_rank || 9)
+        )
+        .map(
+          (x) =>
+            `<option value="${x.id}"${x.id === sel ? " selected" : ""}>${esc(x.group_code || "?")}${
+              x.group_rank || ""
+            } · ${esc(x.name)}</option>`
+        )
+        .join("");
+
+    const auto = t.auto_seeded !== false;
+    const done = mdGroupsComplete();
+    const note = !auto
+      ? "Seated by hand — the automatic bracket will leave this tie alone until you clear both seats."
+      : done
+      ? "Seated automatically from the final league table."
+      : `Waiting on the league: ${mdGroupProgress()}. The seats fill themselves the moment the last group tie is scored.`;
+
+    return `
+      <div class="sh-seat${auto ? "" : " manual"}">
+        <p class="sh-seat-h">${esc(t.home_label)} <i>v</i> ${esc(t.away_label)}</p>
+        <div class="sh-seat-row">
+          <select class="sh-seat-sel" data-seat="home" aria-label="Home team">${opts(t.home_team_id)}</select>
+          <span class="sh-seat-v">v</span>
+          <select class="sh-seat-sel" data-seat="away" aria-label="Away team">${opts(t.away_team_id)}</select>
+          <button type="button" class="btn-mini" data-sh-act="seat">Seat these teams</button>
+          ${auto ? "" : `<button type="button" class="btn-mini ghost" data-sh-act="unseat">Back to automatic</button>`}
+        </div>
+        <p class="sh-seat-note">${esc(note)}</p>
+      </div>`;
+  }
+
+  const mdGroupsComplete = () =>
+    mdTies.filter((t) => t.phase === "group").every((t) => t.status === "done");
+  const mdGroupProgress = () => {
+    const g = mdTies.filter((t) => t.phase === "group");
+    return `${g.filter((t) => t.status === "done").length} of ${g.length} ties played`;
+  };
+
   function renderSheetPanel() {
     const host = $("#shPanel");
     const t = mdTies.find((x) => x.id === shTie);
@@ -3168,20 +3220,24 @@
       host.innerHTML = `<p class="md-idle">Pick a fixture on the left to open its line-up window.</p>`;
       return;
     }
+    const ready = mdSeated(t);
     host.innerHTML = `<div class="panel md-panel">
       ${mdTieHead(t)}
+      ${t.phase === "group" ? "" : shSeatBlock(t)}
       <div class="md-actions">
         <label class="md-mins">
           <span>Minutes</span>
           <input type="number" id="shMinutes" min="1" max="240" step="1" value="${shMinutes}" />
         </label>
-        <button type="button" class="btn-primary sm" data-sh-act="open">
+        <button type="button" class="btn-primary sm" data-sh-act="open"${ready ? "" : " disabled"}>
           <span class="spin" aria-hidden="true"></span><span class="btn-label">Open both sheets</span>
         </button>
-        <button type="button" class="btn-mini" data-sh-act="reset">Reset both</button>
-        <button type="button" class="btn-mini danger" data-sh-act="close">Close the window</button>
+        <button type="button" class="btn-mini" data-sh-act="reset"${ready ? "" : " disabled"}>Reset both</button>
+        <button type="button" class="btn-mini danger" data-sh-act="close"${ready ? "" : " disabled"}>Close the window</button>
       </div>
-      <div class="sh-cards">${shCard(t, "home")}${shCard(t, "away")}</div>
+      ${ready
+        ? `<div class="sh-cards">${shCard(t, "home")}${shCard(t, "away")}</div>`
+        : `<p class="md-idle">Seat both teams above and the line-up window can open, exactly as it does for a league tie.</p>`}
     </div>`;
   }
 
@@ -3282,6 +3338,36 @@
     const kind = act.dataset.shAct;
     const t = mdTies.find((x) => x.id === shTie);
     if (!t) return;
+
+    // Seating a knockout is not a clock operation, so it is handled before
+    // the minutes are read and validated.
+    if (kind === "seat" || kind === "unseat") {
+      const panel = $("#shPanel");
+      const pick = (side) => {
+        const el = panel.querySelector(`.sh-seat-sel[data-seat="${side}"]`);
+        return el && el.value ? Number(el.value) : null;
+      };
+      const home = kind === "seat" ? pick("home") : null;
+      const away = kind === "seat" ? pick("away") : null;
+      if (kind === "seat") {
+        if (!home || !away) return toast("Pick a team on both sides", "err");
+        if (home === away) return toast("A team cannot play itself", "err");
+      }
+      busy(act, true);
+      const res = await sb.rpc("tie_set_teams", { p_tie_id: t.id, p_home: home, p_away: away });
+      busy(act, false);
+      if (res.error) return toast(res.error.message, "err");
+      toast(
+        kind === "seat"
+          ? `${tourNameOf(home)} v ${tourNameOf(away)} — the sheets can open now`
+          : "Handed back to the automatic bracket",
+        "ok"
+      );
+      await mdLoadCore();
+      await shReload();
+      renderSheets();
+      return;
+    }
 
     const mins = shReadMinutes();
     if (kind !== "close" && mins == null)

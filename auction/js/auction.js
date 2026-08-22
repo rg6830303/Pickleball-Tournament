@@ -332,7 +332,7 @@
           </div>
           <div class="fx-who">
             <p class="fx-tag">${
-              t.group_code ? `<b>Group ${esc(t.group_code)}</b> Round ${t.round}` : esc(t.phase.toUpperCase())
+              t.group_code ? `<b>Group ${esc(t.group_code)}</b> Round ${esc(t.round)}` : `<b>${esc(PHASE_WORD[t.phase] || t.phase)}</b>`
             }${t.id === nextId ? ' <span class="fx-next">Up next</span>' : ""}</p>
             <p class="fx-vs">vs</p>
             <p class="fx-opp">${esc(opp)}</p>
@@ -1109,11 +1109,14 @@
       <div class="ts-filed">${rows}</div>`;
   }
 
+  /* "QF" is what the database calls it; a captain wants the word. */
+  const PHASE_WORD = { group: "Group", qf: "Quarter-final", sf: "Semi-final", final: "The final" };
+  const tieTag = (r) =>
+    r.group_code ? `Group ${esc(r.group_code)} · Round ${esc(r.round)}` : esc(PHASE_WORD[r.phase] || String(r.phase || "").toUpperCase());
+
   function sheetCardHTML(r) {
     const st = tsState(r);
-    const tag = r.group_code
-      ? `Group ${esc(r.group_code)} · Round ${r.round}`
-      : esc(String(r.phase || "").toUpperCase());
+    const tag = tieTag(r);
     const clock =
       st === "open"
         ? `<div class="ts-clockwrap">

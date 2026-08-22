@@ -2414,3 +2414,49 @@ body.mn-blownup { overscroll-behavior: none; }
   .sq-in.phone { grid-column: 1 / -1; }
   .sq-r { height: 40px; }
 }
+
+/* ------------------------------------------------------------
+   SEATING A KNOCKOUT
+   The bracket fills itself from the league table; this is the
+   organiser's override, and the place a quarter-final waits.
+   ------------------------------------------------------------ */
+.sh-seat {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.sh-seat.manual { border-left-color: var(--warn); }
+
+.sh-seat-h {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.sh-seat-h i { font-style: normal; color: var(--text-faint); margin: 0 4px; }
+
+.sh-seat-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sh-seat-sel {
+  flex: 1 1 190px;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-family: inherit;
+  font-size: 13px;
+}
+.sh-seat-sel:focus { outline: none; border-color: var(--red); }
+.sh-seat-v { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+.sh-seat-note { margin-top: 9px; font-size: 12px; color: var(--text-faint); line-height: 1.55; }
+
+@media (max-width: 760px), (pointer: coarse) {
+  .sh-seat-sel { min-height: 44px; font-size: 16px; flex-basis: 100%; }
+  .sh-seat-v { display: none; }
+}
