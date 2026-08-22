@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/mn-card.css?v=202608200900" />
-  <link rel="stylesheet" href="css/admin.css?v=202608201730" />
+  <link rel="stylesheet" href="css/mn-card.css?v=202608221100" />
+  <link rel="stylesheet" href="css/admin.css?v=202608221100" />
 </head>
 <body>
 
@@ -178,6 +178,8 @@
         </div>
         <div class="toolbar-actions">
           <span class="grid-hint" id="teamsHint">Live from the squad table — captains see the same list</span>
+          <span class="grid-hint" id="teamsBalance"></span>
+          <button class="btn-mini" id="btnTeamsEdit" type="button" aria-pressed="false">✎ Edit squads</button>
           <button class="btn-mini" id="btnTeamsCsv" type="button">⬇ Download CSV</button>
         </div>
       </section>
@@ -242,6 +244,7 @@
         </div>
         <div class="toolbar-actions">
           <span class="grid-hint" id="shHint">Open a 15-minute window and watch both line-ups land</span>
+          <button class="btn-mini danger" id="btnResetSheets" type="button" title="Clear every team sheet in the tournament">↺ Reset all team sheets</button>
           <button class="btn-mini" id="btnShRefresh" type="button">↻ Refresh</button>
         </div>
       </section>
@@ -275,6 +278,7 @@
           <span class="grid-hint" id="sbHint">Every score you save rebuilds the table instantly</span>
           <button class="btn-mini" id="btnSbStandCsv" type="button">⬇ Standings CSV</button>
           <button class="btn-mini" id="btnSbResCsv" type="button">⬇ Results CSV</button>
+          <button class="btn-mini danger" id="btnResetScores" type="button" title="Clear every score in the tournament">↺ Reset scoreboard</button>
         </div>
       </section>
 
@@ -678,13 +682,13 @@
   <div class="lightbox" id="lightbox" hidden><img alt="Attachment preview" id="lightboxImg" /></div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/mpl-format.js?v=202608200900"></script>
-  <script src="js/mn-sky.js?v=202608200900"></script>
-  <script src="js/mn-card.js?v=202608200900"></script>
-  <script src="js/mn-pw.js?v=202608200900"></script>
-  <script src="js/mn-sold.js?v=202608200900"></script>
+  <script src="js/mpl-format.js?v=202608221100"></script>
+  <script src="js/mn-sky.js?v=202608221100"></script>
+  <script src="js/mn-card.js?v=202608221100"></script>
+  <script src="js/mn-pw.js?v=202608221100"></script>
+  <script src="js/mn-sold.js?v=202608221100"></script>
   <script src="js/vendor/supabase.js" defer></script>
-  <script src="js/config.js?v=202608200900"></script>
-  <script src="js/admin.js?v=202608201730" defer></script>
+  <script src="js/config.js?v=202608221100"></script>
+  <script src="js/admin.js?v=202608221100" defer></script>
 </body>
 </html>

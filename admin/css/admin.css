@@ -2368,3 +2368,49 @@ body.mn-blownup { overscroll-behavior: none; }
   .squad-board { gap: 12px; }
   .ledger-intro { font-size: 12.5px; }
 }
+
+/* ------------------------------------------------------------
+   EDITING A SQUAD IN PLACE
+   ------------------------------------------------------------ */
+.sq-player.edit {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 96px 30px;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 2px;
+}
+.sq-in {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 7px 8px;
+  font-family: inherit;
+  font-size: 13px;
+  min-width: 0;
+  width: 100%;
+}
+.sq-in:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 2px rgba(229,38,45,0.18); }
+.sq-in.cat { font-family: var(--font-display); font-weight: 700; text-align: center; padding: 7px 2px; }
+.sq-in.cat.c-A { border-color: rgba(229,38,45,0.6); color: #ff8b8e; }
+.sq-in.phone { font-size: 12px; color: var(--text-dim); }
+
+.sq-r {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text-faint);
+  border-radius: 7px;
+  height: 32px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+}
+.sq-r.on { background: var(--red); border-color: var(--red); color: #fff; }
+
+@media (max-width: 760px), (pointer: coarse) {
+  .sq-player.edit { grid-template-columns: 52px minmax(0, 1fr) 40px; row-gap: 6px; }
+  .sq-in { min-height: 40px; font-size: 16px; }
+  .sq-in.phone { grid-column: 1 / -1; }
+  .sq-r { height: 40px; }
+}

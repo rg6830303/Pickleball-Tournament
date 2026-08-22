@@ -869,6 +869,7 @@
 
     squadTeams = t.data || [];
     squadRows = s.data || [];
+    await loadSquadBalance();
     renderTeamsBoard();
     startSquadRealtime();
   }
@@ -913,6 +914,7 @@
 
   function renderTeamsBoard() {
     const board = $("#squadBoard");
+    renderBalanceNote();
     const { teams, match } = teamsFiltered();
 
     $("#teamsEmpty").hidden = squadRows.length > 0;
@@ -955,20 +957,130 @@
       .join("");
   }
 
+  /* ============================================================
+     EDITING A SQUAD
+     team_squads is the one list every screen reads — the console, the
+     captain's phone, the open board and every filed line-up. A name
+     corrected here is corrected everywhere, which is exactly why the
+     edit lives here and nowhere else.
+     ============================================================ */
+  let squadEditing = false;
+  let squadBalance = [];
+
+  const CATS = ["A", "B", "C"];
+
+  function squadEditRow(p) {
+    return `
+      <li class="sq-player edit" data-sq="${esc(p.id)}">
+        <select class="sq-in cat c-${esc(p.category)}" data-f="category" aria-label="Category">
+          ${CATS.map((c) => `<option${c === p.category ? " selected" : ""}>${c}</option>`).join("")}
+        </select>
+        <input class="sq-in name" data-f="player_name" value="${esc(p.player_name)}" aria-label="Player name" />
+        <input class="sq-in phone" data-f="phone" value="${esc(p.phone || "")}" placeholder="phone" aria-label="Phone" />
+        <button class="sq-r${p.retained ? " on" : ""}" data-f="retained" type="button"
+                title="Retained player">R</button>
+      </li>`;
+  }
+
+  /* Saves on blur or Enter, one field at a time — the same feel as the
+     spreadsheet tab, and nothing is lost if the page is closed mid-edit. */
+  async function saveSquadField(el) {
+    const li = el.closest("[data-sq]");
+    if (!li) return;
+    const id = li.dataset.sq;
+    const field = el.dataset.f;
+    const row = squadRows.find((r) => r.id === id);
+    if (!row) return;
+
+    let value = field === "retained" ? !row.retained : el.value;
+    if (field === "player_name") {
+      value = String(value).trim();
+      if (!value) { el.value = row.player_name; return toast("A player needs a name", "err"); }
+    }
+    if (field === "phone") value = String(value).trim() || null;
+    if (value === row[field]) return;
+
+    const { error } = await sb.from("team_squads").update({ [field]: value }).eq("id", id);
+    if (error) {
+      el.value = row[field] ?? "";
+      return toast("Couldn't save: " + error.message, "err");
+    }
+    row[field] = value;
+
+    // A player already named on a filed sheet now reads differently there.
+    if (field === "player_name" || field === "category") {
+      const { data } = await sb.rpc("squad_player_usage", { p_squad_id: id });
+      if (data && data.length) {
+        toast(`Saved — ${row.player_name} is on ${data.length} filed team sheet${data.length > 1 ? "s" : ""}, now updated`, "info");
+      } else {
+        toast("Saved", "ok");
+      }
+    } else {
+      toast("Saved", "ok");
+    }
+    loadSquadBalance().then(renderTeamsBoard);
+  }
+
+  document.addEventListener("change", (e) => {
+    const el = e.target.closest("#tab-teams .sq-in");
+    if (el && el.tagName === "SELECT") saveSquadField(el);
+  });
+  document.addEventListener("blur", (e) => {
+    const el = e.target.closest && e.target.closest("#tab-teams input.sq-in");
+    if (el) saveSquadField(el);
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const el = e.target.closest && e.target.closest("#tab-teams input.sq-in");
+    if (el) { e.preventDefault(); el.blur(); }
+  });
+  document.addEventListener("click", (e) => {
+    const r = e.target.closest("#tab-teams .sq-r");
+    if (r) saveSquadField(r);
+  });
+
+  $("#btnTeamsEdit")?.addEventListener("click", () => {
+    squadEditing = !squadEditing;
+    const b = $("#btnTeamsEdit");
+    b.setAttribute("aria-pressed", String(squadEditing));
+    b.classList.toggle("on", squadEditing);
+    b.textContent = squadEditing ? "✓ Done editing" : "✎ Edit squads";
+    $("#teamsHint").textContent = squadEditing
+      ? "Editing — changes save as you go and reach every screen at once"
+      : "Live from the squad table — captains see the same list";
+    renderTeamsBoard();
+  });
+
+  async function loadSquadBalance() {
+    const { data, error } = await sb.from("squad_balance").select("*");
+    if (!error) squadBalance = data || [];
+  }
+
+  function renderBalanceNote() {
+    const el = $("#teamsBalance");
+    if (!el) return;
+    const off = squadBalance.filter((b) => !b.ok);
+    el.textContent = !squadBalance.length
+      ? ""
+      : off.length
+      ? `${off.length} squad${off.length > 1 ? "s" : ""} not 1A / 4B / 4C`
+      : "Every squad is 1A / 4B / 4C";
+    el.classList.toggle("bad", off.length > 0);
+    el.classList.toggle("good", squadBalance.length > 0 && !off.length);
+  }
+
   function teamCard(t, match) {
     const squad = squadRows
       .filter((r) => r.team_id === t.id)
       .sort((a, b) => a.sort_order - b.sort_order);
 
     const rows = squad
-      .map(
-        (p) => `
+      .map((p) => (squadEditing ? squadEditRow(p) : `
         <li class="sq-player${match(p.player_name) ? " hit" : ""}">
           <span class="sq-cat c-${esc(p.category)}">${esc(p.category)}</span>
           <span class="sq-name">${esc(p.player_name)}</span>
           ${p.retained ? '<span class="sq-ret" title="Retained player">R</span>' : ""}
-        </li>`
-      )
+        </li>`))
       .join("");
 
     return `
@@ -1166,6 +1278,48 @@
     a.download = `mpl-schedule-${stamp()}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
+  });
+
+  /* ============================================================
+     RESET
+     A rehearsal, a demo, a tie typed against the wrong fixture — the day
+     needs a way back to nothing. Both of these are staff-only in the
+     database as well as here, and both say exactly what they will destroy
+     before they do it.
+     ============================================================ */
+  $("#btnResetScores")?.addEventListener("click", async () => {
+    const played = sbResults.length;
+    const hist = sbAudit.length;
+    confirmDialog(
+      played
+        ? `Clear all ${played} match score${played > 1 ? "s" : ""}? Every tie goes back to unplayed, the league table empties and the knockout bracket un-seats. ` +
+          `The score history (${hist} entr${hist === 1 ? "y" : "ies"}) is kept so you can still see what was entered.`
+        : "There are no scores to clear. Run it anyway to reset every tie to unplayed?",
+      async () => {
+        const { data, error } = await sb.rpc("reset_scoreboard", { p_clear_history: false, p_tie_id: null });
+        if (error) return toast("Reset failed: " + error.message, "err");
+        const r = Array.isArray(data) ? data[0] : data;
+        toast(`Scoreboard reset — ${r?.results_removed ?? 0} scores cleared`, "ok");
+        await sbReload();
+      },
+      "Reset the scoreboard"
+    );
+  });
+
+  $("#btnResetSheets")?.addEventListener("click", async () => {
+    const filed = shBoard.filter((r) => r.status === "submitted").length;
+    confirmDialog(
+      `Clear every team sheet in the tournament${filed ? `, including ${filed} already filed` : ""}? ` +
+        `Captains will see no sheet until you open a new window, and the trump on any recorded score is cleared with them.`,
+      async () => {
+        const { error } = await sb.rpc("reset_team_sheets", { p_tie_id: null });
+        if (error) return toast("Reset failed: " + error.message, "err");
+        toast("Every team sheet cleared", "ok");
+        await loadSheets();
+        await sbReload();
+      },
+      "Reset the team sheets"
+    );
   });
 
   /* ---- one-time auction install helper (shown when tables are missing) ---- */

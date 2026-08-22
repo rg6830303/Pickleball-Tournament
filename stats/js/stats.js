@@ -37,7 +37,7 @@
   let live = false;              // realtime socket actually subscribed
   let firstPaint = true;
 
-  const D = { teams: [], standings: [], fixtures: [], results: [], squads: [], format: [], ledger: [], lineups: [], sheets: [] };
+  const D = { teams: [], standings: [], fixtures: [], results: [], squads: [], format: [], ledger: [], lineups: [], sheets: [], phase: null };
   const openLedger = new Set();  // team ids whose working is showing
   const openTies = new Set();    // tie ids the reader has expanded
   const openSquads = new Set();  // team ids the reader has expanded
@@ -56,9 +56,10 @@
       sb.from("points_ledger").select("*").order("team_id").order("tie_id"),
       sb.from("public_lineups").select("*").order("tie_id").order("slot").order("position"),
       sb.from("public_sheet_status").select("*"),
+      sb.from("public_phase").select("*").maybeSingle(),
     ];
-    const [teams, standings, fixtures, results, squads, format, ledger, lineups, sheets] = await Promise.all(q);
-    const bad = [teams, standings, fixtures, results, squads, format, ledger, lineups, sheets].find((r) => r.error);
+    const [teams, standings, fixtures, results, squads, format, ledger, lineups, sheets, phase] = await Promise.all(q);
+    const bad = [teams, standings, fixtures, results, squads, format, ledger, lineups, sheets, phase].find((r) => r.error);
     if (bad) throw bad.error;
 
     D.teams = teams.data || [];
@@ -70,6 +71,7 @@
     D.ledger = ledger.data || [];
     D.lineups = lineups.data || [];
     D.sheets = sheets.data || [];
+    D.phase = phase.data || null;
   }
 
   let refreshing = false;
@@ -584,11 +586,61 @@
 
   /* ---------------- paint ---------------- */
 
+  /* The group stage ends and the day changes shape: the knockouts stop
+     being a promise and become the thing everyone is watching. The page
+     rearranges itself to say so — nobody should have to scroll past four
+     finished tables to find out who is in the semi-final. */
+  function renderPhase() {
+    const ph = D.phase;
+    const body = document.body;
+    if (!ph) return;
+
+    const done = Boolean(ph.group_complete);
+    body.classList.toggle("playoffs", done);
+
+    const ladder = $("#sec-ladder");
+    const standings = $("#sec-standings");
+    if (done && ladder && standings && ladder.compareDocumentPosition(standings) & Node.DOCUMENT_POSITION_PRECEDING) {
+      standings.parentNode.insertBefore(ladder, standings);
+    }
+
+    const sub = $("#h-ladder")?.parentElement?.querySelector(".sec-sub");
+    const champ = ph.champion_name;
+    if (sub) {
+      sub.innerHTML = champ
+        ? `<b class="champ-line">${esc(champ)} are the champions of Season 1.</b>`
+        : done
+        ? `Group stage complete — the top two of every group are through. ` +
+          `${esc(ph.knockouts_done)} of 7 knockout ties played.`
+        : `Quarter-finals, semi-finals and the final. The bracket fills in the moment the last group tie is scored ` +
+          `(${esc(ph.group_ties_done)} of ${esc(ph.group_ties)} done).`;
+    }
+
+    const banner = $("#phaseBanner");
+    if (banner) {
+      if (champ) {
+        banner.hidden = false;
+        banner.className = "phase-banner champ";
+        banner.innerHTML = `<span class="pb-k">Champions</span><b>${esc(champ)}</b>`;
+      } else if (done) {
+        banner.hidden = false;
+        banner.className = "phase-banner";
+        const qs = D.standings.filter((x) => Number(x.rank) <= 2).map((x) => x.team_name);
+        banner.innerHTML =
+          `<span class="pb-k">Knockouts</span><b>Group stage complete</b>` +
+          `<span class="pb-q">${qs.map((n) => `<i>${esc(n)}</i>`).join("")}</span>`;
+      } else {
+        banner.hidden = true;
+      }
+    }
+  }
+
   function renderAll() {
     renderHero();
     renderStandings();
     renderTies();
     renderLadder();
+    renderPhase();
     renderSquads();
     firstPaint = false;
     document.body.dataset.ready = "1";

@@ -1031,3 +1031,48 @@ tr.open .pts-caret { transform: rotate(180deg); color: var(--red); }
   .lu-p { font-size: 14px; }
   .lu-slot { padding: 10px 8px; }
 }
+
+/* ------------------------------------------------------------
+   THE DAY CHANGES SHAPE
+   Once the group stage is done the ladder moves above the tables and
+   says who is through. When the final is played, it says who won.
+   ------------------------------------------------------------ */
+.phase-banner {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px;
+  margin: 0 auto 22px; padding: 14px 18px; max-width: var(--wrap, 1180px);
+  background: linear-gradient(100deg, rgba(229,38,45,0.16), rgba(229,38,45,0.04));
+  border: 1px solid rgba(229,38,45,0.4);
+  border-radius: var(--radius, 14px);
+}
+.phase-banner .pb-k {
+  font-family: var(--font-display); font-size: 11px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--red);
+}
+.phase-banner b {
+  font-family: var(--font-display); font-size: clamp(17px, 3.4vw, 23px);
+  letter-spacing: 0.03em; text-transform: uppercase;
+}
+.phase-banner .pb-q { display: flex; flex-wrap: wrap; gap: 6px; }
+.phase-banner .pb-q i {
+  font-style: normal; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+  background: rgba(255,255,255,0.07); color: var(--text-dim);
+}
+.phase-banner.champ {
+  background: linear-gradient(100deg, rgba(232,195,90,0.2), rgba(232,195,90,0.04));
+  border-color: rgba(232,195,90,0.55);
+}
+.phase-banner.champ .pb-k { color: #e8c35a; }
+.phase-banner.champ b { color: #f7e6b0; }
+
+/* the ladder takes the lead once it matters */
+body.playoffs #sec-ladder { border-top: 2px solid var(--red); padding-top: 22px; }
+body.playoffs #sec-ladder .sec-h::after {
+  content: "Live"; margin-left: 10px; font-family: var(--font-body); font-size: 10.5px;
+  font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--red); vertical-align: middle;
+}
+.champ-line { color: #e8c35a; }
+
+@media (max-width: 720px) {
+  .phase-banner { margin: 0 14px 18px; padding: 12px 14px; }
+}
