@@ -2279,7 +2279,8 @@
     const el = $("#poolStats");
     if (!el) return;
     const stat = (label, value, tone) =>
-      `<div class="stat ${tone || ""}"><div class="n">${value}</div><div class="l">${label}</div></div>`;
+      // esc both: `label` carries auction_categories.label, which is staff-editable
+      `<div class="stat ${tone || ""}"><div class="n">${esc(value)}</div><div class="l">${esc(label)}</div></div>`;
     const named = pRows.filter((r) => String(r.name || "").trim());
     const blank = pRows.length - named.length;
     const linked = pRows.filter((r) => r.player_key && String(r.player_key).trim()).length;

@@ -204,7 +204,9 @@
     $("#liveDot")?.setAttribute("hidden", "");
 
     const [t, s] = await Promise.all([
-      sb.from("auction_teams").select("id,name,captain_name,group_code,group_rank").eq("id", myTeamId).maybeSingle(),
+      // public_teams, not auction_teams: a captain has no business reading
+      // another side's purse or the auth id behind their login.
+      sb.from("public_teams").select("id,name,captain_name,group_code,group_rank").eq("id", myTeamId).maybeSingle(),
       sb.from("team_squads").select("*").eq("team_id", myTeamId).order("sort_order"),
     ]);
 

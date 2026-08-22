@@ -567,9 +567,16 @@
     }, 380);
   }
 
+  /* The ticket prints back what the player typed. A name with an & or a
+     < is legitimate and must survive as itself, not as markup. */
+  const esc = (v) =>
+    String(v ?? "").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
+
   function showSuccess(r) {
     $("#successSub").innerHTML =
-      `Your registration is in, <b>${r.full_name}</b>. We'll verify your payment and confirm on WhatsApp shortly.`;
+      `Your registration is in, <b>${esc(r.full_name)}</b>. We'll verify your payment and confirm on WhatsApp shortly.`;
 
     const rows = [
       ["Reg. Code", r.reg_code, "mono"],
@@ -582,7 +589,7 @@
     $("#ticketBody").innerHTML = rows
       .map(
         ([k, v, cls]) =>
-          `<div class="t-row"><span class="k">${k}</span><span class="v ${cls || ""}">${v}</span></div>`
+          `<div class="t-row"><span class="k">${esc(k)}</span><span class="v ${cls || ""}">${esc(v)}</span></div>`
       )
       .join("");
     $("#ticketFoot").textContent = `${EV.dates} · ${EV.venue} · See you on court 🏆`;
