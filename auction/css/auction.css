@@ -1405,3 +1405,125 @@ body.mn-blownup { overscroll-behavior: none; }
   .fixtures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .fixtures .fx { margin: 0; }
 }
+
+/* ============================================================
+   THE PRESENTING LOCKUP
+   Kendu Entertainment presents · the league mark · Rajwada Group.
+
+   Every logo is a real image sitting above the type it replaces.
+   .no-img is set by the image's own onerror, which swaps the block
+   back to the wordmark — a missing or slow file never leaves a
+   broken icon on a public page. Sizes are clamped rather than fixed,
+   so the lockup keeps its proportions from a 360px phone to a
+   projector without a single media query fighting another.
+   ============================================================ */
+.lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(10px, 2.2vw, 18px);
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto clamp(16px, 3vw, 26px);
+  text-align: center;
+}
+
+/* ---- Kendu Entertainment presents ---- */
+.lk-presents {
+  display: flex;
+  align-items: center;
+  gap: clamp(9px, 1.6vw, 14px);
+}
+.lk-fox {
+  width: clamp(38px, 7vw, 60px);
+  height: auto;
+  flex: none;
+  filter: drop-shadow(0 3px 10px rgba(0,0,0,0.55));
+}
+.lk-presents.no-img .lk-fox { display: none; }
+
+.lk-presents-txt { text-align: left; line-height: 1.15; }
+.lk-presents-txt b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(12px, 1.9vw, 15px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.lk-presents-txt span {
+  display: block;
+  font-size: clamp(10px, 1.5vw, 12px);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+/* ---- the league mark ---- */
+.lk-main { width: 100%; display: flex; justify-content: center; }
+.lk-mpl {
+  width: clamp(240px, 62vw, 430px);
+  height: auto;
+  filter: drop-shadow(0 10px 34px rgba(0,0,0,0.6));
+}
+.lk-fallback { display: none; }
+.lk-main.no-img .lk-mpl { display: none; }
+.lk-main.no-img .lk-fallback { display: block; }
+
+/* ---- Rajwada Group ---- */
+.lk-partner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  margin-top: clamp(2px, 1vw, 8px);
+  padding-top: clamp(10px, 2vw, 16px);
+  border-top: 1px solid var(--line);
+  width: min(320px, 70%);
+}
+.lk-rajwada {
+  width: clamp(120px, 26vw, 190px);
+  height: auto;
+  opacity: 0.92;
+}
+.lk-partner-txt {
+  font-size: clamp(9.5px, 1.4vw, 11px);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+/* the name is the caption under the mark, and the whole label when it is missing */
+.lk-partner.no-img .lk-rajwada { display: none; }
+.lk-partner.no-img .lk-partner-txt {
+  font-family: var(--font-display);
+  font-size: clamp(12px, 1.8vw, 15px);
+  letter-spacing: 0.18em;
+  color: var(--text-dim);
+}
+
+/* The Rajwada mark is dark-on-dark by design; lift it off the page
+   without altering the artwork. */
+.lk-rajwada { background: rgba(255,255,255,0.035); border-radius: 10px; padding: 8px 14px; }
+
+@media (max-width: 420px) {
+  .lk-presents { flex-direction: column; gap: 7px; }
+  .lk-presents-txt { text-align: center; }
+  .lk-partner { width: min(280px, 86%); }
+}
+
+/* A phone in landscape has almost no height — keep the mark from
+   pushing the table off the first screen. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .lk-mpl { width: clamp(180px, 30vw, 260px); }
+  .lk-partner { display: none; }
+}
+
+/* the sign-in card is narrow, so the lockup tightens inside it */
+.lockup-auth { margin-bottom: 18px; gap: 12px; }
+.lockup-auth .lk-mpl { width: clamp(190px, 58vw, 260px); }
+.lockup-auth .lk-fox { width: clamp(32px, 9vw, 42px); }
+.lockup-auth .lk-rajwada { width: clamp(96px, 30vw, 130px); }
+.lockup-auth .lk-partner { width: min(240px, 88%); padding-top: 12px; }
+.lockup-auth .lk-fallback .auth-kicker { margin: 0; }

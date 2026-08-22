@@ -16,7 +16,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/stats.css?v=202608222000" />
+  <link rel="stylesheet" href="css/stats.css?v=202608222300" />
 </head>
 <body>
 
@@ -38,12 +38,41 @@
 
     <!-- ================= 1. HERO ================= -->
     <header class="hero" id="hero">
-      <span class="hero-ball" aria-hidden="true"><svg class="pb"><use href="#pball"></use></svg></span>
-      <p class="hero-kicker">Monsoon</p>
-      <h1 class="hero-title">Pickle League</h1>
-      <p class="hero-season" id="heroSeason">Season 1 — Live Scoreboard</p>
 
-      <p class="hero-meta" id="heroMeta"></p>
+      <!-- The presenting lockup. Each logo is a real image with the old
+           wordmark kept underneath it: if a file is missing or slow to
+           arrive, the block falls back to type rather than showing a
+           broken icon. -->
+      <div class="lockup" id="lockup">
+
+        <div class="lk-presents">
+          <img class="lk-fox" src="assets/logo-kendu.png" alt="Kendu Entertainment"
+               width="72" height="72" decoding="async"
+               onerror="this.closest('.lk-presents').classList.add('no-img')" />
+          <p class="lk-presents-txt"><b>Kendu Entertainment</b><span>presents</span></p>
+        </div>
+
+        <div class="lk-main">
+          <img class="lk-mpl" src="assets/logo-mpl.png" alt="Monsoon Pickle League"
+               width="640" height="590" fetchpriority="high" decoding="async"
+               onerror="this.closest('.lk-main').classList.add('no-img')" />
+          <div class="lk-fallback" aria-hidden="true">
+            <span class="hero-ball"><svg class="pb"><use href="#pball"></use></svg></span>
+            <p class="hero-kicker">Monsoon</p>
+            <h1 class="hero-title">Pickle League</h1>
+          </div>
+        </div>
+
+        <p class="hero-season" id="heroSeason">Season 1 — Live Scoreboard</p>
+        <p class="hero-meta" id="heroMeta"></p>
+
+        <div class="lk-partner">
+          <img class="lk-rajwada" src="assets/logo-rajwada.png" alt="Rajwada Group"
+               width="300" height="210" loading="lazy" decoding="async"
+               onerror="this.closest('.lk-partner').classList.add('no-img')" />
+          <p class="lk-partner-txt">Rajwada Group</p>
+        </div>
+      </div>
 
       <div class="hero-live" id="heroLive" hidden>
         <span class="pulse" aria-hidden="true"></span>
@@ -108,9 +137,10 @@
 
   </main>
 
-  <script src="js/vendor/supabase.js?v=202608222000"></script>
-  <script src="js/mpl-standings.js?v=202608222000"></script>
-  <script src="js/config.js?v=202608222000"></script>
-  <script src="js/stats.js?v=202608222000"></script>
+  <script src="js/vendor/supabase.js?v=202608222300"></script>
+  <script src="js/mn-sky.js?v=202608222300"></script>
+  <script src="js/mpl-standings.js?v=202608222300"></script>
+  <script src="js/config.js?v=202608222300"></script>
+  <script src="js/stats.js?v=202608222300"></script>
 </body>
 </html>

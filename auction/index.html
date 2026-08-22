@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/mn-card.css?v=202608222100" />
-  <link rel="stylesheet" href="css/auction.css?v=202608222100" />
+  <link rel="stylesheet" href="css/mn-card.css?v=202608222300" />
+  <link rel="stylesheet" href="css/auction.css?v=202608222300" />
 </head>
 <body>
 
@@ -19,10 +19,31 @@
   <!-- ==================== LOGIN ==================== -->
   <div class="auth-wrap" id="authWrap">
     <form class="auth-card" id="loginForm" autocomplete="off">
-      <div class="auth-badge" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V10M12 21V6M18 21v-8"/></svg>
+      <!-- Same presenting lockup as the open board. Each logo falls back
+           to type on its own onerror, so a missing file never leaves a
+           broken icon on the sign-in screen. -->
+      <div class="lockup lockup-auth">
+        <div class="lk-presents">
+          <img class="lk-fox" src="assets/logo-kendu.png" alt="Kendu Entertainment"
+               width="72" height="72" decoding="async"
+               onerror="this.closest('.lk-presents').classList.add('no-img')" />
+          <p class="lk-presents-txt"><b>Kendu Entertainment</b><span>presents</span></p>
+        </div>
+        <div class="lk-main">
+          <img class="lk-mpl" src="assets/logo-mpl.png" alt="Monsoon Pickle League"
+               width="640" height="590" fetchpriority="high" decoding="async"
+               onerror="this.closest('.lk-main').classList.add('no-img')" />
+          <div class="lk-fallback" aria-hidden="true">
+            <p class="auth-kicker">Monsoon Pickle League</p>
+          </div>
+        </div>
+        <div class="lk-partner">
+          <img class="lk-rajwada" src="assets/logo-rajwada.png" alt="Rajwada Group"
+               width="300" height="210" loading="lazy" decoding="async"
+               onerror="this.closest('.lk-partner').classList.add('no-img')" />
+          <p class="lk-partner-txt">Rajwada Group</p>
+        </div>
       </div>
-      <p class="auth-kicker">Monsoon Pickle League</p>
       <h1 class="auth-title">Team Auction</h1>
 
       <div class="field">
@@ -201,13 +222,13 @@
 
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="js/mpl-format.js?v=202608222100"></script>
-  <script src="js/mn-sky.js?v=202608222100"></script>
-  <script src="js/mn-card.js?v=202608222100"></script>
-  <script src="js/mn-pw.js?v=202608222100"></script>
-  <script src="js/mn-sold.js?v=202608222100"></script>
+  <script src="js/mpl-format.js?v=202608222300"></script>
+  <script src="js/mn-sky.js?v=202608222300"></script>
+  <script src="js/mn-card.js?v=202608222300"></script>
+  <script src="js/mn-pw.js?v=202608222300"></script>
+  <script src="js/mn-sold.js?v=202608222300"></script>
   <script src="js/vendor/supabase.js" defer></script>
-  <script src="js/config.js?v=202608222100"></script>
-  <script src="js/auction.js?v=202608222100" defer></script>
+  <script src="js/config.js?v=202608222300"></script>
+  <script src="js/auction.js?v=202608222300" defer></script>
 </body>
 </html>
