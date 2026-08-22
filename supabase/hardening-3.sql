@@ -158,3 +158,55 @@ create or replace view public.public_points_ledger as
   select * from public.points_ledger where phase = 'group';
 
 grant select on public.public_points_ledger to anon, authenticated;
+-- ============================================================
+--  A GROUP TIE CANNOT BE RE-SEATED
+--
+--  tie_set_teams exists so the organiser can seat a knockout. Pointed
+--  at a group tie it would move a team into another group's fixture,
+--  and public_standings joins on team id without checking the group —
+--  so that team appears in two group tables at once, one of them under
+--  a group it does not belong to. The console never offers this (the
+--  seat control is drawn for knockouts only), but the RPC allowed it.
+-- ============================================================
+create or replace function public.tie_set_teams(p_tie_id int, p_home int default null, p_away int default null)
+returns public.tournament_ties
+language plpgsql security definer set search_path = public as $$
+declare v_row public.tournament_ties; v_phase text;
+begin
+  if not public.is_auction_staff() then
+    raise exception 'Only tournament staff can seat a knockout tie';
+  end if;
+
+  select phase into v_phase from public.tournament_ties where id = p_tie_id;
+  if v_phase is null then raise exception 'No such tie'; end if;
+  if v_phase = 'group' then
+    raise exception 'Group fixtures are fixed — only a knockout tie can be seated';
+  end if;
+  if p_home is not null and p_home = p_away then
+    raise exception 'A team cannot play itself';
+  end if;
+
+  update public.tournament_ties
+     set home_team_id = p_home,
+         away_team_id = p_away,
+         auto_seeded = (p_home is null and p_away is null)
+   where id = p_tie_id
+  returning * into v_row;
+
+  delete from public.team_sheet_picks p
+   using public.team_sheets s
+   where p.sheet_id = s.id
+     and s.tie_id = p_tie_id
+     and s.team_id is distinct from p_home
+     and s.team_id is distinct from p_away;
+  delete from public.team_sheets s
+   where s.tie_id = p_tie_id
+     and s.team_id is distinct from p_home
+     and s.team_id is distinct from p_away;
+
+  perform public.tie_recount(p_tie_id);
+  perform public.playoffs_sync();
+  perform public.playoffs_advance();
+  select * into v_row from public.tournament_ties where id = p_tie_id;
+  return v_row;
+end $$;
