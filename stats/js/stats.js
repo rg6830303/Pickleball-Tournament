@@ -53,7 +53,7 @@
       sb.from("public_results").select("*").order("tie_id").order("slot"),
       sb.from("public_squads").select("*").order("team_id").order("sort_order"),
       sb.from("tournament_format").select("*").order("slot"),
-      sb.from("points_ledger").select("*").order("team_id").order("tie_id"),
+      sb.from("public_points_ledger").select("*").order("team_id").order("tie_id"),
       sb.from("public_lineups").select("*").order("tie_id").order("slot").order("position"),
       sb.from("public_sheet_status").select("*"),
       sb.from("public_phase").select("*").maybeSingle(),

@@ -3456,7 +3456,7 @@
 
   async function loadLedger() {
     const [lg, tt, au] = await Promise.all([
-      sb.from("points_ledger").select("*").order("team_id").order("tie_id").order("slot", { nullsFirst: false }),
+      sb.from("public_points_ledger").select("*").order("team_id").order("tie_id").order("slot", { nullsFirst: false }),
       sb.from("points_ledger_totals").select("*").eq("phase", "group"),
       sb.from("score_audit_log").select("*").limit(200),
     ]);
