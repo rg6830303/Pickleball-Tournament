@@ -124,11 +124,6 @@
   function renderHero() {
     $("#heroSeason").textContent = `${CFG.EVENT.season} — Live Scoreboard`;
 
-    setCount("#cTeams", D.teams.length);
-    setCount("#cPlayers", D.squads.length);
-    setCount("#cTies", D.fixtures.length);
-    setCount("#cMatches", D.results.length);
-
     const liveTies = D.fixtures.filter((t) => t.status === "live");
     const box = $("#heroLive");
     box.hidden = liveTies.length === 0;
@@ -617,12 +612,6 @@
 
   function boot() {
     renderLegend();
-    // Each fact stays whole; the spaces around the dots are the only places
-    // the line is allowed to break, so a phone never splits "9:00 AM".
-    $("#heroMeta").innerHTML = [CFG.EVENT.when, CFG.EVENT.venue, CFG.EVENT.firstServe]
-      .map((f) => `<span>${esc(f)}</span>`)
-      .join(` <i>·</i> `);
-
     if (!window.supabase || !CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) {
       stamp(false, "The scoreboard is not wired to a database yet.");
       return;

@@ -1383,3 +1383,9 @@ body.playoffs #sec-ladder .sec-h::after {
 /* "presents" sat at --text-faint over a moving storm, which is not enough
    contrast to read on a phone in daylight. */
 .lk-presents-txt span { color: var(--text-dim); }
+
+/* The hero used to carry a date line and four counter boxes. With both
+   gone its old bottom padding left a hole above the scoreboard, so the
+   first thing on the page was empty space. */
+.hero { padding: clamp(14px, 3vw, 22px) 0 clamp(14px, 2.5vw, 20px); }
+.hero .stamp { margin-top: clamp(8px, 1.6vw, 12px); }
