@@ -1389,3 +1389,33 @@ body.playoffs #sec-ladder .sec-h::after {
    first thing on the page was empty space. */
 .hero { padding: clamp(14px, 3vw, 22px) 0 clamp(14px, 2.5vw, 20px); }
 .hero .stamp { margin-top: clamp(8px, 1.6vw, 12px); }
+
+/* ------------------------------------------------------------
+   THE SUPPLIED MARKS
+   Both logos arrived as JPEGs on solid black, so they would show as
+   black rectangles on a near-black page. `screen` drops the black to
+   nothing and leaves the artwork — the same trick the poster uses.
+   The Rajwada mark is dark grey on black and barely legible at any
+   size, so it is lifted rather than left as a smudge.
+   ------------------------------------------------------------ */
+/* The black is gone from the files themselves now, so no blend mode is
+   needed — mix-blend-mode could not be trusted here anyway, because an
+   ancestor stacking context stops it blending with the page behind. */
+.lk-fox, .lk-rajwada { background: none; padding: 0; }
+.lk-fox { filter: drop-shadow(0 3px 12px rgba(0,0,0,0.5)); }
+.lk-rajwada { opacity: 0.95; }
+
+/* The supplied marks are the identity, so give them room. The fox reads
+   as a mark rather than a favicon, and Rajwada is a partner credit, not
+   a footnote. Both stay on one line beside their text on a phone. */
+.lk-fox { width: clamp(48px, 12vw, 76px); }
+.lk-rajwada { width: clamp(160px, 44vw, 250px); }
+
+@media (max-width: 420px) {
+  .lk-presents { flex-direction: row; gap: 10px; }
+  .lk-presents-txt { text-align: left; }
+}
+
+/* The mark says "Rajwada Group" itself — the caption under it is only
+   needed when the image is missing, where it becomes the credit. */
+.lk-partner:not(.no-img) .lk-partner-txt { display: none; }
