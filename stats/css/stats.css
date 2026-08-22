@@ -1076,3 +1076,186 @@ body.playoffs #sec-ladder .sec-h::after {
 @media (max-width: 720px) {
   .phase-banner { margin: 0 14px 18px; padding: 12px 14px; }
 }
+
+/* ============================================================
+   LEAGUE TABLE — shared by the console and the open board.
+   Copied byte-for-byte into both stylesheets: edit both, or neither.
+
+   One DOM, two layouts. On a laptop it reads as a table. On a phone
+   the columns would need a sideways swipe, and the column people came
+   for — Points — would be the one hidden, so below 760px each team
+   becomes a row with its points held on the right and the six working
+   numbers labelled underneath.
+   ============================================================ */
+.st-group {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.st-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 16px;
+  background: linear-gradient(100deg, rgba(229,38,45,0.14), transparent 70%);
+  border-bottom: 1px solid var(--line);
+}
+.st-badge {
+  flex: none;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 14px; font-weight: 700;
+}
+.st-title {
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.st-qnote {
+  margin-left: auto;
+  font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-faint); white-space: nowrap;
+}
+
+.st-table { display: flex; flex-direction: column; }
+
+.st-hrow, .st-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto 74px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+}
+
+.st-hrow {
+  padding-top: 9px; padding-bottom: 9px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-faint);
+}
+.st-hrow .st-nums { display: flex; gap: 0; }
+.st-hrow .st-n { width: 46px; text-align: right; }
+.st-hrow .st-pts { text-align: right; }
+
+.st-row { border-top: 1px solid rgba(255,255,255,0.05); transition: background 0.15s; }
+.st-row:first-of-type { border-top: none; }
+.st-row.q { background: linear-gradient(90deg, rgba(47,191,113,0.09), transparent 55%); }
+.st-row.q::before {
+  content: ""; position: absolute; left: 0; width: 3px; height: 100%; background: var(--ok);
+}
+.st-row { position: relative; }
+.st-row.tap { cursor: pointer; }
+.st-row.tap:hover { background: rgba(255,255,255,0.04); }
+.st-row.tap:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+
+.st-rank { display: flex; align-items: baseline; gap: 5px; }
+.st-rank b { font-family: var(--font-display); font-size: 19px; font-variant-numeric: tabular-nums; }
+.st-q {
+  font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em;
+  color: #0b1f14; background: var(--ok); border-radius: 4px; padding: 1px 4px;
+}
+
+.st-team { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.st-team b {
+  font-family: var(--font-display); font-size: 15px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.st-team small { font-size: 11.5px; color: var(--text-faint); line-height: 1.3; overflow-wrap: anywhere; }
+
+.st-nums { display: flex; gap: 0; }
+.st-n {
+  width: 46px; text-align: right; font-size: 14px;
+  font-variant-numeric: tabular-nums; color: var(--text-dim);
+}
+.st-n i { display: none; }
+.st-n.win { color: var(--text); font-weight: 600; }
+.st-n.up { color: var(--ok); }
+.st-n.down { color: #ff8b8e; }
+
+.st-pts {
+  display: flex; align-items: baseline; justify-content: flex-end; gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.st-pts b { font-family: var(--font-display); font-size: 21px; color: var(--red); }
+.st-pts i, .st-pts em { display: none; }
+
+.st-legend {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+  margin-bottom: 8px;
+}
+.st-legend-h {
+  font-family: var(--font-display); font-size: 11px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--red); margin-bottom: 10px;
+}
+.st-legend ul { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.st-legend li { display: flex; align-items: baseline; gap: 7px; font-size: 12.5px; color: var(--text-dim); }
+.st-legend b {
+  font-family: var(--font-display); font-size: 13px; color: var(--text);
+  min-width: 20px; text-align: right;
+}
+.st-legend b.red { color: var(--red); }
+.st-legend b.down { color: #ff8b8e; }
+
+/* ---- the phone ---- */
+@media (max-width: 760px) {
+  .st-hrow { display: none; }
+
+  .st-row {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "rank team pts"
+      "nums nums nums";
+    row-gap: 9px;
+    padding: 13px 14px;
+  }
+  .st-rank { grid-area: rank; }
+  .st-team { grid-area: team; }
+  .st-pts  { grid-area: pts; }
+  .st-nums { grid-area: nums; }
+
+  .st-team b { font-size: 15.5px; }
+
+  .st-nums {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+    padding-top: 9px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .st-n {
+    width: auto;
+    display: flex; flex-direction: column; align-items: center; gap: 1px;
+    font-size: 14px; color: var(--text);
+  }
+  .st-n i {
+    display: block; font-style: normal; font-size: 9.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-faint);
+  }
+
+  .st-pts b { font-size: 26px; line-height: 1; }
+  .st-pts i {
+    display: block; font-style: normal; font-size: 9.5px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--text-faint);
+  }
+  .st-pts em { display: block; font-style: normal; font-size: 10px; color: var(--text-faint); }
+  .st-row.open .st-pts em { transform: rotate(180deg); color: var(--red); }
+
+  .st-legend ul { gap: 7px 14px; }
+  .st-legend li { font-size: 12px; }
+}
+
+@media (max-width: 380px) {
+  .st-nums { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; }
+}

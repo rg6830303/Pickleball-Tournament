@@ -3607,35 +3607,15 @@
   });
 
   /* ---- the league table, exactly as public_standings ranked it ---- */
-  const STD_COLS = [
-    ["Group", 0], ["Rank", 0], ["Team", 0],
-    ["MP", 1], ["W", 1], ["L", 1], ["PS", 1], ["PC", 1], ["PD", 1], ["Pts", 1],
-  ];
-
   function renderStandings() {
     const host = $("#sbStandings");
     $("#sbStandEmpty").hidden = sbStand.length > 0;
-    if (!sbStand.length) {
-      host.innerHTML = "";
-      $("#sbLegend").innerHTML = stdLegend();
-      return;
-    }
-    host.innerHTML = GROUPS.map((g) => {
-      const list = sbStand.filter((r) => r.group_code === g);
-      if (!list.length) return "";
-      return `<section class="std-block">
-        <p class="std-h">Group ${g}</p>
-        <div class="std-wrap">
-          <table class="std">
-            <thead><tr>${STD_COLS.map(
-              ([l, num]) => `<th class="${num ? "num" : ""}">${l}</th>`
-            ).join("")}</tr></thead>
-            <tbody>${list.map(stdRow).join("")}</tbody>
-          </table>
-        </div>
-      </section>`;
-    }).join("");
-    $("#sbLegend").innerHTML = stdLegend();
+    // MPL_STANDINGS is shared with the open board so the two tables cannot
+    // drift apart. The console shows it read-only; editing lives elsewhere
+    // on this tab.
+    host.innerHTML = window.MPL_STANDINGS.render(sbStand, { qualify: 2 });
+    const legend = $("#sbLegend");
+    if (legend) legend.innerHTML = sbStand.length ? window.MPL_STANDINGS.legend() : "";
   }
 
   function stdRow(r) {

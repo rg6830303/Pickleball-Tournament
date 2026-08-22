@@ -172,36 +172,17 @@
       return;
     }
 
-    host.innerHTML = GROUPS.map((g) => {
-      const rows = D.standings.filter((s) => s.group_code === g);
-      if (!rows.length) return "";
-      return `
-        <article class="grp">
-          <div class="grp-head">
-            <span class="grp-badge">${esc(g)}</span>
-            <h3 class="grp-name">Group ${esc(g)}</h3>
-            <span class="grp-note">Top 2 qualify</span>
-          </div>
-          <div class="tbl-wrap">
-            <table class="tbl">
-              <thead>
-                <tr>
-                  <th class="c-grp">Group</th>
-                  <th class="c-rank">Rank</th>
-                  <th class="c-team">Team</th>
-                  ${COLS.map(([k, t]) => `<th class="c-n"><abbr title="${esc(t)}">${k}</abbr></th>`).join("")}
-                  <th class="c-pts">Pts</th>
-                </tr>
-              </thead>
-              <tbody>${rows.map(teamRow).join("")}</tbody>
-            </table>
-          </div>
-          <p class="tbl-hint">Swipe the table sideways for W · L · PS · PC · PD · Pts</p>
-        </article>`;
-    }).join("");
+    // MPL_STANDINGS is the console's renderer, shared so the open board and
+    // the organiser are looking at the same table.
+    host.innerHTML = window.MPL_STANDINGS.render(D.standings, {
+      qualify: 2,
+      clickable: true,
+      isOpen: (id) => openLedger.has(id),
+      extra: (s) => ledgerRow(s, D.ledger.filter((l) => l.team_id === s.team_id)),
+    });
 
     // A tap anywhere on the row opens its working; the caret is only a hint.
-    $$("tr.can-open", host).forEach((tr) => {
+    $$(".st-row.tap", host).forEach((tr) => {
       const toggle = () => {
         const id = Number(tr.dataset.team);
         openLedger.has(id) ? openLedger.delete(id) : openLedger.add(id);
@@ -214,60 +195,31 @@
     });
   }
 
-  function teamRow(s) {
-    const q = Number(s.rank) <= 2;
-    const pd = Number(s.point_diff);
-    const open = openLedger.has(s.team_id);
-    const lines = D.ledger.filter((l) => l.team_id === s.team_id);
-    return `
-      <tr class="${q ? "q" : ""}${lines.length ? " can-open" : ""}${open ? " open" : ""}"
-          data-team="${s.team_id}"${lines.length ? ' tabindex="0" role="button" aria-expanded="' + open + '"' : ""}>
-        <td class="c-grp"><span class="mini-badge">${esc(s.group_code)}</span></td>
-        <td class="c-rank"><span class="rank">${esc(s.rank)}</span>${
-          q ? `<span class="qchip" title="In a qualifying place">Q</span>` : ""
-        }</td>
-        <td class="c-team">
-          <span class="tname">${esc(s.team_name)}</span>
-          <span class="tcap">${esc(s.captain_name || "")}</span>
-        </td>
-        <td class="c-n">${esc(s.matches_played)}</td>
-        <td class="c-n win">${esc(s.won)}</td>
-        <td class="c-n">${esc(s.lost)}</td>
-        <td class="c-n">${esc(s.points_for)}</td>
-        <td class="c-n">${esc(s.points_against)}</td>
-        <td class="c-n pd ${pd > 0 ? "up" : pd < 0 ? "down" : ""}">${esc(signed(pd))}</td>
-        <td class="c-pts"><b>${esc(s.points)}</b>${
-          lines.length ? `<i class="pts-caret" aria-hidden="true">▾</i>` : ""
-        }</td>
-      </tr>${lines.length ? ledgerRow(s, lines, open) : ""}`;
-  }
-
   /* The working, on the public page: anyone can check a total without
      taking anyone's word for it. */
-  function ledgerRow(s, lines, open) {
+  function ledgerRow(s, lines) {
+    if (!lines.length) return "";
     const total = lines.reduce((n, l) => n + Number(l.points), 0);
     return `
-      <tr class="led-row${open ? "" : " hide"}" data-led="${s.team_id}">
-        <td colspan="10">
-          <p class="led-h">How ${esc(s.team_name)} reached ${esc(s.points)} points</p>
-          <ul class="led-lines">
-            ${lines
-              .map(
-                (l) => `
-              <li class="${Number(l.points) < 0 ? "neg" : ""}">
-                <span class="led-when">${esc(
-                  l.group_code ? "G" + l.group_code + " R" + l.round : String(l.phase).toUpperCase()
-                )} v ${esc(l.opponent_name || "—")}</span>
-                <span class="led-what">${esc(l.slot_label)}</span>
-                <span class="led-why">${esc(l.detail)}</span>
-                <b class="led-p">${Number(l.points) > 0 ? "+" : ""}${esc(l.points)}</b>
-              </li>`
-              )
-              .join("")}
-          </ul>
-          <p class="led-total">Total ${total}</p>
-        </td>
-      </tr>`;
+      <div class="led-row" data-led="${s.team_id}">
+        <p class="led-h">How ${esc(s.team_name)} reached ${esc(s.points)} points</p>
+        <ul class="led-lines">
+          ${lines
+            .map(
+              (l) => `
+            <li class="${Number(l.points) < 0 ? "neg" : ""}">
+              <span class="led-when">${esc(
+                l.group_code ? "G" + l.group_code + " R" + l.round : String(l.phase).toUpperCase()
+              )} v ${esc(l.opponent_name || "—")}</span>
+              <span class="led-what">${esc(l.slot_label)}</span>
+              <span class="led-why">${esc(l.detail)}</span>
+              <b class="led-p">${Number(l.points) > 0 ? "+" : ""}${esc(l.points)}</b>
+            </li>`
+            )
+            .join("")}
+        </ul>
+        <p class="led-total">Total ${total}</p>
+      </div>`;
   }
 
   const LEGEND = [
@@ -281,12 +233,9 @@
   ];
 
   function renderLegend() {
-    $("#legend").innerHTML =
-      `<p class="legend-h">How points are won</p>
-       <ul class="legend-list">
-         ${LEGEND.map((l) => `<li><b class="${l.tone || ""}">${l.v}</b><span>${esc(l.t)}</span></li>`).join("")}
-       </ul>`;
+    $("#legend").innerHTML = window.MPL_STANDINGS.legend();
   }
+
 
   /* ---------------- 3. run of show ---------------- */
 
@@ -635,7 +584,25 @@
     }
   }
 
-  function renderAll() {
+  /* The board polls every 30 seconds and also wakes on realtime. Repainting
+     four tables, 31 ties, a ladder and sixteen squads for data that has not
+     moved is wasted work on a phone — and it snatches the page out from
+     under anyone mid-read. A cheap signature makes an unchanged refresh
+     cost nothing. */
+  let lastSig = null;
+  const dataSig = () =>
+    JSON.stringify([
+      D.standings.map((s) => [s.team_id, s.points, s.matches_played, s.point_diff]),
+      D.fixtures.map((f) => [f.id, f.home_team_id, f.away_team_id, f.home_score, f.away_score, f.status]),
+      D.results.length, D.lineups.length, D.squads.length,
+      D.phase && [D.phase.group_complete, D.phase.knockouts_done, D.phase.champion_team_id],
+    ]);
+
+  function renderAll(force) {
+    const sig = dataSig();
+    if (!force && sig === lastSig) return;
+    lastSig = sig;
+
     renderHero();
     renderStandings();
     renderTies();
@@ -644,7 +611,7 @@
     renderSquads();
     firstPaint = false;
     document.body.dataset.ready = "1";
-  }
+    }
 
   /* ---------------- boot ---------------- */
 

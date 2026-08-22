@@ -1361,3 +1361,47 @@ body.mn-blownup { overscroll-behavior: none; }
   .ts-picks { grid-template-columns: 1fr; }
   .roster-note, .mday-sub { font-size: 12.5px; }
 }
+
+/* ============================================================
+   CAPTAIN APP — ONE COLUMN, ONE WIDTH
+   The app frame was 1080px wide while every pane inside it was
+   620px, so on a laptop the header floated over a column it had
+   no relationship to. Everything now shares one measure and lines
+   up at any width; the extra room on a wide screen goes to the
+   panes that can genuinely use it.
+   ============================================================ */
+:root { --cap-wrap: 760px; }
+
+.app { max-width: var(--cap-wrap); }
+
+.cap-tabs,
+#capMatches,
+#capRules,
+.roster {
+  max-width: var(--cap-wrap);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* the tab strip stays one line and scrolls rather than wrapping ragged */
+.cap-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  justify-content: flex-start;
+}
+.cap-tabs::-webkit-scrollbar { display: none; }
+.cap-tab { flex: 0 0 auto; }
+
+@media (min-width: 620px) {
+  .cap-tabs { justify-content: center; }
+}
+
+/* a laptop has room to show the day at a glance */
+@media (min-width: 900px) {
+  :root { --cap-wrap: 860px; }
+  .fixtures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .fixtures .fx { margin: 0; }
+}
