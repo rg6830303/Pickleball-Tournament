@@ -1437,3 +1437,8 @@ body.playoffs #sec-ladder .sec-h::after {
    read the wordmark inside it on a phone, capped so it does not push the
    scoreboard off a laptop's first screen. */
 .lk-mpl { width: clamp(250px, 68vw, 430px); }
+
+/* With the season line gone the hero is three marks and nothing else, so
+   the rule above Rajwada is the only separator left and it needs a little
+   more air than it had when text sat on either side of it. */
+.lk-partner { margin-top: clamp(6px, 1.6vw, 14px); padding-top: clamp(14px, 2.6vw, 22px); }

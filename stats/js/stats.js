@@ -122,7 +122,6 @@
   /* ---------------- 1. hero ---------------- */
 
   function renderHero() {
-    $("#heroSeason").textContent = `${CFG.EVENT.season} — Live Scoreboard`;
 
     const liveTies = D.fixtures.filter((t) => t.status === "live");
     const box = $("#heroLive");
