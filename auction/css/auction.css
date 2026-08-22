@@ -1120,7 +1120,7 @@ body.mn-blownup { overscroll-behavior: none; }
 .fx-till { font-size: 10.5px; color: var(--text-faint); }
 .fx-court { font-size: 11.5px; color: var(--red); margin-top: 5px; font-weight: 600; }
 .fx-who { flex: 1; min-width: 0; }
-.fx-tag { font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+.fx-tag { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--text-faint); margin-bottom: 5px; }
 .fx-tag b { color: var(--text-dim); }
 .fx-next { color: var(--red); margin-left: 6px; }
@@ -1403,7 +1403,7 @@ body.mn-blownup { overscroll-behavior: none; }
 @media (min-width: 900px) {
   :root { --cap-wrap: 860px; }
   .fixtures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .fixtures .fx { margin: 0; }
+  .fixtures .fxw { margin: 0; }
 }
 
 /* ============================================================
@@ -1527,3 +1527,232 @@ body.mn-blownup { overscroll-behavior: none; }
 .lockup-auth .lk-rajwada { width: clamp(96px, 30vw, 130px); }
 .lockup-auth .lk-partner { width: min(240px, 88%); padding-top: 12px; }
 .lockup-auth .lk-fallback .auth-kicker { margin: 0; }
+
+
+/* ============================================================
+   A TIE, OPENED UP
+   The fixture card is the lid. Under it sit the five matches in
+   play order, both line-ups, the two game scores and the working
+   that turned them into league points. This team is always the
+   row on top, so a captain never has to work out which side is
+   theirs before they can read a score.
+   ============================================================ */
+.fxw { display: block; }
+.fx { width: 100%; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fx:hover { border-color: var(--line-strong); }
+.fx:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.fxw.is-open .fx { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+
+/* the caret is the only thing on the card that says it opens */
+.fx-caret {
+  flex: none; align-self: center; margin-left: 10px;
+  width: 22px; height: 22px; display: grid; place-items: center;
+  color: var(--text-faint); transition: transform 0.2s var(--ease-out), color 0.2s;
+}
+.fx-caret::before {
+  content: ""; width: 8px; height: 8px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+.fx:hover .fx-caret { color: var(--text-dim); }
+.fxw.is-open .fx-caret { transform: rotate(180deg); color: var(--red); }
+
+.tx {
+  border: 1px solid var(--line); border-top: 0;
+  border-left: 3px solid var(--line-strong);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: var(--bg-2);
+  padding: 13px 14px 15px;
+  animation: fadeIn 0.28s ease both;
+}
+.fxw.is-open .fx.next + .tx { border-left-color: var(--red); }
+.fxw.is-open .fx.scored + .tx { border-left-color: var(--gold); }
+
+.tx-h {
+  font-family: var(--font-display); font-size: 11.5px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--red); margin-bottom: 10px;
+}
+.tx-note { font-size: 12.5px; line-height: 1.55; color: var(--text-dim); margin-bottom: 10px; }
+.tx-note.warn { color: #ffd7d8; }
+
+/* ---- waiting on the sheets: never an empty grid, never a 0-0 ---- */
+.tx-wait {
+  border: 1px solid var(--line); border-left: 3px solid var(--warn, var(--gold));
+  border-radius: var(--radius-sm); background: var(--panel-2); padding: 12px 13px;
+}
+.tx-waith {
+  font-family: var(--font-display); font-size: 13px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gold);
+}
+.tx-waitline { font-size: 14px; color: var(--text); margin-top: 6px; }
+.tx-waitline b { font-family: var(--font-display); letter-spacing: 0.05em; }
+.tx-waitp { font-size: 12.5px; line-height: 1.6; color: var(--text-dim); margin-top: 7px; }
+
+/* ---- the five matches ---- */
+.tx-ms { display: flex; flex-direction: column; gap: 9px; }
+.tx-m {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 10px 11px 11px;
+}
+.tx-m.has-trump { border-color: rgba(232,195,90,0.4); }
+.tx-m.is-soon { background: transparent; border-style: dashed; }
+
+.tx-mhead { display: flex; align-items: center; gap: 9px; }
+.tx-no {
+  flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px;
+  border-radius: 5px; background: var(--red); color: #fff;
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+}
+.tx-m.is-soon .tx-no { background: var(--line-strong); color: var(--text-dim); }
+.tx-mlabel {
+  flex: 1; min-width: 0; font-family: var(--font-display); font-size: 14px;
+  letter-spacing: 0.05em; text-transform: uppercase; overflow-wrap: anywhere;
+}
+.tx-mlabel em {
+  font-style: normal; font-family: var(--font-body); font-size: 10px;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-faint);
+  margin-left: 7px;
+}
+.tx-pts {
+  flex: none; font-family: var(--font-display); font-size: 19px; line-height: 1;
+  letter-spacing: 0.02em; color: var(--text-dim); white-space: nowrap;
+}
+.tx-pts i { font-style: normal; font-size: 9.5px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--text-faint); margin-left: 4px; }
+.tx-pts.pos { color: var(--ok); }
+.tx-pts.neg { color: var(--red); }
+.tx-soon {
+  flex: none; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text-faint); border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: 4px 9px; white-space: nowrap;
+}
+
+/* ---- one side of one match ---- */
+.tx-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+.tx-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  grid-template-areas: "team score" "names score";
+  gap: 3px 10px; align-items: center;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-left: 3px solid var(--line); border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.tx-row.us { border-left-color: var(--red); }
+.tx-row.won { border-color: rgba(47,191,113,0.42); border-left-color: var(--ok);
+  background: rgba(47,191,113,0.06); }
+.tx-row.trumped { border-top-color: rgba(232,195,90,0.55); }
+
+.tx-rteam {
+  grid-area: team; min-width: 0;
+  font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-dim); overflow-wrap: anywhere;
+}
+.tx-you {
+  font-family: var(--font-display); font-size: 9.5px; letter-spacing: 0.14em;
+  color: #fff; background: var(--red); border-radius: 4px; padding: 1px 5px; margin-left: 5px;
+}
+.tx-won {
+  font-family: var(--font-display); font-size: 9.5px; letter-spacing: 0.14em;
+  color: #06210f; background: var(--ok); border-radius: 4px; padding: 1px 5px; margin-left: 5px;
+}
+.tx-tchip {
+  font-style: normal; font-family: var(--font-display); font-size: 9.5px;
+  letter-spacing: 0.14em; color: #0d0d0e; background: var(--gold);
+  border-radius: 4px; padding: 1px 6px; margin-left: 5px;
+}
+.tx-names { grid-area: names; display: flex; flex-wrap: wrap; gap: 5px 12px; min-width: 0; }
+.tx-p { display: inline-flex; align-items: center; gap: 6px; font-size: 14.5px;
+  line-height: 1.35; overflow-wrap: anywhere; }
+.tx-p.none { color: var(--text-faint); font-size: 12.5px; font-style: italic; }
+.tx-cat {
+  flex: none; width: 20px; height: 20px; border-radius: 5px;
+  display: grid; place-items: center; font-style: normal;
+  font-family: var(--font-display); font-size: 11px; font-weight: 700; color: #fff;
+}
+.tx-cat.c-A { background: var(--red); }
+.tx-cat.c-B { background: #3f3f45; }
+.tx-cat.c-C { background: #26262b; color: var(--text-dim); }
+
+.tx-pt {
+  grid-area: score; align-self: center; text-align: right;
+  font-family: var(--font-display); font-size: 28px; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--text-dim);
+}
+.tx-row.won .tx-pt { color: var(--ok); }
+
+/* the arithmetic, in the words the ledger uses */
+.tx-why {
+  margin-top: 8px; padding-left: 9px; border-left: 2px solid var(--line-strong);
+  font-size: 12px; line-height: 1.5; color: var(--text-dim);
+}
+.tx-why.soon { color: var(--text-faint); }
+
+/* ---- the tie result ---- */
+.tx-foot {
+  margin-top: 11px; padding: 11px 12px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+.tx-foot.pending {
+  font-size: 12.5px; line-height: 1.6; color: var(--text-dim); background: transparent;
+  border-style: dashed;
+}
+.tx-fline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tx-flabel { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint); }
+.tx-fsc { font-family: var(--font-display); font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.tx-fsc i { font-style: normal; color: var(--text-faint); margin: 0 3px; }
+.tx-fsc b.w { color: var(--ok); }
+.tx-fres {
+  font-family: var(--font-display); font-size: 12.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-dim); margin-left: auto;
+}
+.tx-fres.won { color: var(--ok); }
+.tx-fres.lost { color: var(--red); }
+.tx-sweep {
+  margin-top: 8px; font-size: 12.5px; color: #0d0d0e; background: var(--gold);
+  border-radius: 6px; padding: 5px 9px; font-weight: 600;
+}
+.tx-ftot { margin-top: 8px; font-size: 13px; color: var(--text-dim); }
+.tx-ftot b { font-family: var(--font-display); font-size: 17px; color: var(--text); margin: 0 3px; }
+
+/* A phone reads the two sides stacked; there is no room for a name column
+   beside a 28px score and anything narrower would clip a player's name. */
+@media (max-width: 600px), (pointer: coarse) {
+  .fx { min-height: 76px; }
+  /* The caret earns its place, but not at the cost of wrapping the round line
+     on a 390px phone: it takes the width back out of the tag's tracking. */
+  .fx-caret { width: 18px; height: 26px; margin-left: 6px; }
+  .fx-when { padding-right: 10px; }
+  .fx { gap: 11px; }
+  .tx { padding: 12px 11px 14px; }
+  .tx-row { grid-template-columns: minmax(0, 1fr) 46px; }
+  .tx-pt { font-size: 25px; }
+  .tx-p { font-size: 15px; }
+  .tx-why { font-size: 12.5px; }
+}
+
+/* On a laptop an open tie takes the full measure rather than being squeezed
+   into one half of the two-column fixture grid. */
+@media (min-width: 900px) {
+  .fxw.is-open { grid-column: 1 / -1; }
+  .tx-row { grid-template-columns: minmax(0, 190px) minmax(0, 1fr) 60px;
+            grid-template-areas: "team names score"; align-items: center; }
+  .tx-rteam { align-self: center; }
+}
+
+/* ---- the supplied marks, same treatment as the open board ----
+   The black is already keyed out of the files, so no plate is needed
+   behind them, and the presenting credit stacks under the mark. */
+.lk-fox, .lk-rajwada { background: none; padding: 0; }
+.lk-fox { filter: drop-shadow(0 3px 12px rgba(0,0,0,0.5)); }
+.lk-rajwada { opacity: 0.95; }
+.lk-presents { flex-direction: column; gap: 8px; }
+.lk-presents-txt { text-align: center; }
+.lk-partner:not(.no-img) .lk-partner-txt { display: none; }
+.lockup-auth .lk-fox { width: clamp(66px, 20vw, 96px); }
+.lockup-auth .lk-rajwada { width: clamp(120px, 38vw, 170px); }
+
+/* with the badge gone the name sits alone; give it the room it frees */
+.brand { gap: 0; }
+.brand-team { font-size: clamp(15px, 4.4vw, 19px); }

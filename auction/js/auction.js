@@ -58,6 +58,21 @@
   };
 
   const myTeam = () => teams.find((t) => t.id === myTeamId) || null;
+
+  /* The corner used to carry the team's database id, then its initials. A
+     captain does not need either: they know which team they are. What is
+     useful there is the team's own name and a word for the person holding
+     the phone, so the badge is gone and the captain's name takes its place. */
+  function setBrandTeam(name, captain) {
+    const n = String(name || "").trim();
+    if (n) $("#brandTeam").textContent = n;
+    const sub = document.querySelector(".brand-sub");
+    const who = String(captain || "").trim();
+    if (sub && (n || who)) {
+      sub.textContent = who ? `Welcome, ${who}` : `Squad · ${CFG.EVENT.season}`;
+    }
+  }
+
   const teamName = (id) => teams.find((t) => t.id === id)?.name || `Team ${id}`;
 
   /* ---------------- boot ---------------- */
@@ -172,7 +187,7 @@
     myTeamId = data;
     $("#authWrap").hidden = true;
     $("#app").hidden = false;
-    $("#brandMark").textContent = String(myTeamId);
+    // The badge fills in from the team name below, not from its id.
 
     if (!SHOW_AUCTION) {
       await enterSquadOnly();
@@ -196,8 +211,6 @@
     document.querySelector(".stage")?.setAttribute("hidden", "");
     document.querySelector(".cols")?.setAttribute("hidden", "");
     $("#roster").hidden = false;
-    const sub = document.querySelector(".brand-sub");
-    if (sub) sub.textContent = `Squad · ${CFG.EVENT.season}`;
 
     // The realtime badge would sit there saying "connecting…" forever with no
     // auction channel open, so it goes with the rest of the auction chrome.
@@ -211,7 +224,7 @@
     ]);
 
     const team = t.data || { id: myTeamId, name: `Team ${myTeamId}` };
-    $("#brandTeam").textContent = team.name;
+    setBrandTeam(team.name, team.captain_name);
     $("#rosterTeam").textContent = team.name;
     $("#rosterCap").textContent = team.captain_name ? `Captain · ${team.captain_name}` : "";
     $("#rosterGroup").textContent = team.group_code
@@ -301,8 +314,18 @@
 
   /* The team's own ties, with the running match score once the organiser has
      recorded one. home_score/away_score are matches won, not game points —
-     tie_recount() keeps them in step with match_results. */
+     tie_recount() keeps them in step with match_results. Tapping a tie opens
+     it up: the five matches in play order, who was on court for each of them,
+     and where every league point came from. */
+  let mdMine = [];                 // this team's ties, kept for a repaint after a tap
+  const openTies = new Set();      // tie ids the captain has expanded — survives a realtime repaint
+  const tieDetail = {};            // tie id -> { results, lineups, status } | { error }
+  const tieBusy = new Set();       // ties whose detail call is in flight
+
+  const mdNameOf = (id) => (id && mdNames ? mdNames[id] || null : null);
+
   function renderFixtures(mine, nameOf) {
+    mdMine = mine;
     // "Up next" is the first tie that has not finished; once the day is over
     // nothing is highlighted rather than the last tie pretending to be next.
     const now = Date.now();
@@ -325,8 +348,16 @@
           if (t.decided_by === "shootout") res += " · shootout";
         }
 
+        const open = openTies.has(t.id);
+        const tag = t.group_code
+          ? `Group ${t.group_code} Round ${t.round}`
+          : PHASE_WORD[t.phase] || t.phase;
+
         return `
-        <article class="fx${t.id === nextId ? " next" : ""}${scored ? " scored" : ""}">
+        <div class="fxw${open ? " is-open" : ""}">
+        <article class="fx${t.id === nextId ? " next" : ""}${scored ? " scored" : ""}"
+                 data-tie="${t.id}" role="button" tabindex="0" aria-expanded="${open}"
+                 aria-label="${esc(tag)} versus ${esc(opp || "opponent to be confirmed")} — open the tie">
           <div class="fx-when">
             <p class="fx-time">${esc(FMT.timeOf(t.starts_at))}</p>
             <p class="fx-till">to ${esc(FMT.timeOf(t.ends_at))}</p>
@@ -347,7 +378,10 @@
                  </div>`
               : ""
           }
-        </article>`;
+          <span class="fx-caret" aria-hidden="true"></span>
+        </article>
+        ${open ? `<div class="tx" id="tx-${t.id}">${tieBodyHTML(t)}</div>` : ""}
+        </div>`;
       })
       .join("");
 
@@ -356,8 +390,276 @@
     $("#fixNote").textContent =
       `${mine.length} ties · ${mine.length * 5} matches` +
       (courts.length ? ` · ${courts.length > 1 ? "Courts" : "Court"} ${courts.join(" & ")}` : "") +
-      (played ? ` · ${played} under way` : "");
+      (played ? ` · ${played} under way` : "") +
+      " · tap a tie to open it";
   }
+
+  function repaintFixtures() {
+    if (mdMine.length) renderFixtures(mdMine, mdNameOf);
+  }
+
+  /* ============================================================
+     A TIE, OPENED UP
+     Five matches, both line-ups, the scores, and the arithmetic that
+     turned them into league points. Every state below is a real one on
+     match day, and none of them may show an empty grid or a 0-0 for a
+     tie nobody has played yet.
+     ============================================================ */
+
+  /* The rules in the order points_ledger applies them: the match, then the
+     trump. The sweep belongs to the whole tie, so it is added in the foot. */
+  function matchPoints(pf, pa, myTrump, oppTrump) {
+    const match = pf > pa ? 3 : pa - pf <= 2 ? 1 : 0;
+    const trump = myTrump && pf > pa ? 2 : myTrump && oppTrump && pf < pa ? -2 : 0;
+    return { match, trump, total: match + trump };
+  }
+
+  /* The same working the ledger prints, so a captain can check a total
+     without a rulebook and get the number the board gives them. */
+  function matchWhy(pf, pa, myTrump, oppTrump) {
+    const bits = [];
+    if (pf > pa) bits.push(`Won ${pf}-${pa} → +3`);
+    else if (pf === pa) bits.push(`Level ${pf}-${pa} → +1`);
+    else bits.push(`Lost ${pf}-${pa} by ${pa - pf} → ${pa - pf <= 2 ? "+1 (within 2)" : "0 (more than 2)"}`);
+
+    if (myTrump && oppTrump && pf > pa) bits.push("your trump and theirs, and you won it → +2");
+    else if (myTrump && oppTrump && pf < pa) bits.push("both sides trumped it and you lost → −2");
+    else if (myTrump && pf > pa) bits.push("trump won → +2");
+    else if (myTrump && pf < pa) bits.push("trump lost — they had not trumped it, so no penalty");
+    else if (myTrump) bits.push("trump match level → no bonus");
+    return bits.join(" · ");
+  }
+
+  const signedPts = (n) => (n > 0 ? "+" + n : n < 0 ? "−" + Math.abs(n) : "0");
+
+  async function loadTieDetail(tieId, force) {
+    if (tieBusy.has(tieId)) return;
+    if (tieDetail[tieId] && !force) return;
+    tieBusy.add(tieId);
+    const [rs, lu, st] = await Promise.all([
+      sb.from("public_results").select("*").eq("tie_id", tieId).order("slot"),
+      // one row per player per slot; the view withholds every name until the
+      // seal on both sheets is spent, so an empty read is a state, not a fault
+      sb.from("public_lineups").select("*").eq("tie_id", tieId).order("slot").order("position"),
+      sb.from("public_sheet_status").select("*").eq("tie_id", tieId).maybeSingle(),
+    ]);
+    tieBusy.delete(tieId);
+    const bad = [rs, lu, st].find((r) => r.error);
+    tieDetail[tieId] = bad
+      ? { error: bad.error.message || String(bad.error) }
+      : { results: rs.data || [], lineups: lu.data || [], status: st.data || null };
+    paintTie(tieId);
+  }
+
+  /* One tie only: a score landing on tie 7 must not redraw tie 3 mid-read. */
+  function paintTie(tieId) {
+    const host = document.getElementById("tx-" + tieId);
+    const t = mdMine.find((x) => x.id === tieId);
+    if (host && t) host.innerHTML = tieBodyHTML(t);
+  }
+
+  function toggleTie(id) {
+    // The repaint replaces the card, which would drop a keyboard user on the
+    // body with nothing to press a second time. Put them back on the card.
+    const keep = document.activeElement?.closest?.(".fx")?.dataset.tie === String(id);
+    if (openTies.has(id)) openTies.delete(id);
+    else {
+      openTies.add(id);
+      loadTieDetail(id);
+    }
+    repaintFixtures();
+    // preventScroll: refocusing must not yank the page around under a thumb
+    if (keep) document.querySelector(`.fx[data-tie="${id}"]`)?.focus({ preventScroll: true });
+  }
+
+  function tieBodyHTML(t) {
+    const d = tieDetail[t.id];
+    if (!d) return `<p class="tx-note">Opening the tie…</p>`;
+    if (d.error) return `<p class="tx-note warn">Couldn't open this tie: ${esc(d.error)}</p>`;
+
+    const home = t.home_team_id === myTeamId;
+    const lu = d.lineups || [];
+    const rs = d.results || [];
+
+    // Nothing filed, nothing played: say what it is waiting for rather than
+    // drawing five empty rows and a 0-0 that never happened.
+    if (!lu.length && !rs.length) return tieWaitHTML(d.status);
+
+    const mySide = home ? "home" : "away";
+    const opSide = home ? "away" : "home";
+    const myName =
+      lu.find((l) => l.side === mySide)?.team_name || mdNameOf(myTeamId) || "Your team";
+    const opName =
+      lu.find((l) => l.side === opSide)?.team_name ||
+      mdNameOf(home ? t.away_team_id : t.home_team_id) ||
+      (home ? t.away_label : t.home_label) ||
+      "Opponent";
+
+    const bySlot = new Map(rs.map((r) => [Number(r.slot), r]));
+    let running = 0;
+
+    const rows = [1, 2, 3, 4, 5]
+      .map((slot) => {
+        const r = bySlot.get(slot);
+        const fb = TS_SLOTS.find((s) => s.slot === slot);
+        const at = (side) =>
+          lu
+            .filter((l) => l.side === side && Number(l.slot) === slot)
+            .sort((a, b) => a.position - b.position);
+        const mine = at(mySide);
+        const theirs = at(opSide);
+
+        const label =
+          r?.slot_label || mine[0]?.slot_label || theirs[0]?.slot_label || fb?.label || "Match " + slot;
+        // The published labels already say "Doubles"/"Singles"; the kind is only
+        // worth printing when an organiser has renamed a slot to something else.
+        const rawKind = r?.kind || mine[0]?.kind || theirs[0]?.kind || (slot === 3 ? "singles" : "doubles");
+        const kind = label.toLowerCase().includes(String(rawKind).toLowerCase()) ? "" : rawKind;
+
+        // Once a score exists it carries the trumps; before that the filed
+        // line-up is the only place they are recorded.
+        const myTrump = r ? Boolean(mySide === "home" ? r.home_trump : r.away_trump) : mine.some((p) => p.is_trump);
+        const opTrump = r ? Boolean(opSide === "home" ? r.home_trump : r.away_trump) : theirs.some((p) => p.is_trump);
+
+        const played = Boolean(r);
+        const pf = played ? Number(mySide === "home" ? r.home_points : r.away_points) : null;
+        const pa = played ? Number(opSide === "home" ? r.home_points : r.away_points) : null;
+        const pts = played ? matchPoints(pf, pa, myTrump, opTrump) : null;
+        if (pts) running += pts.total;
+
+        const side = (cls, name, players, score, won, trumped) => `
+          <div class="tx-row ${cls}${won ? " won" : ""}${trumped ? " trumped" : ""}">
+            <p class="tx-rteam">${esc(name)}${cls === "us" ? ' <b class="tx-you">you</b>' : ""}${
+          won ? ' <b class="tx-won">won</b>' : ""
+        }${
+          trumped ? ' <i class="tx-tchip" title="This side declared their trump on this match">Trump</i>' : ""
+        }</p>
+            <div class="tx-names">${
+              players.length
+                ? players
+                    .map(
+                      (p) =>
+                        `<span class="tx-p"><i class="tx-cat c-${esc(p.category)}">${esc(
+                          p.category
+                        )}</i>${esc(p.player_name)}</span>`
+                    )
+                    .join("")
+                : '<span class="tx-p none">Line-up not published</span>'
+            }</div>
+            <p class="tx-pt">${score === null ? "—" : score}</p>
+          </div>`;
+
+        return `
+          <div class="tx-m${played ? "" : " is-soon"}${myTrump || opTrump ? " has-trump" : ""}">
+            <div class="tx-mhead">
+              <span class="tx-no">${slot}</span>
+              <span class="tx-mlabel">${esc(label)}${kind ? `<em>${esc(kind)}</em>` : ""}</span>
+              ${
+                played
+                  ? `<span class="tx-pts ${
+                      pts.total > 0 ? "pos" : pts.total < 0 ? "neg" : "nil"
+                    }">${signedPts(pts.total)}<i>${Math.abs(pts.total) === 1 ? "pt" : "pts"}</i></span>`
+                  : `<span class="tx-soon">To come</span>`
+              }
+            </div>
+            <div class="tx-rows">
+              ${side("us", myName, mine, pf, played && pf > pa, myTrump)}
+              ${side("them", opName, theirs, pa, played && pa > pf, opTrump)}
+            </div>
+            ${
+              played
+                ? `<p class="tx-why">${esc(matchWhy(pf, pa, myTrump, opTrump))}</p>`
+                : `<p class="tx-why soon">Not played yet.</p>`
+            }
+          </div>`;
+      })
+      .join("");
+
+    return `
+      <p class="tx-h">The five matches, in play order</p>
+      ${!lu.length ? '<p class="tx-note">The line-ups for this tie have not been published.</p>' : ""}
+      <div class="tx-ms">${rows}</div>
+      ${tieFootHTML(t, rs, running, opName)}`;
+  }
+
+  /* Sheets not in, nothing played. public_sheet_status counts sheets without
+     revealing a single name, so it is safe to show at any moment. */
+  function tieWaitHTML(st) {
+    const filed = Number(st?.filed || 0);
+    const need = Number(st?.required || 2);
+    const line =
+      filed === 0
+        ? "Neither captain has filed a team sheet yet."
+        : `<b>${filed} of ${need}</b> team sheets filed.`;
+    const clock =
+      st && st.window_open
+        ? ` The window is open${st.closes_at ? " until " + esc(FMT.timeOf(st.closes_at)) : ""}.`
+        : "";
+    return `
+      <div class="tx-wait">
+        <p class="tx-waith">Waiting on the team sheets</p>
+        <p class="tx-waitline">${line}${clock}</p>
+        <p class="tx-waitp">Both line-ups stay sealed until every captain has named their side — the opposition cannot read yours either. Nothing has been played, so there is no score to show.</p>
+      </div>`;
+  }
+
+  /* Matches won, the winner, and the sweep — plus this team's running total
+     from the five lines above, so the arithmetic ends somewhere. */
+  function tieFootHTML(t, rs, running, opName) {
+    const home = t.home_team_id === myTeamId;
+    const us = Number(home ? t.home_score : t.away_score) || 0;
+    const them = Number(home ? t.away_score : t.home_score) || 0;
+
+    if (!rs.length) {
+      return `<p class="tx-foot pending">Line-ups are in. No match has been scored yet — the scores land here as the organiser records them.</p>`;
+    }
+
+    const sweep =
+      rs.length === 5 &&
+      rs.every(
+        (r) =>
+          Number(home ? r.home_points : r.away_points) > Number(home ? r.away_points : r.home_points)
+      );
+    const total = running + (sweep ? 2 : 0);
+
+    let verdict = "", cls = "";
+    if (t.status === "done") {
+      if (t.winner_team_id === myTeamId) { verdict = "You won the tie"; cls = "won"; }
+      else if (t.winner_team_id) { verdict = `${opName} won the tie`; cls = "lost"; }
+      else verdict = "Level on matches";
+      if (t.decided_by === "shootout") verdict += " · decided by a 7-point shootout";
+    } else {
+      verdict = `${rs.length} of 5 matches recorded`;
+    }
+
+    return `
+      <div class="tx-foot">
+        <div class="tx-fline">
+          <span class="tx-flabel">Matches won</span>
+          <span class="tx-fsc"><b class="${us > them ? "w" : ""}">${us}</b><i>–</i><b class="${
+      them > us ? "w" : ""
+    }">${them}</b></span>
+          <span class="tx-fres ${cls}">${esc(verdict)}</span>
+        </div>
+        ${sweep ? '<p class="tx-sweep">Clean sweep — all five matches won → +2</p>' : ""}
+        <p class="tx-ftot">Your points from this tie <b>${signedPts(total)}</b>${
+      sweep ? " — the five matches plus 2 for the sweep" : ""
+    }</p>
+      </div>`;
+  }
+
+  /* Tapping anywhere on a tie card opens it; the keyboard gets the same. */
+  document.addEventListener("click", (e) => {
+    const card = e.target.closest && e.target.closest(".fx");
+    if (card && card.dataset.tie) toggleTie(Number(card.dataset.tie));
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const card = e.target.closest && e.target.closest(".fx");
+    if (!card || !card.dataset.tie) return;
+    e.preventDefault();
+    toggleTie(Number(card.dataset.tie));
+  });
 
   /* Scores land while the captain is looking at another pane. Re-read just the
      ties rather than the whole match-day header. */
@@ -366,8 +668,11 @@
     const { data, error } = await sb.from("tournament_ties").select("*").order("sort_order");
     if (error || !data) return;
     const mine = data.filter((t) => t.home_team_id === myTeamId || t.away_team_id === myTeamId);
-    if (mine.length) renderFixtures(mine, (id) => (id ? mdNames[id] || null : null));
-    $("#capLadder").innerHTML = FMT.ladder(data, (id) => (id ? mdNames[id] || null : null));
+    if (mine.length) renderFixtures(mine, mdNameOf);
+    $("#capLadder").innerHTML = FMT.ladder(data, mdNameOf);
+    // A tie the captain has open has to move with the score, so those are
+    // re-read too; the closed ones stay cold until they are opened.
+    openTies.forEach((id) => loadTieDetail(id, true));
   }
 
   /* squad / matches / rules — one at a time on a phone */
@@ -512,7 +817,7 @@
 
   /* ---------------- render ---------------- */
   function renderAll() {
-    $("#brandTeam").textContent = teamName(myTeamId);
+    setBrandTeam(myTeam()?.name || "", myTeam()?.captain_name || "");
     renderWelcome();
     renderWallet();
     renderStage();

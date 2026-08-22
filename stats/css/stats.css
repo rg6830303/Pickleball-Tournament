@@ -1419,3 +1419,16 @@ body.playoffs #sec-ladder .sec-h::after {
 /* The mark says "Rajwada Group" itself — the caption under it is only
    needed when the image is missing, where it becomes the credit. */
 .lk-partner:not(.no-img) .lk-partner-txt { display: none; }
+
+/* The presenting credit reads as a stack: the mark, then the words under
+   it. Bigger than a badge — it is the first thing on the page and it is
+   somebody's brand, so it gets the room to be recognised. */
+.lk-presents { flex-direction: column; gap: clamp(6px, 1.2vw, 10px); }
+.lk-presents-txt { text-align: center; }
+.lk-fox { width: clamp(84px, 21vw, 150px); }
+
+/* the row arrangement for narrow screens is no longer wanted */
+@media (max-width: 420px) {
+  .lk-presents { flex-direction: column; }
+  .lk-presents-txt { text-align: center; }
+}
