@@ -188,3 +188,42 @@ end $$;
 
 -- the internal helper stays unreachable; sheet_submit is the door
 revoke all on function public.sheet_file(int,int,jsonb,int,boolean) from public, anon, authenticated;
+-- ============================================================
+--  THE ORGANISER CAN FILL A SHEET THAT WAS NEVER OPENED
+--
+--  sheet_submit_for() refuses when no sheet row exists, which is right
+--  for a captain — they can only file into a window someone opened for
+--  them. For staff it is a footgun: filling a line-up in on a team's
+--  behalf is itself the act of opening it, and being told to press
+--  "open" first only to overwrite it a second later helps nobody.
+--
+--  So staff filing creates the row if it is missing. Captains are
+--  unaffected: sheet_submit still goes through the same guard it always
+--  did, and still needs an open window inside its deadline.
+-- ============================================================
+create or replace function public.sheet_submit_for(p_tie_id int, p_team_id int, p_picks jsonb, p_trump int)
+returns public.team_sheets
+language plpgsql security definer set search_path = public as $$
+declare v_tie public.tournament_ties;
+begin
+  if not public.is_auction_staff() then
+    raise exception 'Only tournament staff can file for a team';
+  end if;
+
+  select * into v_tie from public.tournament_ties where id = p_tie_id;
+  if not found then raise exception 'No such tie'; end if;
+  if p_team_id is distinct from v_tie.home_team_id
+     and p_team_id is distinct from v_tie.away_team_id then
+    raise exception 'That team is not playing this tie';
+  end if;
+
+  -- filing on a team's behalf opens the sheet if nobody has yet
+  insert into public.team_sheets (tie_id, team_id, status, opens_at, deadline)
+  values (p_tie_id, p_team_id, 'open', now(), null)
+  on conflict (tie_id, team_id) do nothing;
+
+  return public.sheet_file(p_tie_id, p_team_id, p_picks, p_trump, true);
+end $$;
+
+revoke all on function public.sheet_submit_for(int,int,jsonb,int) from public, anon;
+grant execute on function public.sheet_submit_for(int,int,jsonb,int) to authenticated;
