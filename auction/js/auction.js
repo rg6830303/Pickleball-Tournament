@@ -1189,9 +1189,9 @@
   // organiser publishes; these are the fallback so the form still draws when
   // that read fails on stadium wifi.
   const TS_SLOTS = [
-    { slot: 1, cells: 2, label: "AB / BB Doubles", note: "Your A with a B — or two B players when the A takes the singles" },
+    { slot: 1, cells: 2, label: "AB Doubles",      note: "Your Category A player with a Category B player" },
     { slot: 2, cells: 2, label: "BC Doubles",      note: "One Category B player with a Category C player" },
-    { slot: 3, cells: 1, label: "Singles",         note: "A single player — your A or a B" },
+    { slot: 3, cells: 1, label: "B Singles",       note: "A single Category B player" },
     { slot: 4, cells: 2, label: "BC Doubles",      note: "A second B + C pair — different players" },
     { slot: 5, cells: 2, label: "CC Doubles",      note: "Two Category C players" },
   ];
@@ -1279,17 +1279,13 @@
     });
     if (new Set(ids).size !== 9) return "Each player can only be named once";
 
-    const singles = catOf(at(3, 1));
-    if (singles !== "A" && singles !== "B")
-      return "The singles must be played by your A or a B — not a C";
+    // One legal shape now: the singles is a B, and match 1 is the A with a B.
+    if (catOf(at(3, 1)) !== "B")
+      return "The singles must be played by a Category B player";
 
     const one = [catOf(at(1, 1)), catOf(at(1, 2))];
-    if (singles === "A") {
-      if (one.filter((c) => c === "B").length !== 2)
-        return "Your A is playing the singles, so match 1 must be two B players";
-    } else if (!(one.includes("A") && one.includes("B"))) {
-      return "Match 1 must be your A with a B — your A is not in the singles";
-    }
+    if (!(one.includes("A") && one.includes("B")))
+      return "Match 1 must be your Category A player with a Category B player";
 
     for (const s of [2, 4]) {
       const cs = [catOf(at(s, 1)), catOf(at(s, 2))];

@@ -21,9 +21,9 @@
 
     /* the five matches of every tie, in the order they are played */
     tie: [
-      { slot: 1, label: "AB / BB Doubles", note: "Your A with a B — or two B players when the A takes the singles" },
+      { slot: 1, label: "AB Doubles", note: "Your Category A player with a Category B player" },
       { slot: 2, label: "BC Doubles", note: "One Category B player with a Category C player" },
-      { slot: 3, label: "Singles",    note: "A single player — your A or a B" },
+      { slot: 3, label: "B Singles",  note: "A single Category B player" },
       { slot: 4, label: "BC Doubles", note: "A second B + C pair — different players" },
       { slot: 5, label: "CC Doubles", note: "Two Category C players" },
     ],
